@@ -2,12 +2,31 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { ArrowLeft, Camera, User, Mail, Shield, Key, Save, Check } from 'lucide-react';
+import { ArrowLeft, Camera, User, Mail, Shield, Key, Save, Check, Globe, CreditCard } from 'lucide-react';
 
 const ProfileSettings = () => {
     const navigate = useNavigate();
     const { currentUser, updateUser } = useAuth();
-    const { appLanguage } = useLanguage();
+    const { appLanguage, setAppLanguage, serviceLanguages, setServiceLanguage, t, LANGUAGES } = useLanguage();
+
+    // ... (rest of state)
+
+    // Helper to render language options
+    const renderLanguageOptions = () => {
+        // Fallback if LANGUAGES is undefined
+        const langs = LANGUAGES || [
+            { code: 'de', label: 'Deutsch' },
+            { code: 'en', label: 'English' },
+            { code: 'tr', label: 'Türkçe' },
+            { code: 'fr', label: 'Français' },
+            { code: 'es', label: 'Español' }
+        ];
+        return langs.map(lang => (
+            <option key={lang.code} value={lang.code}>
+                {lang.flag ? `${lang.flag} ` : ''}{lang.label}
+            </option>
+        ));
+    };
 
     const [formData, setFormData] = useState({
         name: currentUser?.name || '',
@@ -15,75 +34,56 @@ const ProfileSettings = () => {
         role: currentUser?.role || 'Administrator',
         currentPassword: '',
         newPassword: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        stripePublicKey: currentUser?.stripePublicKey || '',
+        stripeSecretKey: currentUser?.stripeSecretKey || '',
+        paypalClientId: currentUser?.paypalClientId || ''
     });
     const [saved, setSaved] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleAvatarChange = (e) => {
+    const handleAvatarChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onloadend = () => {
+            reader.onloadend = async () => {
                 if (updateUser) {
-                    updateUser({ ...currentUser, avatar: reader.result });
+                    setIsLoading(true);
+                    await updateUser({ ...currentUser, avatar: reader.result });
+                    setIsLoading(false);
                 }
             };
             reader.readAsDataURL(file);
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (updateUser) {
-            updateUser({
+            setIsLoading(true);
+            const result = await updateUser({
                 ...currentUser,
                 name: formData.name,
                 email: formData.email,
-                role: formData.role
+                role: formData.role,
+                stripePublicKey: formData.stripePublicKey,
+                stripeSecretKey: formData.stripeSecretKey,
+                paypalClientId: formData.paypalClientId
             });
-        }
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-    };
+            setIsLoading(false);
 
-    const t = {
-        de: {
-            profileSettings: 'Profil bearbeiten',
-            back: 'Zurück zu Einstellungen',
-            personalInfo: 'Persönliche Informationen',
-            fullName: 'Vollständiger Name',
-            email: 'E-Mail-Adresse',
-            role: 'Rolle',
-            changeAvatar: 'Profilbild ändern',
-            security: 'Sicherheit',
-            currentPassword: 'Aktuelles Passwort',
-            newPassword: 'Neues Passwort',
-            confirmPassword: 'Passwort bestätigen',
-            saveChanges: 'Änderungen speichern',
-            saved: 'Gespeichert!'
-        },
-        tr: {
-            profileSettings: 'Profil Düzenle',
-            back: 'Ayarlara Geri Dön',
-            personalInfo: 'Kişisel Bilgiler',
-            fullName: 'Tam Ad',
-            email: 'E-posta Adresi',
-            role: 'Rol',
-            changeAvatar: 'Profil Resmini Değiştir',
-            security: 'Güvenlik',
-            currentPassword: 'Mevcut Şifre',
-            newPassword: 'Yeni Şifre',
-            confirmPassword: 'Şifreyi Onayla',
-            saveChanges: 'Değişiklikleri Kaydet',
-            saved: 'Kaydedildi!'
+            if (result.success) {
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+            } else {
+                alert(result.error || 'Update failed');
+            }
         }
     };
-
-    const text = t[appLanguage] || t.de;
 
     return (
         <div className="page-container">
@@ -93,17 +93,18 @@ const ProfileSettings = () => {
                         <ArrowLeft />
                     </button>
                     <div>
-                        <h1>{text.profileSettings}</h1>
-                        <p>{text.back}</p>
+                        <h1>{t('profileSettings') || (appLanguage === 'tr' ? 'Profil Ayarları' : 'Profileinstellungen')}</h1>
+                        <p>{t('backToSettings') || (appLanguage === 'tr' ? 'Ayarlara Geri Dön' : 'Zurück zu Einstellungen')}</p>
                     </div>
                 </div>
                 <button
                     className="primary-btn"
                     onClick={handleSave}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    disabled={isLoading}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '140px', justifyContent: 'center' }}
                 >
-                    {saved ? <Check size={20} /> : <Save size={20} />}
-                    {saved ? text.saved : text.saveChanges}
+                    {isLoading ? <span className="spinner" style={{ width: '18px', height: '18px' }}></span> : (saved ? <Check size={20} /> : <Save size={20} />)}
+                    {saved ? t('saved') : t('saveChanges') || (appLanguage === 'tr' ? 'Değişiklikleri Kaydet' : 'Änderungen speichern')}
                 </button>
             </header>
 
@@ -171,11 +172,11 @@ const ProfileSettings = () => {
                 <div className="settings-card card">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
                         <User size={22} color="var(--primary)" />
-                        <h3 style={{ margin: 0 }}>{text.personalInfo}</h3>
+                        <h3 style={{ margin: 0 }}>{t('personalInfo') || (appLanguage === 'tr' ? 'Kişisel Bilgiler' : 'Persönliche Informationen')}</h3>
                     </div>
 
                     <div className="form-group">
-                        <label>{text.fullName}</label>
+                        <label>{t('fullName')}</label>
                         <input
                             type="text"
                             className="form-input"
@@ -187,7 +188,7 @@ const ProfileSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label>{text.email}</label>
+                        <label>{t('email')}</label>
                         <div style={{ position: 'relative' }}>
                             <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                             <input
@@ -203,7 +204,7 @@ const ProfileSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label>{text.role}</label>
+                        <label>{t('role')}</label>
                         <div style={{ position: 'relative' }}>
                             <Shield size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                             <select
@@ -226,11 +227,11 @@ const ProfileSettings = () => {
                 <div className="settings-card card">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
                         <Key size={22} color="var(--primary)" />
-                        <h3 style={{ margin: 0 }}>{text.security}</h3>
+                        <h3 style={{ margin: 0 }}>{t('security') || (appLanguage === 'tr' ? 'Güvenlik' : 'Sicherheit')}</h3>
                     </div>
 
                     <div className="form-group">
-                        <label>{text.currentPassword}</label>
+                        <label>{t('currentPassword') || (appLanguage === 'tr' ? 'Mevcut Şifre' : 'Aktuelles Passwort')}</label>
                         <input
                             type="password"
                             className="form-input"
@@ -242,7 +243,7 @@ const ProfileSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label>{text.newPassword}</label>
+                        <label>{t('newPassword') || (appLanguage === 'tr' ? 'Yeni Şifre' : 'Neues Passwort')}</label>
                         <input
                             type="password"
                             className="form-input"
@@ -254,7 +255,7 @@ const ProfileSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label>{text.confirmPassword}</label>
+                        <label>{t('confirmPassword')}</label>
                         <input
                             type="password"
                             className="form-input"
@@ -263,6 +264,108 @@ const ProfileSettings = () => {
                             onChange={handleChange}
                             placeholder="••••••••"
                         />
+                    </div>
+                </div>
+
+
+
+                {/* Language & Region */}
+                <div className="settings-card card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem' }}>
+                        <Globe size={22} color="var(--primary)" />
+                        <h3 style={{ margin: 0 }}>{t('language') || (appLanguage === 'tr' ? 'Dil ve Bölge' : 'Sprache & Region')}</h3>
+                    </div>
+
+                    <div className="form-group">
+                        <label>{t('appLanguageLabel') || (appLanguage === 'tr' ? 'Uygulama Dili (Arayüz)' : 'Anwendungs-Sprache')}</label>
+                        <select
+                            className="form-input"
+                            value={appLanguage}
+                            onChange={(e) => setAppLanguage(e.target.value)}
+                        >
+                            {renderLanguageOptions()}
+                        </select>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            {appLanguage === 'tr' ? 'Menüler ve butonlar bu dilde görünecektir.' : 'Menüs und Schaltflächen werden in dieser Sprache angezeigt.'}
+                        </p>
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: 'var(--text-main)' }}>
+                            {appLanguage === 'tr' ? 'Hizmet Dilleri (Panel Bazlı)' : 'Service-Sprachen (Panel-basiert)'}
+                        </h4>
+
+                        {/* Invoicing Panel */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <label style={{ fontSize: '0.9rem' }}>Fatura & Muhasebe (Rechnung)</label>
+                                <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '12px' }}>Varsayılan: DE</span>
+                            </div>
+                            <select
+                                className="form-input"
+                                value={serviceLanguages?.invoicing || 'de'}
+                                onChange={(e) => setServiceLanguage('invoicing', e.target.value)}
+                            >
+                                {renderLanguageOptions()}
+                            </select>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {appLanguage === 'tr' ? 'Müşteriye kesilen fatura ve teklif dili.' : 'Sprache für Rechnungen und Angebote an Kunden.'}
+                            </p>
+                        </div>
+
+                        {/* Appointment Panel */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <label style={{ fontSize: '0.9rem' }}>Randevu Sistemi</label>
+                                <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: '#fef3c7', color: '#b45309', borderRadius: '12px' }}>Varsayılan: TR</span>
+                            </div>
+                            <select
+                                className="form-input"
+                                value={serviceLanguages?.appointments || 'tr'}
+                                onChange={(e) => setServiceLanguage('appointments', e.target.value)}
+                            >
+                                {renderLanguageOptions()}
+                            </select>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {appLanguage === 'tr' ? 'Müşteriye gönderilen SMS ve bildirim dili.' : 'Sprache für SMS und Benachrichtigungen an Kunden.'}
+                            </p>
+                        </div>
+
+                        {/* Stock Panel */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <label style={{ fontSize: '0.9rem' }}>Stok & Satış Yönetimi</label>
+                                <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: '#dcfce7', color: '#166534', borderRadius: '12px' }}>Varsayılan: EN</span>
+                            </div>
+                            <select
+                                className="form-input"
+                                value={serviceLanguages?.stock || 'en'}
+                                onChange={(e) => setServiceLanguage('stock', e.target.value)}
+                            >
+                                {renderLanguageOptions()}
+                            </select>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {appLanguage === 'tr' ? 'Ürün etiketleri ve mağaza dili.' : 'Sprache für Produktetiketten und Shop.'}
+                            </p>
+                        </div>
+
+                        {/* Website Panel */}
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <label style={{ fontSize: '0.9rem' }}>Website & CMS</label>
+                                <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: '#f3e8ff', color: '#6b21a8', borderRadius: '12px' }}>Varsayılan: EN</span>
+                            </div>
+                            <select
+                                className="form-input"
+                                value={serviceLanguages?.website || 'en'}
+                                onChange={(e) => setServiceLanguage('website', e.target.value)}
+                            >
+                                {renderLanguageOptions()}
+                            </select>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                {appLanguage === 'tr' ? 'Web sitenizin varsayılan ziyaretçi dili.' : 'Standardsprache für Besucher Ihrer Website.'}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
