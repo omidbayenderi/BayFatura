@@ -8,7 +8,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import '../index.css';
 
 const Archive = () => {
-    const { invoices, deleteInvoice, STATUSES, companyProfile } = useInvoice();
+    const { invoices, deleteInvoice, updateInvoiceStatus, STATUSES, companyProfile } = useInvoice();
     const { t, appLanguage } = useLanguage();
     const navigate = useNavigate();
     const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -88,16 +88,31 @@ const Archive = () => {
                                         {new Intl.NumberFormat('de-DE', { style: 'currency', currency: inv.currency || 'EUR' }).format(inv.total)}
                                     </td>
                                     <td>
-                                        <span className="badge" style={{
-                                            backgroundColor: (STATUSES[inv.status] || STATUSES.draft).color + '20',
-                                            color: (STATUSES[inv.status] || STATUSES.draft).color,
-                                            padding: '4px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '12px',
-                                            fontWeight: '600'
-                                        }}>
-                                            {t(inv.status || 'draft')}
-                                        </span>
+                                        <select
+                                            className="status-select"
+                                            value={inv.status || 'draft'}
+                                            onChange={(e) => updateInvoiceStatus(inv.id, e.target.value)}
+                                            style={{
+                                                backgroundColor: (STATUSES[inv.status || 'draft'] || STATUSES.draft).color + '20',
+                                                color: (STATUSES[inv.status || 'draft'] || STATUSES.draft).color,
+                                                borderColor: 'transparent',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
+                                                appearance: 'none',
+                                                WebkitAppearance: 'none',
+                                                textAlign: 'center',
+                                                minWidth: '80px'
+                                            }}
+                                        >
+                                            <option value="draft">{t('draft')}</option>
+                                            <option value="sent">{t('sent')}</option>
+                                            <option value="paid">{t('paid')}</option>
+                                            <option value="partial">{t('partial')}</option>
+                                            <option value="overdue">{t('overdue')}</option>
+                                        </select>
                                     </td>
                                     <td>
                                         <div className="table-actions">

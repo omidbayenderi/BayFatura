@@ -13,6 +13,11 @@
   --danger: #ef4444;
 
   --bg-body: #f8fafc;
+
+  /* Invoice Customization Defaults */
+  --invoice-primary: #8B5CF6;
+  --invoice-accent-bg: #f1f5f9;
+
   --bg-card: #ffffff;
   --bg-sidebar: #1e293b;
 
@@ -376,6 +381,82 @@ label {
   color: var(--text-muted);
 }
 
+/* Digital Signature Management */
+.signature-overlay-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.signature-action-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.signature-action-btn:hover {
+  background: #dc2626;
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.signature-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.signature-action-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.signature-action-option:hover {
+  border-color: var(--primary);
+  background: #f8fafc;
+}
+
+.signature-action-option.delete:hover {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.signature-action-option i,
+.signature-action-option svg {
+  color: var(--primary);
+}
+
+.signature-action-option.delete i,
+.signature-action-option.delete svg {
+  color: #ef4444;
+}
+
 /* --- Tables --- */
 .modern-table {
   width: 100%;
@@ -661,6 +742,7 @@ label {
   font-size: 2.2rem;
   font-weight: 800;
   letter-spacing: -1px;
+  color: var(--invoice-primary);
 }
 
 /* Metadata: Two Columns */
@@ -718,7 +800,7 @@ label {
 }
 
 .invoice-items-table-clean th {
-  background: #f1f5f9;
+  background: var(--invoice-accent-bg, #f1f5f9);
   border: 1px solid #e2e8f0;
   padding: 10px;
   text-align: left;
@@ -743,7 +825,49 @@ label {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  /* Margin moved to parent wrapper .invoice-summary-section */
+}
+
+.invoice-summary-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
   margin-bottom: 40px;
+  page-break-inside: avoid;
+}
+
+.invoice-signature-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 200px;
+  padding-bottom: 2px;
+}
+
+.signature-image {
+  height: 60px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 4px;
+}
+
+.signature-placeholder {
+  height: 50px;
+  width: 100%;
+}
+
+.signature-line {
+  width: 100%;
+  height: 1px;
+  background-color: #000;
+  margin-bottom: 4px;
+}
+
+.signature-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #333;
+  margin: 0;
 }
 
 .totals-row-clean {
@@ -765,7 +889,7 @@ label {
 /* Grey Footer Block */
 .invoice-bottom-footer-block {
   margin-top: auto;
-  background: #f1f5f9;
+  background: var(--invoice-accent-bg, #f1f5f9);
   /* Break out of parent padding */
   margin-left: -15mm;
   margin-right: -15mm;
@@ -823,98 +947,84 @@ label {
   text-transform: uppercase;
 }
 
-/* --- Original Print Styles Restore --- */
-@media print {
-  @page {
-    /* Eliminates browser headers/footers (Title, URL, Date) */
-    margin: 0;
-    size: auto;
-  }
-
-  html,
-  body {
-    background: white !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    height: auto !important;
-    overflow: visible !important;
-  }
-
-  /* Hide ALL normal UI elements & potential persistent headers */
-  .sidebar,
-  .page-header,
-  .mobile-header,
-  .no-print,
-  .btn,
-  button,
-  .actions,
-  .editor-layout,
-  .floating-actions,
-  .page-title,
-  .page-subtitle,
-  .input-section,
-  .form-group,
-  .card,
-  nav,
-  header,
-  .modal-overlay {
-    display: none !important;
-  }
-
-  /* Reset Page Container logic for print */
-  .page-container {
-    padding: 0 !important;
-    margin: 0 !important;
-    max-width: none !important;
-    width: 100% !important;
-    height: auto !important;
-  }
-
-  .main-content {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-  }
-
-  /* Reveal and Position the Hidden Print Container */
-  .hidden-print-container {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    display: block !important;
-    width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    z-index: 9999;
-  }
-
-  /* Ensure Invoice Paper fills the page properly */
-  .invoice-paper-wrapper {
-    width: 210mm !important;
-    /* Use min-height to ensure full A4 look, but allow auto to fit content if user prefers no extra whitespace (though invoices usually fixed A4) */
-    min-height: 297mm !important;
-    box-shadow: none !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    background: white !important;
-    print-color-adjust: exact !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .invoice-paper {
-    padding: 15mm !important;
-  }
-
-  .invoice-items-table-clean th {
-    background-color: #f1f5f9 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+.print-footer-number {
+  display: none;
 }
+
+/* --- Original Print Styles Restore --- */
+/* --- Advanced Multi-Page Layout (Screen & Print) --- */
+.print-page {
+  position: relative !important;
+  width: 210mm !important;
+  min-width: 210mm !important;
+  height: 296.8mm !important;
+  /* Slightly smaller than 297mm to avoid browser rounding issues */
+  min-height: 296.8mm !important;
+  padding: 12mm 15mm !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background: white !important;
+  margin: 0 auto !important;
+  /* Center without extra screen spacing */
+  box-shadow: none !important;
+  /* Remove heavy shadow */
+  border-bottom: 2px dashed #e2e8f0 !important;
+  /* Discrete page separator for screen only */
+  page-break-after: always !important;
+  page-break-inside: avoid !important;
+}
+
+.print-page:last-child {
+  border-bottom: none !important;
+}
+
+/* Ensure the wrapper doesn't Clip the A4 pages on screen */
+.view-layout {
+  padding: 0 !important;
+  background: white !important;
+  /* Clean neutral background */
+  min-height: 100vh;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  overflow-x: auto !important;
+}
+
+.invoice-paper-wrapper {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Absolute Footer Logic (Screen & Print) */
+.invoice-bottom-footer-block {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin: 0 !important;
+  padding: 10mm 15mm !important;
+  background: #f1f5f9 !important;
+  height: auto !important;
+  min-height: 45mm !important;
+}
+
+.print-footer-xy {
+  position: absolute !important;
+  bottom: 5mm;
+  right: 15mm;
+  font-size: 9pt;
+  color: #64748b;
+  z-index: 10001;
+}
+
+/* Print styles moved to end of file for priority */
 
 .invoice-table td {
   padding: 6px 10px;
@@ -1136,11 +1246,10 @@ label {
   }
 
   .view-layout {
-    padding: 8px !important;
+    padding: 0 !important;
     min-height: 400px;
-    background: #cbd5e1 !important;
+    background: white !important;
     display: block !important;
-    /* Allow scroll */
   }
 
   /* Adjust chart for mobile */
@@ -1524,6 +1633,30 @@ textarea.input {
   color: var(--text-main);
 }
 
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
 .confirm-dialog {
   max-width: 400px;
   padding: 32px;
@@ -1572,4 +1705,164 @@ textarea.input {
 
 .btn-danger:hover {
   background: #dc2626;
+}
+
+/* --- ABSOLUTE FINAL PRINT OVERRIDES --- */
+@media print {
+  @page {
+    margin: 0 !important;
+    size: A4 portrait !important;
+  }
+
+  /* KILL ALL TRANSFORMS AND ZOOM WITH HIGH SPECIFICITY */
+  html,
+  body,
+  #root,
+  .app-layout,
+  .main-content,
+  .page-container,
+  .view-layout,
+  .content-wrapper,
+  .invoice-paper-wrapper {
+    transform: none !important;
+    zoom: normal !important;
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Specifically target the mobile scale that was causing the A6 issue */
+  body .view-layout .invoice-paper-wrapper,
+  body .invoice-paper-wrapper {
+    transform: none !important;
+    width: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+
+  /* Specifically target children to ensure visibility */
+  body .invoice-paper-wrapper * {
+    visibility: visible !important;
+  }
+
+  /* Hide UI elements definitely */
+  .sidebar,
+  .mobile-header,
+  .page-header,
+  .floating-actions,
+  .btn,
+  button,
+  .no-print,
+  .sidebar-overlay,
+  nav {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Neutralize all layout containers to be transparent flow boxes */
+  #root,
+  .app-layout,
+  .main-content,
+  .page-container,
+  .view-layout {
+    display: block !important;
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .content-wrapper {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 210mm !important;
+  }
+
+  /* The wrapper must flow naturally for multi-page support */
+  .invoice-paper-wrapper {
+    display: block !important;
+    width: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    position: relative !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .print-page {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 210mm !important;
+    height: 296.8mm !important;
+    min-height: 296.8mm !important;
+    padding: 12mm 15mm 45mm 15mm !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    overflow: hidden !important;
+    background: white !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    border: none !important;
+    margin: 0 !important;
+    visibility: visible !important;
+  }
+
+  .print-page:last-child {
+    page-break-after: avoid !important;
+  }
+
+  /* Footer absolute anchoring */
+  .invoice-bottom-footer-block {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: var(--invoice-accent-bg, #f1f5f9) !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 40mm !important;
+    padding: 5mm 15mm !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    visibility: visible !important;
+  }
+
+  .print-footer-xy {
+    display: block !important;
+    position: absolute !important;
+    bottom: 3mm !important;
+    right: 15mm !important;
+    font-size: 9pt !important;
+    color: #64748b !important;
+    z-index: 100 !important;
+    visibility: visible !important;
+  }
+
+  .invoice-items-table-clean th {
+    background-color: var(--invoice-accent-bg, #f1f5f9) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }

@@ -12,8 +12,8 @@ export const useStripeCheckout = () => {
             const { data, error } = await supabase.functions.invoke('create-checkout-session', {
                 body: {
                     priceId,
-                    successUrl: import.meta.env.VITE_SUCCESS_URL || window.location.origin + '/BayRechnung/success',
-                    cancelUrl: import.meta.env.VITE_CANCEL_URL || window.location.origin + '/BayRechnung/',
+                    successUrl: import.meta.env.VITE_SUCCESS_URL || window.location.origin + '/BayFatura/success',
+                    cancelUrl: import.meta.env.VITE_CANCEL_URL || window.location.origin + '/BayFatura/',
                 },
             });
 

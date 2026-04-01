@@ -1,69 +1,91 @@
-import React, { useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useRef, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInvoice } from '../context/InvoiceContext';
 import InvoicePaper from '../components/InvoicePaper';
-import { Printer, ArrowLeft, Trash2 } from 'lucide-react';
+import { Printer, ArrowLeft, Trash2, ArrowRightCircle, Edit, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const InvoiceView = () => {
+const InvoiceView = ({ type = 'invoice' }) => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { invoices, deleteInvoice, companyProfile } = useInvoice();
+    const { invoices, quotes, deleteInvoice, deleteQuote, saveInvoice, companyProfile } = useInvoice();
     const { t } = useLanguage();
 
-    const invoice = invoices.find(inv => inv.id === Number(id) || inv.id === id);
+    const list = type === 'quote' ? quotes : invoices;
+    const invoice = list.find(inv => inv.id === Number(id) || inv.id === id);
     const invoiceRef = useRef();
+
+    const [searchParams] = useSearchParams();
+    const shouldAutoPrint = searchParams.get('autoprint') === 'true';
+
+    useEffect(() => {
+        if (shouldAutoPrint && invoice) {
+            // Small delay to ensure rendering is complete
+            const timer = setTimeout(() => {
+                window.print();
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+    }, [shouldAutoPrint, invoice]);
 
     if (!invoice) {
         return (
             <div className="page-container">
                 <div className="empty-state">
-                    <h2>{t('invoiceNotFound')}</h2>
-                    <button className="primary-btn" onClick={() => navigate('/archive')}>{t('backToArchive')}</button>
+                    <h2>{type === 'quote' ? t('quoteNotFound') : t('invoiceNotFound')}</h2>
+                    <button className="primary-btn" onClick={() => navigate(type === 'quote' ? '/quotes' : '/archive')}>
+                        {type === 'quote' ? t('backToQuotes') : t('backToArchive')}
+                    </button>
                 </div>
             </div>
         );
     }
 
-    const handleDownloadPdf = async () => {
-        const element = invoiceRef.current;
-        if (!element) return;
-
-        try {
-            const canvas = await html2canvas(element, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
-            });
-
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`Rechnung_${invoice.invoiceNumber}.pdf`);
-        } catch (error) {
-            console.error('PDF generation failed:', error);
-            window.print(); // Fallback to window.print if jsPDF fails
-        }
+    const handlePrint = () => {
+        window.print();
     };
 
     const handleDelete = () => {
         if (window.confirm(t('delete') + '?')) {
-            const deleted = deleteInvoice(invoice.id);
+            const deleteFunc = type === 'quote' ? deleteQuote : deleteInvoice;
+            const deleted = deleteFunc(invoice.id);
             if (deleted) {
-                navigate('/archive');
+                navigate(type === 'quote' ? '/quotes' : '/archive');
             }
         }
+    };
+
+    const handleConvert = () => {
+        // Destructure to separate ID and type from rest of data
+        const { id, type: oldType, ...rest } = invoice;
+
+        // Create new invoice object
+        const newInvoiceData = {
+            ...rest,
+            status: 'draft',
+            type: 'invoice',
+            footerNote: '',
+            // Generate a new Invoice Number
+            invoiceNumber: new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 1000)).padStart(4, '0'),
+            date: new Date().toISOString().split('T')[0], // Reset date to today
+            createdAt: new Date().toISOString()
+        };
+
+        // Save as new invoice
+        const savedInvoice = saveInvoice(newInvoiceData);
+
+        // Navigate to edit the new invoice
+        setTimeout(() => {
+            navigate(`/invoice/${savedInvoice.id}/edit`);
+        }, 300);
     };
 
     const sender = invoice.senderSnapshot || {};
 
     const paperData = {
+        type: type, // Force type from prop to ensure correct title (Quote vs Invoice)
         logo: companyProfile.logo || sender.logo, // Use current logo
         senderCompany: companyProfile.companyName || sender.companyName,
         senderStreet: companyProfile.street || sender.street,
@@ -95,10 +117,14 @@ const InvoiceView = () => {
 
         invoiceNumber: invoice.invoiceNumber,
         date: invoice.date,
+        currency: invoice.currency || 'EUR',
+
+        // Industry Specific Data from nesting
+        ...(invoice.industryData || {}),
+        // Backward compatibility for old flattened invoices
         vehicle: invoice.vehicle,
         plate: invoice.plate,
         km: invoice.km,
-        currency: invoice.currency || 'EUR',
 
         items: invoice.items || [],
 
@@ -120,16 +146,42 @@ const InvoiceView = () => {
                         <ArrowLeft />
                     </button>
                     <div>
-                        <h1>{t('invoiceDetails')}</h1>
+                        <h1>{type === 'quote' ? (t('quoteDetails') || 'Angebot Details') : (t('invoiceDetails') || 'Rechnung Details')}</h1>
                         <p>{invoice.invoiceNumber} - {invoice.recipientName}</p>
                     </div>
                 </div>
                 <div className="actions" style={{ display: 'flex', gap: '12px' }}>
+                    <a
+                        href={`https://wa.me/?text=${encodeURIComponent(
+                            `${t('hello') || 'Merhaba'} ${invoice.recipientName},\n\n` +
+                            `${t('invoiceReadyMsg') || 'Faturanız hazırdır.'} ` +
+                            `${t('invoiceNumber')}: ${invoice.invoiceNumber}\n` +
+                            `${t('total')}: ${new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency || 'EUR' }).format(invoice.total || 0)}\n\n` +
+                            `${window.location.href}`
+                        )}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="primary-btn"
+                        style={{ backgroundColor: '#25D366', display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+                    >
+                        <MessageCircle size={20} />
+                        WhatsApp
+                    </a>
+                    {type === 'quote' && (
+                        <button className="primary-btn" onClick={handleConvert} style={{ backgroundColor: '#10b981' }}>
+                            <ArrowRightCircle size={20} />
+                            {t('convertToInvoice') || 'In Rechnung umwandeln'}
+                        </button>
+                    )}
+                    <button className="secondary-btn" onClick={() => navigate(`/${type}/${invoice.id}/edit`)}>
+                        <Edit size={20} />
+                        {t('edit')}
+                    </button>
                     <button className="secondary-btn delete-hover" onClick={handleDelete} style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>
                         <Trash2 size={20} />
                         {t('delete')}
                     </button>
-                    <button className="primary-btn" onClick={handleDownloadPdf}>
+                    <button className="primary-btn" onClick={handlePrint}>
                         <Printer size={20} />
                         {t('printPdf')}
                     </button>
@@ -179,11 +231,7 @@ const InvoiceView = () => {
                 </div>
             )}
 
-            <div className="view-layout no-print" style={{ overflow: 'auto', display: 'flex', justifyContent: 'center' }}>
-                <InvoicePaper data={paperData} totals={paperTotals} />
-            </div>
-
-            <div className="hidden-print-container">
+            <div className="view-layout">
                 <InvoicePaper ref={invoiceRef} data={paperData} totals={paperTotals} />
             </div>
         </div>

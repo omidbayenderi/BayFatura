@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useInvoice } from '../context/InvoiceContext';
-import { Plus, Trash2, Download, Receipt } from 'lucide-react';
+import { Plus, Trash2, Download, Receipt, Camera, Image as ImageIcon, X, Eye } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 const Expenses = () => {
@@ -17,11 +17,13 @@ const Expenses = () => {
     const [showForm, setShowForm] = useState(false);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [viewReceipt, setViewReceipt] = useState(null); // For modal
     const [formData, setFormData] = useState({
         title: '',
         amount: '',
         category: 'spareParts',
-        currency: 'EUR'
+        currency: 'EUR',
+        receiptImage: null
     });
 
     const handleSubmit = (e) => {
@@ -30,7 +32,7 @@ const Expenses = () => {
             ...formData,
             amount: parseFloat(formData.amount)
         });
-        setFormData({ title: '', amount: '', category: 'spareParts', currency: 'EUR' });
+        setFormData({ title: '', amount: '', category: 'spareParts', currency: 'EUR', receiptImage: null });
         setShowForm(false);
     };
 
@@ -40,6 +42,17 @@ const Expenses = () => {
             setFormData(prev => ({ ...prev, category: newCategoryName.trim() }));
             setNewCategoryName('');
             setIsAddingCategory(false);
+        }
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => ({ ...prev, receiptImage: reader.result }));
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -138,7 +151,49 @@ const Expenses = () => {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Bill Scanner / Image Upload Section */}
+                            <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <label>Bill Scanner / Beleg</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                    <label className="secondary-btn" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Camera size={18} />
+                                        <span>Scan / Upload</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment" // Hints mobile browsers to use camera
+                                            style={{ display: 'none' }}
+                                            onChange={handleImageChange}
+                                        />
+                                    </label>
+                                    {formData.receiptImage && (
+                                        <div style={{ position: 'relative', height: '40px', width: '40px' }}>
+                                            <img
+                                                src={formData.receiptImage}
+                                                alt="Receipt"
+                                                style={{ height: '100%', width: '100%', objectFit: 'cover', borderRadius: '4px', border: '1px solid #e2e8f0' }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, receiptImage: null }))}
+                                                style={{
+                                                    position: 'absolute', top: '-6px', right: '-6px',
+                                                    background: 'var(--danger)', color: 'white',
+                                                    borderRadius: '50%', border: 'none',
+                                                    width: '16px', height: '16px',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    cursor: 'pointer', fontSize: '10px'
+                                                }}
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
+
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '1rem' }}>
                             <button type="button" className="secondary-btn" onClick={() => setShowForm(false)}>{t('cancel')}</button>
                             <button type="submit" className="primary-btn">{t('save')}</button>
@@ -154,6 +209,7 @@ const Expenses = () => {
                             <th>{t('date')}</th>
                             <th>{t('category')}</th>
                             <th>{t('description')}</th>
+                            <th style={{ textAlign: 'center' }}>Beleg</th>
                             <th style={{ textAlign: 'right' }}>{t('amount')}</th>
                             <th style={{ textAlign: 'right' }}>{t('actions')}</th>
                         </tr>
@@ -164,6 +220,20 @@ const Expenses = () => {
                                 <td>{new Date(exp.date).toLocaleDateString('de-DE')}</td>
                                 <td><span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>{t(exp.category)}</span></td>
                                 <td><strong>{exp.title}</strong></td>
+                                <td style={{ textAlign: 'center' }}>
+                                    {exp.receiptImage ? (
+                                        <button
+                                            className="icon-btn"
+                                            title="View Receipt"
+                                            onClick={() => setViewReceipt(exp.receiptImage)}
+                                            style={{ color: 'var(--primary)' }}
+                                        >
+                                            <Receipt size={18} />
+                                        </button>
+                                    ) : (
+                                        <span style={{ color: '#cbd5e1' }}>-</span>
+                                    )}
+                                </td>
                                 <td style={{ textAlign: 'right', fontWeight: '600', color: 'var(--danger)' }}>
                                     - {new Intl.NumberFormat('de-DE', { style: 'currency', currency: exp.currency || 'EUR' }).format(exp.amount)}
                                 </td>
@@ -176,7 +246,7 @@ const Expenses = () => {
                         ))}
                         {expenses.length === 0 && (
                             <tr>
-                                <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                                     <Receipt size={40} style={{ marginBottom: '12px', opacity: 0.3 }} /><br />
                                     {t('noData')}
                                 </td>
@@ -185,6 +255,32 @@ const Expenses = () => {
                     </tbody>
                 </table>
             </div>
+
+            {/* Receipt Modal */}
+            {viewReceipt && (
+                <div className="modal-overlay" onClick={() => setViewReceipt(null)}>
+                    <div className="modal-content" style={{ maxWidth: '500px', width: '90%', padding: '0', background: 'transparent', boxShadow: 'none' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ position: 'relative' }}>
+                            <img
+                                src={viewReceipt}
+                                alt="Receipt Full"
+                                style={{ width: '100%', height: 'auto', borderRadius: '8px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}
+                            />
+                            <button
+                                onClick={() => setViewReceipt(null)}
+                                style={{
+                                    position: 'absolute', top: '-12px', right: '-12px',
+                                    background: 'white', border: 'none', borderRadius: '50%',
+                                    width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

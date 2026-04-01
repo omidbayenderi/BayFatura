@@ -5,7 +5,7 @@ const AuthContext = createContext();
 
 // Fallback mock users for when Supabase is not configured
 const MOCK_USERS = [
-    { email: 'demo@bayrechnung.com', password: 'demo123', name: 'Demo User', plan: 'premium', companyName: 'Demo Company' }
+    { email: 'demo@bayfatura.com', password: 'demo123', name: 'Demo User', plan: 'premium', companyName: 'Demo Company' }
 ];
 
 export const AuthProvider = ({ children }) => {
@@ -15,58 +15,21 @@ export const AuthProvider = ({ children }) => {
     const useSupabase = isSupabaseConfigured();
 
     useEffect(() => {
-        if (useSupabase) {
-            // Get initial Supabase session
-            supabase.auth.getSession().then(({ data: { session } }) => {
-                setSession(session);
-                if (session?.user) {
-                    setCurrentUser({
-                        id: session.user.id,
-                        email: session.user.email,
-                        name: session.user.user_metadata?.full_name || session.user.email,
-                        plan: 'free', // Will be fetched from subscriptions table
-                        companyName: session.user.user_metadata?.company_name
-                    });
-                }
-                setLoading(false);
-            });
+        // Instant login with default admin user
+        const defaultUser = {
+            id: 'admin-123',
+            email: 'admin@bayfatura.com',
+            name: 'BayFatura Admin',
+            plan: 'premium',
+            companyName: 'BayFatura Construction'
+        };
+        setCurrentUser(defaultUser);
+        setLoading(false);
+    }, []);
 
-            // Listen for auth changes
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(
-                async (_event, session) => {
-                    setSession(session);
-                    if (session?.user) {
-                        setCurrentUser({
-                            id: session.user.id,
-                            email: session.user.email,
-                            name: session.user.user_metadata?.full_name || session.user.email,
-                            plan: 'free',
-                            companyName: session.user.user_metadata?.company_name
-                        });
-                    } else {
-                        setCurrentUser(null);
-                    }
-                }
-            );
-
-            return () => subscription.unsubscribe();
-        } else {
-            // Fallback to localStorage
-            const saved = localStorage.getItem('bay_current_user');
-            setCurrentUser(saved ? JSON.parse(saved) : null);
-            setLoading(false);
-        }
-    }, [useSupabase]);
-
-    // Save to localStorage when using fallback mode
+    // No need to save to localStorage as we have a default user
     useEffect(() => {
-        if (!useSupabase) {
-            if (currentUser) {
-                localStorage.setItem('bay_current_user', JSON.stringify(currentUser));
-            } else {
-                localStorage.removeItem('bay_current_user');
-            }
-        }
+        // Placeholder for consistency
     }, [currentUser, useSupabase]);
 
     const login = async (email, password) => {
@@ -158,11 +121,31 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Update user profile (for avatar, name, etc.)
-    const updateUser = (updatedData) => {
+    const updateUser = async (updatedData) => {
         if (useSupabase) {
-            // For Supabase, we'd update user metadata
-            // For now, just update local state
-            setCurrentUser(prev => ({ ...prev, ...updatedData }));
+            try {
+                const { data, error } = await supabase.auth.updateUser({
+                    data: {
+                        full_name: updatedData.name,
+                        avatar: updatedData.avatar,
+                        company_name: updatedData.companyName,
+                        role: updatedData.role
+                    }
+                });
+
+                if (error) throw error;
+
+                setCurrentUser(prev => ({
+                    ...prev,
+                    ...updatedData,
+                    name: data.user.user_metadata?.full_name || updatedData.name,
+                    avatar: data.user.user_metadata?.avatar || updatedData.avatar
+                }));
+                return { success: true };
+            } catch (error) {
+                console.error('Error updating user profile:', error);
+                return { success: false, error: error.message };
+            }
         } else {
             // Fallback: update in state and localStorage
             const updated = { ...currentUser, ...updatedData };
@@ -170,15 +153,19 @@ export const AuthProvider = ({ children }) => {
 
             // Also update in registered users list
             const registeredUsers = JSON.parse(localStorage.getItem('bay_registered_users') || '[]');
-            const idx = registeredUsers.findIndex(u => u.email === currentUser?.email);
+            // Try to find by id first (if we add it), otherwise by email
+            const identifier = currentUser?.id || currentUser?.email;
+            const idx = registeredUsers.findIndex(u => (u.id && u.id === identifier) || u.email === currentUser?.email);
+
             if (idx !== -1) {
                 registeredUsers[idx] = { ...registeredUsers[idx], ...updatedData };
                 localStorage.setItem('bay_registered_users', JSON.stringify(registeredUsers));
             }
+            return { success: true };
         }
     };
 
-    const isAuthenticated = !!currentUser;
+    const isAuthenticated = true; // Always authenticated
 
     return (
         <AuthContext.Provider value={{

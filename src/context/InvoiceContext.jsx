@@ -4,28 +4,28 @@ const InvoiceContext = createContext();
 
 const INITIAL_COMPANY_PROFILE = {
     logo: null,
-    companyName: 'SH Autoservice',
+    companyName: 'SH Bau & Construction',
     owner: 'Omid Bayenderi',
     street: 'Schillerstraße',
     houseNum: '2',
     zip: '37269',
     city: 'Eschwege',
     phone: '+49 (0) 176 841 500 97',
-    email: 'shautoservice.2025@gmail.com',
+    email: 'shbau.2026@gmail.com',
     taxId: '123/456/7890',
     vatId: 'DE123456789',
     bankName: 'Deutsche Bank',
     iban: 'DE73 5227 0024 0859 6561 00',
     bic: '', // e.g. DEUTDEDB522
-    paymentTerms: 'Zahlbar innerhalb von 14 Tagen ohne Abzug. \nZahlungsart: Bar',
+    paymentTerms: 'Zahlbar innerhalb von 14 Tagen ohne Abzug. \nZahlungsart: Überweisung / Bar',
     defaultCurrency: 'EUR',
     defaultTaxRate: 19,
     paypalMe: '', // e.g. https://paypal.me/user
     stripeLink: '', // e.g. https://buy.stripe.com/test
 
     // Premium Configuration
-    plan: 'standard', // 'standard' or 'premium'
-    industry: 'automotive', // 'automotive' or 'general'
+    plan: 'premium', // Default to premium for this demo
+    industry: 'general', // Default to general
     logoDisplayMode: 'both', // 'logoOnly', 'nameOnly', 'both'
     stripeApiKey: '',
     stripeWebhookSecret: '',
@@ -43,6 +43,12 @@ export const InvoiceProvider = ({ children }) => {
     // State: Invoice Archive
     const [invoices, setInvoices] = useState(() => {
         const saved = localStorage.getItem('bay_invoices');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    // State: Quotes
+    const [quotes, setQuotes] = useState(() => {
+        const saved = localStorage.getItem('bay_quotes');
         return saved ? JSON.parse(saved) : [];
     });
 
@@ -71,6 +77,7 @@ export const InvoiceProvider = ({ children }) => {
         return saved ? JSON.parse(saved) : {
             primaryColor: '#8B5CF6',
             accentColor: '#6366F1',
+            brandPalette: [], // Colors extracted from logo
             signatureUrl: null,
             footerText: '',
             quoteValidityDays: 30
@@ -83,6 +90,16 @@ export const InvoiceProvider = ({ children }) => {
         return saved ? JSON.parse(saved) : [];
     });
 
+    // State: Employees / Users
+    const [employees, setEmployees] = useState(() => {
+        const saved = localStorage.getItem('bay_employees');
+        return saved ? JSON.parse(saved) : [
+            { id: 1, name: INITIAL_COMPANY_PROFILE.owner, email: INITIAL_COMPANY_PROFILE.email, role: 'Admin', sites: ['All Sites'], status: 'Active' },
+            { id: 2, name: 'Ahmet Yılmaz', email: 'ahmet@firma.com', role: 'Site Lead', sites: ['Site A'], status: 'Active' },
+            { id: 3, name: 'Mehmet Demir', email: 'mehmet@firma.com', role: 'Accountant', sites: ['HQ'], status: 'Active' }
+        ];
+    });
+
     // Save Profile
     useEffect(() => {
         localStorage.setItem('bay_profile', JSON.stringify(companyProfile));
@@ -92,6 +109,11 @@ export const InvoiceProvider = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('bay_invoices', JSON.stringify(invoices));
     }, [invoices]);
+
+    // Save Quotes
+    useEffect(() => {
+        localStorage.setItem('bay_quotes', JSON.stringify(quotes));
+    }, [quotes]);
 
     // Save Expenses
     useEffect(() => {
@@ -117,6 +139,26 @@ export const InvoiceProvider = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('bay_payment_reminders', JSON.stringify(paymentReminders));
     }, [paymentReminders]);
+
+    // Save Employees
+    useEffect(() => {
+        localStorage.setItem('bay_employees', JSON.stringify(employees));
+    }, [employees]);
+
+    // State: Messages
+    const [messages, setMessages] = useState(() => {
+        const saved = localStorage.getItem('bay_messages');
+        return saved ? JSON.parse(saved) : [
+            { id: 1, type: 'alert', title: 'Daily Report Missing', message: 'Şantiye Kuzey hasn\'t submitted today\'s report.', time: new Date().toISOString(), status: 'unread', sender: 'System', category: 'system' },
+            { id: 2, type: 'message', title: 'New Feedback', message: 'Materials arrived on site.', time: new Date(Date.now() - 86400000).toISOString(), status: 'read', sender: 'Ahmet Yılmaz', category: 'internal' },
+            { id: 3, type: 'message', title: 'Invoice Inquiry', message: 'Can you please send the invoice for last week\'s service?', time: new Date(Date.now() - 172800000).toISOString(), status: 'unread', sender: 'Müller Bau GmbH', category: 'customer' }
+        ];
+    });
+
+    // Save Messages
+    useEffect(() => {
+        localStorage.setItem('bay_messages', JSON.stringify(messages));
+    }, [messages]);
 
     const addExpenseCategory = (newCategory) => {
         if (!newCategory) return;
@@ -145,6 +187,28 @@ export const InvoiceProvider = ({ children }) => {
         const idStr = String(id);
         setInvoices(prev => prev.filter(inv => String(inv.id) !== idStr));
         return true;
+    };
+
+    const saveQuote = (quoteData) => {
+        const newQuote = {
+            id: Date.now(),
+            createdAt: new Date().toISOString(),
+            ...quoteData
+        };
+        setQuotes(prev => [newQuote, ...prev]);
+        return newQuote;
+    };
+
+    const deleteQuote = (id) => {
+        const idStr = String(id);
+        setQuotes(prev => prev.filter(q => String(q.id) !== idStr));
+        return true;
+    };
+
+    const updateQuote = (id, newData) => {
+        setQuotes(prev => prev.map(q =>
+            String(q.id) === String(id) ? { ...q, ...newData, updatedAt: new Date().toISOString() } : q
+        ));
     };
 
     const saveExpense = (expenseData) => {
@@ -209,6 +273,47 @@ export const InvoiceProvider = ({ children }) => {
         setPaymentReminders(prev => prev.filter(r => r.id !== id));
     };
 
+    // Employee Management
+    const saveEmployee = (empData) => {
+        const newEmployee = {
+            id: Date.now(),
+            createdAt: new Date().toISOString(),
+            status: 'Active',
+            ...empData
+        };
+        setEmployees(prev => [...prev, newEmployee]);
+        return newEmployee;
+    };
+
+    const deleteEmployee = (id) => {
+        setEmployees(prev => prev.filter(e => e.id !== id));
+    };
+
+    const updateEmployee = (id, newData) => {
+        setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...newData } : e));
+    };
+
+    // Message Management
+    const sendMessage = (msgData) => {
+        const newMessage = {
+            id: Date.now(),
+            time: new Date().toISOString(),
+            status: 'unread',
+            type: 'message', // alert, warning, success, message
+            ...msgData
+        };
+        setMessages(prev => [newMessage, ...prev]);
+        return newMessage;
+    };
+
+    const markMessageAsRead = (id) => {
+        setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'read' } : m));
+    };
+
+    const deleteMessage = (id) => {
+        setMessages(prev => prev.filter(m => m.id !== id));
+    };
+
     // Export Helper
     const exportToCSV = (data, filename) => {
         if (!data || data.length === 0) return;
@@ -251,12 +356,16 @@ export const InvoiceProvider = ({ children }) => {
         <InvoiceContext.Provider value={{
             companyProfile,
             invoices,
+            quotes,
             expenses,
             recurringTemplates,
             invoiceCustomization,
             paymentReminders,
             saveInvoice,
             deleteInvoice,
+            saveQuote,
+            deleteQuote,
+            updateQuote,
             saveExpense,
             deleteExpense,
             saveRecurringTemplate,
@@ -272,7 +381,15 @@ export const InvoiceProvider = ({ children }) => {
             addExpenseCategory,
             deleteExpenseCategory,
             CURRENCIES,
-            STATUSES
+            STATUSES,
+            employees,
+            saveEmployee,
+            deleteEmployee,
+            updateEmployee,
+            messages,
+            sendMessage,
+            markMessageAsRead,
+            deleteMessage
         }}>
             {children}
         </InvoiceContext.Provider>

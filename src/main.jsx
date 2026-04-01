@@ -7,7 +7,8 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import './index.css';
 import App from './App.jsx';
 
-console.log('🚀 BayRechnung starting with basename /BayRechnung...');
+// Handle legacy path redirect (if needed) or just start
+console.log('🚀 BayFatura starting with basename /BayFatura...');
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -15,7 +16,7 @@ if (!rootElement) {
 } else {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-      <BrowserRouter basename="/BayRechnung">
+      <BrowserRouter basename="/BayFatura">
         <LanguageProvider>
           <AuthProvider>
             <InvoiceProvider>

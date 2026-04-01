@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useInvoice } from '../context/InvoiceContext';
 import { Download, TrendingUp, TrendingDown, AlertCircle, Receipt, BarChart3 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -25,6 +25,8 @@ const Reports = () => {
     const topClients = Object.entries(clientTurnover)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5);
+
+    const [activeTab, setActiveTab] = useState('financial');
 
     const formatCurr = (val) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val);
 
@@ -81,54 +83,88 @@ const Reports = () => {
                 </div>
             </div>
 
-            <div className="settings-grid">
-                <div className="card">
-                    <h3>{t('topClients')}</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {topClients.map(([name, amount], i) => (
-                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '0.8rem' }}>{name[0]}</div>
-                                    <span style={{ fontWeight: '500' }}>{name}</span>
-                                </div>
-                                <span style={{ fontWeight: '600' }}>{formatCurr(amount)}</span>
-                            </div>
-                        ))}
-                        {topClients.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>{t('noData')}</p>}
-                    </div>
+            <div className="card" style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid var(--border)', marginBottom: '24px' }}>
+                    <h3
+                        onClick={() => setActiveTab('financial')}
+                        style={{
+                            margin: 0, paddingBottom: '12px',
+                            borderBottom: activeTab === 'financial' ? '2px solid var(--primary)' : '2px solid transparent',
+                            color: activeTab === 'financial' ? 'var(--primary)' : 'var(--text-muted)',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {t('financialReports') || 'Finanzberichte'}
+                    </h3>
+                    <h3
+                        onClick={() => setActiveTab('daily')}
+                        style={{
+                            margin: 0, paddingBottom: '12px',
+                            borderBottom: activeTab === 'daily' ? '2px solid var(--primary)' : '2px solid transparent',
+                            color: activeTab === 'daily' ? 'var(--primary)' : 'var(--text-muted)',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {t('dailyReports') || 'Tagesberichte'}
+                    </h3>
                 </div>
 
-                <div className="card">
-                    <h3>{t('businessStats')}</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
-                                <span>{t('paidInvoices')}</span>
-                                <span>{invoices.filter(i => i.status === 'paid').length}</span>
-                            </div>
-                            <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                                <div style={{
-                                    width: `${(invoices.filter(i => i.status === 'paid').length / invoices.length * 100) || 0}%`,
-                                    height: '100%',
-                                    background: 'var(--success)'
-                                }}></div>
+                {activeTab === 'financial' ? (
+                    <div className="settings-grid">
+                        <div className="card">
+                            <h3>{t('topClients')}</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                {topClients.map(([name, amount], i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div className="avatar" style={{ width: '32px', height: '32px', fontSize: '0.8rem' }}>{name[0]}</div>
+                                            <span style={{ fontWeight: '500' }}>{name}</span>
+                                        </div>
+                                        <span style={{ fontWeight: '600' }}>{formatCurr(amount)}</span>
+                                    </div>
+                                ))}
+                                {topClients.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>{t('noData')}</p>}
                             </div>
                         </div>
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
-                                <span>{t('overdueInvoices')}</span>
-                                <span>{openInvoices.length}</span>
-                            </div>
-                            <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                                <div style={{
-                                    width: `${(openInvoices.length / invoices.length * 100) || 0}%`,
-                                    height: '100%',
-                                    background: 'var(--warning)'
-                                }}></div>
+
+                        <div className="card">
+                            <h3>{t('businessStats')}</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
+                                        <span>{t('paidInvoices')}</span>
+                                        <span>{invoices.filter(i => i.status === 'paid').length}</span>
+                                    </div>
+                                    <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${(invoices.filter(i => i.status === 'paid').length / (invoices.length || 1) * 100)}%`,
+                                            height: '100%',
+                                            background: 'var(--success)'
+                                        }}></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
+                                        <span>{t('overdueInvoices')}</span>
+                                        <span>{openInvoices.length}</span>
+                                    </div>
+                                    <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${(openInvoices.length / (invoices.length || 1) * 100)}%`,
+                                            height: '100%',
+                                            background: 'var(--warning)'
+                                        }}></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                        <BarChart3 size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                        <p>{t('noData')} - {activeTab.toUpperCase()} {t('reports').toUpperCase()}</p>
+                    </div>
+                )}
             </div>
         </div>
     );
