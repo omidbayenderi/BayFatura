@@ -151,9 +151,9 @@ const InvoicePaper = forwardRef(({ data, totals }, ref) => {
                                     </tr>
                                     <tr>
                                         <td>{tInvoice('invoiceDateLabel')}</td>
-                                        <td>{data.date ? new Date(data.date).toLocaleDateString(data.language === 'en' ? 'en-US' : 'de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : ''}</td>
+                                        <td>{data.date ? new Date(data.date).toLocaleDateString(invoiceLanguage === 'tr' ? 'tr-TR' : invoiceLanguage === 'en' ? 'en-US' : 'de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : ''}</td>
                                     </tr>
-                                    {industryConfig.fields.map(field => (
+                                    {industryConfig.fields.filter(field => data.industry !== 'automotive').map(field => (
                                         data[field.name] && (
                                             <tr key={field.name}>
                                                 <td>{tInvoice(`${field.name}Label`)}:</td>
@@ -165,6 +165,38 @@ const InvoicePaper = forwardRef(({ data, totals }, ref) => {
                             </table>
                         </div>
                     </div>
+
+                    {/* Highly prominent Automotive block if applicable */}
+                    {data.industry === 'automotive' && (
+                        <div className="invoice-automotive-bar" style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gap: '12px',
+                            padding: '12px',
+                            background: 'var(--invoice-accent-bg)',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            marginBottom: '20px',
+                            fontSize: '0.85rem'
+                        }}>
+                            <div>
+                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>{tInvoice('vehicleLabel')}</span>
+                                <span className="bold">{data.vehicle || '-'}</span>
+                            </div>
+                            <div>
+                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>{tInvoice('plateLabel')}</span>
+                                <span className="bold">{data.plate || '-'}</span>
+                            </div>
+                            <div>
+                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>{tInvoice('kmLabel')}</span>
+                                <span className="bold">{data.km ? `${data.km} km` : '-'}</span>
+                            </div>
+                            <div>
+                                <span style={{ display: 'block', fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', marginBottom: '2px' }}>{tInvoice('vinLabel')}</span>
+                                <span className="bold">{data.vin || '-'}</span>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="invoice-table-container">
                         <table className="invoice-items-table-clean">

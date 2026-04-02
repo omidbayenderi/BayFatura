@@ -15,6 +15,7 @@ import Success from './pages/Success';
 import InvoiceEdit from './pages/InvoiceEdit';
 import Quotes from './pages/Quotes';
 import NewQuote from './pages/NewQuote';
+import Auth from './pages/Auth';
 import { PanelProvider } from './context/PanelContext';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
     <PanelProvider>
       <Routes>
         {/* Public Routes */}
+        <Route path="/login" element={<Auth />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/success" element={<Success />} />
 

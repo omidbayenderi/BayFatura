@@ -453,32 +453,139 @@ const translations = {
         rememberMe: 'Angemeldet bleiben',
         forgotPassword: 'Passwort vergessen?',
         termsAgree: 'Bedingungen akzeptieren',
-        welcomeBack: 'Willkommen zurück!',
-        fillAllFields: 'Bitte alle Felder ausfüllen',
-        invalidCredentials: 'E-Mail oder Passwort falsch',
-        required: 'Erforderlich',
-        passwordMismatch: 'Passwörter stimmen nicht überein',
-        mustAcceptTerms: 'Bedingungen müssen akzeptiert werden',
+        loginLink: 'Anmelden',
+        invalidEmailPass: 'Ungültige E-Mail oder Passwort'
+    },
+    tr: {
+        dashboard: 'Genel Bakış',
+        appName: 'BayFatura',
+        newInvoice: 'Yeni Fatura',
+        quotes: 'Teklifler',
+        archive: 'Arşiv',
+        reports: 'Raporlar',
+        expenses: 'Giderler',
+        recurring: 'Düzenli',
+        users: 'Kullanıcı Yönetimi',
+        messages: 'Mesajlar',
+        settings: 'Ayarlar',
+        save: 'Kaydet',
+        cancel: 'İptal',
+        delete: 'Sil',
+        edit: 'Düzenle',
+        print: 'Yazdır',
+        loading: 'Yükleniyor...',
+        total: 'Toplam Tutar',
+        status: 'Durum',
+        date: 'Tarih',
+        customer: 'Müşteri',
+        invoiceNumber: 'Fatura No',
+        quoteNumber: 'Teklif No',
+        saveAndPrint: 'Kaydet ve Yazdır',
+        actions: 'İşlemler',
+        back: 'Geri',
+        customerInfo: 'Müşteri Bilgileri',
+        vehicleDetails: 'Araç Bilgileri',
+        items: 'Hizmetler / Yedek Parçalar',
+        description: 'Açıklama',
+        quantity: 'Miktar',
+        price: 'Birim Fiyat',
+        addRow: 'Satır Ekle',
+        subtotal: 'Ara Toplam',
+        tax: 'KDV',
+        draft: 'Taslak',
+        sent: 'Gönderildi',
+        paid: 'Ödendi',
+        partial: 'Kısmi Ödeme',
+        overdue: 'Vadesi Geçmiş',
+        invoiceDetails: 'Fatura Detayları',
+        profileSettings: 'Profil Ayarları',
+        bankDetails: 'Banka Bilgileri',
+        taxId: 'Vergi No',
+        vatId: 'KDV No',
+        companyName: 'Firma Adı',
+        owner: 'Sahibi',
+        street: 'Sokak/Cadde',
+        houseNum: 'Kapı No',
+        zip: 'Posta Kodu',
+        city: 'Şehir',
+        phone: 'Telefon',
+        email: 'E-posta',
+        bankName: 'Banka Adı',
+        iban: 'IBAN',
+        paymentTerms: 'Ödeme Koşulları',
 
-        hello: 'Hallo'
+        // Automotive Labels
+        vehicleLabel: 'Araç',
+        plateLabel: 'Plaka',
+        kmLabel: 'Kilometre',
+        vinLabel: 'Şasi No (VIN)',
+        
+        // Invoice Paper
+        page: 'Sayfa',
+        invoiceTitle: 'FATURA',
+        quoteTitle: 'TEKLİF',
+        recipientLabel: 'Fatura Alıcısı:',
+        detailsLabel: 'Fatura Detayları:',
+        invoiceNumberLabel: 'Fatura Numarası:',
+        invoiceDateLabel: 'Fatura Tarihi:',
+        descriptionLabel: 'Açıklama',
+        quantityLabel: 'Miktar',
+        priceLabel: 'Birim Fiyat',
+        totalPriceLabel: 'Toplam Fiyat',
+        subtotalLabel: 'Ara Toplam (Net):',
+        taxLabel: 'Katma Değer Vergisi (KDV):',
+        grossTotalLabel: 'Genel Toplam (Brüt):',
+        paymentTermsAndBank: 'Ödeme Koşulları & Banka Bilgileri',
+        bankLabel: 'Banka:',
+        ibanLabel: 'IBAN:',
+        bicLabel: 'BIC:',
+        usageLabel: 'Açıklama:',
+        signatureLabel: 'İmza',
+
+        // Auth
+        welcomeBack: 'Tekrar Hoş Geldiniz',
+        getStarted: 'Hesap Oluştur',
+        enterDetails: 'İşinizi yönetmek için bilgilerinizi girin',
+        createAccountMsg: 'Faturalandırmaya başlamak için hesap oluşturun',
+        fullName: 'Ad Soyad',
+        companyNameLabel: 'Firma Adı',
+        emailAddress: 'E-posta Adresi',
+        passwordLabel: 'Şifre',
+        loginBtn: 'Giriş Yap',
+        registerBtn: 'Kayıt Ol',
+        processing: 'İşleniyor...',
+        orContinueWith: 'veya şununla devam et',
+        noAccount: 'Hesabınız yok mu?',
+        haveAccount: 'Zaten hesabınız var mı?',
+        signUp: 'Kayıt Ol',
+        loginLink: 'Giriş Yap',
+        invalidEmailPass: 'Geçersiz e-posta veya şifre'
     }
 };
 
 export const LanguageProvider = ({ children }) => {
-    // Force German
-    const appLanguage = 'de';
-    const invoiceLanguage = 'de';
+    const [appLanguage, setAppLanguage] = useState(() => localStorage.getItem('bay_app_lang') || 'de');
+    const [invoiceLanguage, setInvoiceLanguage] = useState(() => localStorage.getItem('bay_inv_lang') || 'de');
+
+    useEffect(() => {
+        localStorage.setItem('bay_app_lang', appLanguage);
+    }, [appLanguage]);
+
+    useEffect(() => {
+        localStorage.setItem('bay_inv_lang', invoiceLanguage);
+    }, [invoiceLanguage]);
 
     const t = (key) => {
-        return translations['de']?.[key] || key;
+        return translations[appLanguage]?.[key] || translations['de']?.[key] || key;
     };
 
     const tInvoice = (key) => {
-        return translations['de']?.[key] || key;
+        return translations[invoiceLanguage]?.[key] || translations['de']?.[key] || key;
     };
 
     const LANGUAGES = [
-        { code: 'de', label: 'Deutsch', flag: '🇩🇪' }
+        { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
+        { code: 'tr', label: 'Türkçe', flag: '🇹🇷' }
     ];
 
     return (

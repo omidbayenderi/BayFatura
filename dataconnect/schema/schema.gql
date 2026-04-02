@@ -1,0 +1,47 @@
+type User @table {
+  displayName: String!
+  email: String!
+  createdAt: Timestamp!
+  businessName: String
+  businessAddress: String
+  taxId: String
+}
+
+type Client @table {
+  user: User!
+  name: String!
+  email: String!
+  createdAt: Timestamp!
+  contactPerson: String
+  address: String
+  phoneNumber: String
+}
+
+type Invoice @table {
+  user: User!
+  client: Client!
+  invoiceNumber: String!
+  issueDate: Date!
+  dueDate: Date!
+  status: String!
+  createdAt: Timestamp!
+  notes: String
+  totalAmount: Float
+}
+
+type InvoiceItem @table {
+  invoice: Invoice!
+  description: String!
+  quantity: Int!
+  unitPrice: Float!
+  createdAt: Timestamp!
+  amount: Float
+}
+
+type Payment @table {
+  invoice: Invoice!
+  paymentDate: Date!
+  amount: Float!
+  createdAt: Timestamp!
+  paymentMethod: String
+}

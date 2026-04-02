@@ -1,4 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { db, auth } from '../lib/firebase';
+import { 
+    collection, 
+    addDoc, 
+    deleteDoc, 
+    doc, 
+    onSnapshot, 
+    query, 
+    where, 
+    orderBy,
+    updateDoc,
+    setDoc,
+    getDoc
+} from 'firebase/firestore';
 
 const InvoiceContext = createContext();
 
@@ -16,324 +30,208 @@ const INITIAL_COMPANY_PROFILE = {
     vatId: 'DE123456789',
     bankName: 'Deutsche Bank',
     iban: 'DE73 5227 0024 0859 6561 00',
-    bic: '', // e.g. DEUTDEDB522
+    bic: '',
     paymentTerms: 'Zahlbar innerhalb von 14 Tagen ohne Abzug. \nZahlungsart: Überweisung / Bar',
     defaultCurrency: 'EUR',
     defaultTaxRate: 19,
-    paypalMe: '', // e.g. https://paypal.me/user
-    stripeLink: '', // e.g. https://buy.stripe.com/test
-
-    // Premium Configuration
-    plan: 'premium', // Default to premium for this demo
-    industry: 'general', // Default to general
-    logoDisplayMode: 'both', // 'logoOnly', 'nameOnly', 'both'
-    stripeApiKey: '',
-    stripeWebhookSecret: '',
-    paypalClientId: '',
-    paypalSecret: ''
+    paypalMe: '',
+    stripeLink: '',
+    plan: 'premium',
+    industry: 'automotive',
+    logoDisplayMode: 'both'
 };
 
 export const InvoiceProvider = ({ children }) => {
-    // State: Company Profile - Merge saved data with defaults for new fields
-    const [companyProfile, setCompanyProfile] = useState(() => {
-        const saved = localStorage.getItem('bay_profile');
-        return saved ? { ...INITIAL_COMPANY_PROFILE, ...JSON.parse(saved) } : INITIAL_COMPANY_PROFILE;
+    const [companyProfile, setCompanyProfile] = useState(INITIAL_COMPANY_PROFILE);
+    const [invoices, setInvoices] = useState([]);
+    const [quotes, setQuotes] = useState([]);
+    const [expenses, setExpenses] = useState([]);
+    const [recurringTemplates, setRecurringTemplates] = useState([]);
+    const [expenseCategories, setExpenseCategories] = useState(['spareParts', 'rent', 'marketing', 'software', 'insurance', 'others']);
+    const [invoiceCustomization, setInvoiceCustomization] = useState({
+        primaryColor: '#8B5CF6',
+        accentColor: '#6366F1',
+        brandPalette: [],
+        signatureUrl: null,
+        footerText: '',
+        quoteValidityDays: 30
     });
+    const [employees, setEmployees] = useState([]);
+    const [messages, setMessages] = useState([]);
 
-    // State: Invoice Archive
-    const [invoices, setInvoices] = useState(() => {
-        const saved = localStorage.getItem('bay_invoices');
-        return saved ? JSON.parse(saved) : [];
-    });
+    // 1. Sync Profile & Customization from Firestore
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user) return;
 
-    // State: Quotes
-    const [quotes, setQuotes] = useState(() => {
-        const saved = localStorage.getItem('bay_quotes');
-        return saved ? JSON.parse(saved) : [];
-    });
+        const profileUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+            if (snapshot.exists()) {
+                setCompanyProfile(prev => ({ ...prev, ...snapshot.data() }));
+            } else {
+                // Initialize profile if not exists
+                setDoc(doc(db, 'users', user.uid), INITIAL_COMPANY_PROFILE);
+            }
+        });
 
-    // State: Expenses
-    const [expenses, setExpenses] = useState(() => {
-        const saved = localStorage.getItem('bay_expenses');
-        return saved ? JSON.parse(saved) : [];
-    });
+        const customizationUnsubscribe = onSnapshot(doc(db, 'customizations', user.uid), (snapshot) => {
+            if (snapshot.exists()) {
+                setInvoiceCustomization(prev => ({ ...prev, ...snapshot.data() }));
+            }
+        });
 
-    // State: Recurring Invoice Templates
-    const [recurringTemplates, setRecurringTemplates] = useState(() => {
-        const saved = localStorage.getItem('bay_recurring');
-        return saved ? JSON.parse(saved) : [];
-    });
-
-    // State: Expense Categories
-    const [expenseCategories, setExpenseCategories] = useState(() => {
-        const saved = localStorage.getItem('bay_expense_categories');
-        const defaults = ['spareParts', 'rent', 'marketing', 'software', 'insurance', 'others'];
-        return saved ? JSON.parse(saved) : defaults;
-    });
-
-    // State: Invoice Customization
-    const [invoiceCustomization, setInvoiceCustomization] = useState(() => {
-        const saved = localStorage.getItem('bay_invoice_customization');
-        return saved ? JSON.parse(saved) : {
-            primaryColor: '#8B5CF6',
-            accentColor: '#6366F1',
-            brandPalette: [], // Colors extracted from logo
-            signatureUrl: null,
-            footerText: '',
-            quoteValidityDays: 30
+        return () => {
+            profileUnsubscribe();
+            customizationUnsubscribe();
         };
-    });
+    }, [auth.currentUser]);
 
-    // State: Payment Reminders
-    const [paymentReminders, setPaymentReminders] = useState(() => {
-        const saved = localStorage.getItem('bay_payment_reminders');
-        return saved ? JSON.parse(saved) : [];
-    });
-
-    // State: Employees / Users
-    const [employees, setEmployees] = useState(() => {
-        const saved = localStorage.getItem('bay_employees');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, name: INITIAL_COMPANY_PROFILE.owner, email: INITIAL_COMPANY_PROFILE.email, role: 'Admin', sites: ['All Sites'], status: 'Active' },
-            { id: 2, name: 'Ahmet Yılmaz', email: 'ahmet@firma.com', role: 'Site Lead', sites: ['Site A'], status: 'Active' },
-            { id: 3, name: 'Mehmet Demir', email: 'mehmet@firma.com', role: 'Accountant', sites: ['HQ'], status: 'Active' }
-        ];
-    });
-
-    // Save Profile
+    // 2. Sync Invoices from Firestore
     useEffect(() => {
-        localStorage.setItem('bay_profile', JSON.stringify(companyProfile));
-    }, [companyProfile]);
+        const user = auth.currentUser;
+        if (!user) {
+            setInvoices([]);
+            return;
+        }
 
-    // Save Invoices
+        const q = query(
+            collection(db, 'invoices'), 
+            where('userId', '==', user.uid),
+            orderBy('createdAt', 'desc')
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setInvoices(data);
+        });
+
+        return unsubscribe;
+    }, [auth.currentUser]);
+
+    // 3. Sync Quotes from Firestore
     useEffect(() => {
-        localStorage.setItem('bay_invoices', JSON.stringify(invoices));
-    }, [invoices]);
+        const user = auth.currentUser;
+        if (!user) {
+            setQuotes([]);
+            return;
+        }
 
-    // Save Quotes
+        const q = query(
+            collection(db, 'quotes'),
+            where('userId', '==', user.uid),
+            orderBy('createdAt', 'desc')
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setQuotes(data);
+        });
+
+        return unsubscribe;
+    }, [auth.currentUser]);
+
+    // 4. Sync Expenses from Firestore
     useEffect(() => {
-        localStorage.setItem('bay_quotes', JSON.stringify(quotes));
-    }, [quotes]);
+        const user = auth.currentUser;
+        if (!user) {
+            setExpenses([]);
+            return;
+        }
 
-    // Save Expenses
-    useEffect(() => {
-        localStorage.setItem('bay_expenses', JSON.stringify(expenses));
-    }, [expenses]);
+        const q = query(
+            collection(db, 'expenses'),
+            where('userId', '==', user.uid),
+            orderBy('date', 'desc')
+        );
 
-    // Save Recurring
-    useEffect(() => {
-        localStorage.setItem('bay_recurring', JSON.stringify(recurringTemplates));
-    }, [recurringTemplates]);
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setExpenses(data);
+        });
 
-    // Save Categories
-    useEffect(() => {
-        localStorage.setItem('bay_expense_categories', JSON.stringify(expenseCategories));
-    }, [expenseCategories]);
+        return unsubscribe;
+    }, [auth.currentUser]);
 
-    // Save Customization
-    useEffect(() => {
-        localStorage.setItem('bay_invoice_customization', JSON.stringify(invoiceCustomization));
-    }, [invoiceCustomization]);
+    // Actions
+    const saveInvoice = async (invoiceData) => {
+        const user = auth.currentUser;
+        if (!user) return;
 
-    // Save Payment Reminders
-    useEffect(() => {
-        localStorage.setItem('bay_payment_reminders', JSON.stringify(paymentReminders));
-    }, [paymentReminders]);
+        const newInvoice = {
+            ...invoiceData,
+            userId: user.uid,
+            createdAt: new Date().toISOString()
+        };
 
-    // Save Employees
-    useEffect(() => {
-        localStorage.setItem('bay_employees', JSON.stringify(employees));
-    }, [employees]);
+        const docRef = await addDoc(collection(db, 'invoices'), newInvoice);
+        return { id: docRef.id, ...newInvoice };
+    };
 
-    // State: Messages
-    const [messages, setMessages] = useState(() => {
-        const saved = localStorage.getItem('bay_messages');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, type: 'alert', title: 'Daily Report Missing', message: 'Şantiye Kuzey hasn\'t submitted today\'s report.', time: new Date().toISOString(), status: 'unread', sender: 'System', category: 'system' },
-            { id: 2, type: 'message', title: 'New Feedback', message: 'Materials arrived on site.', time: new Date(Date.now() - 86400000).toISOString(), status: 'read', sender: 'Ahmet Yılmaz', category: 'internal' },
-            { id: 3, type: 'message', title: 'Invoice Inquiry', message: 'Can you please send the invoice for last week\'s service?', time: new Date(Date.now() - 172800000).toISOString(), status: 'unread', sender: 'Müller Bau GmbH', category: 'customer' }
-        ];
-    });
+    const deleteInvoice = async (id) => {
+        await deleteDoc(doc(db, 'invoices', id));
+    };
 
-    // Save Messages
-    useEffect(() => {
-        localStorage.setItem('bay_messages', JSON.stringify(messages));
-    }, [messages]);
+    const saveQuote = async (quoteData) => {
+        const user = auth.currentUser;
+        if (!user) return;
 
-    const addExpenseCategory = (newCategory) => {
-        if (!newCategory) return;
-        if (!expenseCategories.includes(newCategory)) {
-            setExpenseCategories(prev => [...prev, newCategory]);
+        const newQuote = {
+            ...quoteData,
+            userId: user.uid,
+            createdAt: new Date().toISOString()
+        };
+
+        const docRef = await addDoc(collection(db, 'quotes'), newQuote);
+        return { id: docRef.id, ...newQuote };
+    };
+
+    const deleteQuote = async (id) => {
+        await deleteDoc(doc(db, 'quotes', id));
+    };
+
+    const updateQuote = async (id, newData) => {
+        await updateDoc(doc(db, 'quotes', id), newData);
+    };
+
+    const saveExpense = async (expenseData) => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        await addDoc(collection(db, 'expenses'), {
+            ...expenseData,
+            userId: user.uid,
+            date: expenseData.date || new Date().toISOString().split('T')[0]
+        });
+    };
+
+    const deleteExpense = async (id) => {
+        await deleteDoc(doc(db, 'expenses', id));
+    };
+
+    const updateProfile = async (newData) => {
+        const user = auth.currentUser;
+        if (!user) return;
+        await updateDoc(doc(db, 'users', user.uid), newData);
+    };
+
+    const updateCustomization = async (newData) => {
+        const user = auth.currentUser;
+        if (!user) return;
+        
+        const docRef = doc(db, 'customizations', user.uid);
+        const snapshot = await getDoc(docRef);
+        if (snapshot.exists()) {
+            await updateDoc(docRef, newData);
+        } else {
+            await setDoc(docRef, newData);
         }
     };
 
-    const deleteExpenseCategory = (cat) => {
-        const nonDeletable = ['spareParts', 'rent', 'marketing', 'software', 'insurance', 'others'];
-        if (nonDeletable.includes(cat)) return;
-        setExpenseCategories(prev => prev.filter(c => c !== cat));
+    const updateInvoice = async (id, newData) => {
+        await updateDoc(doc(db, 'invoices', id), newData);
     };
 
-    const saveInvoice = (invoiceData) => {
-        const newInvoice = {
-            id: Date.now(),
-            createdAt: new Date().toISOString(),
-            ...invoiceData
-        };
-        setInvoices(prev => [newInvoice, ...prev]);
-        return newInvoice;
-    };
-
-    const deleteInvoice = (id) => {
-        const idStr = String(id);
-        setInvoices(prev => prev.filter(inv => String(inv.id) !== idStr));
-        return true;
-    };
-
-    const saveQuote = (quoteData) => {
-        const newQuote = {
-            id: Date.now(),
-            createdAt: new Date().toISOString(),
-            ...quoteData
-        };
-        setQuotes(prev => [newQuote, ...prev]);
-        return newQuote;
-    };
-
-    const deleteQuote = (id) => {
-        const idStr = String(id);
-        setQuotes(prev => prev.filter(q => String(q.id) !== idStr));
-        return true;
-    };
-
-    const updateQuote = (id, newData) => {
-        setQuotes(prev => prev.map(q =>
-            String(q.id) === String(id) ? { ...q, ...newData, updatedAt: new Date().toISOString() } : q
-        ));
-    };
-
-    const saveExpense = (expenseData) => {
-        const newExpense = {
-            id: Date.now(),
-            date: new Date().toISOString().split('T')[0],
-            ...expenseData
-        };
-        setExpenses(prev => [newExpense, ...prev]);
-    };
-
-    const deleteExpense = (id) => {
-        setExpenses(prev => prev.filter(exp => exp.id !== id));
-    };
-
-    const saveRecurringTemplate = (templateData) => {
-        const newTemplate = {
-            id: Date.now(),
-            ...templateData,
-            lastGenerated: null
-        };
-        setRecurringTemplates(prev => [newTemplate, ...prev]);
-    };
-
-    const deleteRecurringTemplate = (id) => {
-        setRecurringTemplates(prev => prev.filter(t => t.id !== id));
-    };
-
-    const updateProfile = (newData) => {
-        setCompanyProfile(prev => ({ ...prev, ...newData }));
-    };
-
-    const updateInvoiceStatus = (id, newStatus) => {
-        setInvoices(prev => prev.map(inv =>
-            String(inv.id) === String(id) ? { ...inv, status: newStatus } : inv
-        ));
-    };
-
-    const updateInvoice = (id, newData) => {
-        setInvoices(prev => prev.map(inv =>
-            String(inv.id) === String(id) ? { ...inv, ...newData, updatedAt: new Date().toISOString() } : inv
-        ));
-    };
-
-    // Customization Management
-    const updateCustomization = (newData) => {
-        setInvoiceCustomization(prev => ({ ...prev, ...newData }));
-    };
-
-    // Payment Reminders Management
-    const addPaymentReminder = (reminderData) => {
-        const newReminder = {
-            id: Date.now(),
-            createdAt: new Date().toISOString(),
-            emailSent: false,
-            ...reminderData
-        };
-        setPaymentReminders(prev => [newReminder, ...prev]);
-    };
-
-    const deletePaymentReminder = (id) => {
-        setPaymentReminders(prev => prev.filter(r => r.id !== id));
-    };
-
-    // Employee Management
-    const saveEmployee = (empData) => {
-        const newEmployee = {
-            id: Date.now(),
-            createdAt: new Date().toISOString(),
-            status: 'Active',
-            ...empData
-        };
-        setEmployees(prev => [...prev, newEmployee]);
-        return newEmployee;
-    };
-
-    const deleteEmployee = (id) => {
-        setEmployees(prev => prev.filter(e => e.id !== id));
-    };
-
-    const updateEmployee = (id, newData) => {
-        setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...newData } : e));
-    };
-
-    // Message Management
-    const sendMessage = (msgData) => {
-        const newMessage = {
-            id: Date.now(),
-            time: new Date().toISOString(),
-            status: 'unread',
-            type: 'message', // alert, warning, success, message
-            ...msgData
-        };
-        setMessages(prev => [newMessage, ...prev]);
-        return newMessage;
-    };
-
-    const markMessageAsRead = (id) => {
-        setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'read' } : m));
-    };
-
-    const deleteMessage = (id) => {
-        setMessages(prev => prev.filter(m => m.id !== id));
-    };
-
-    // Export Helper
-    const exportToCSV = (data, filename) => {
-        if (!data || data.length === 0) return;
-
-        const headers = Object.keys(data[0]).join(',');
-        const rows = data.map(obj => {
-            return Object.values(obj).map(val => {
-                const str = String(val).replace(/"/g, '""');
-                return `"${str}"`;
-            }).join(',');
-        });
-
-        const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join('\n');
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `${filename}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const updateInvoiceStatus = async (id, newStatus) => {
+        await updateDoc(doc(db, 'invoices', id), { status: newStatus });
     };
 
     const CURRENCIES = [
@@ -346,7 +244,6 @@ export const InvoiceProvider = ({ children }) => {
     const STATUSES = {
         draft: { label: 'Entwurf', color: '#94a3b8' },
         sent: { label: 'Gesendet', color: '#3b82f6' },
-        viewed: { label: 'Gesehen', color: '#8b5cf6' },
         paid: { label: 'Bezahlt', color: '#10b981' },
         partial: { label: 'Teilweise', color: '#f59e0b' },
         overdue: { label: 'Überfällig', color: '#ef4444' }
@@ -360,7 +257,6 @@ export const InvoiceProvider = ({ children }) => {
             expenses,
             recurringTemplates,
             invoiceCustomization,
-            paymentReminders,
             saveInvoice,
             deleteInvoice,
             saveQuote,
@@ -368,28 +264,15 @@ export const InvoiceProvider = ({ children }) => {
             updateQuote,
             saveExpense,
             deleteExpense,
-            saveRecurringTemplate,
-            deleteRecurringTemplate,
             updateProfile,
             updateInvoiceStatus,
             updateInvoice,
             updateCustomization,
-            addPaymentReminder,
-            deletePaymentReminder,
-            exportToCSV,
             expenseCategories,
-            addExpenseCategory,
-            deleteExpenseCategory,
             CURRENCIES,
             STATUSES,
             employees,
-            saveEmployee,
-            deleteEmployee,
-            updateEmployee,
-            messages,
-            sendMessage,
-            markMessageAsRead,
-            deleteMessage
+            messages
         }}>
             {children}
         </InvoiceContext.Provider>

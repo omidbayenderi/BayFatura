@@ -469,6 +469,17 @@ const Settings = () => {
 
                     <div className="form-row">
                         <div className="form-group">
+                            <label>{appLanguage === 'tr' ? 'Sektör / Kategori' : 'Branche / Kategorie'}</label>
+                            <select className="form-input" name="industry" value={formData.industry || 'general'} onChange={handleChange}>
+                                <option value="general">{appLanguage === 'tr' ? 'Genel' : 'Allgemein'}</option>
+                                <option value="automotive">{appLanguage === 'tr' ? 'Otomotiv / Servis' : 'Automobil / Service'}</option>
+                                <option value="construction">{appLanguage === 'tr' ? 'İnşaat / Şantiye' : 'Bau / Handwerk'}</option>
+                                <option value="gastronomy">{appLanguage === 'tr' ? 'Gastronomi / Etkinlik' : 'Gastronomie'}</option>
+                                <option value="healthcare">{appLanguage === 'tr' ? 'Sağlık / Hasta' : 'Gesundheitswesen'}</option>
+                                <option value="it">{appLanguage === 'tr' ? 'Bilişim / Yazılım' : 'IT / Software'}</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
                             <label>{t('companyName')}</label>
                             <input className="form-input" name="companyName" value={formData.companyName} onChange={handleChange} />
                         </div>

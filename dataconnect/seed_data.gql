@@ -1,0 +1,123 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "This is a seed data mutation for demonstration purposes and contains no sensitive information.") {
+  user_insertMany(data: [
+    {
+      id: "a0000000-0000-0000-0000-000000000001",
+      displayName: "Alice Smith",
+      email: "alice.smith@example.com",
+      createdAt: "2023-01-15T10:00:00Z",
+      businessName: "Alice's Accounting Firm",
+      businessAddress: "123 Main St, Anytown, USA",
+      taxId: "TAXID12345"
+    },
+    {
+      id: "a0000000-0000-0000-0000-000000000002",
+      displayName: "Bob Johnson",
+      email: "bob.johnson@example.com",
+      createdAt: "2023-02-01T11:00:00Z",
+      businessName: "Bob's Business Services",
+      businessAddress: "456 Oak Ave, Otherville, USA",
+      taxId: "TAXID67890"
+    }
+  ])
+  client_insertMany(data: [
+    {
+      id: "b0000000-0000-0000-0000-000000000001",
+      userId: "a0000000-0000-0000-0000-000000000001",
+      name: "Acme Corp",
+      email: "contact@acmecorp.com",
+      createdAt: "2023-03-01T09:00:00Z",
+      contactPerson: "Charlie Brown",
+      address: "789 Pine Ln, Anytown, USA",
+      phoneNumber: "555-123-4567"
+    },
+    {
+      id: "b0000000-0000-0000-0000-000000000002",
+      userId: "a0000000-0000-0000-0000-000000000001",
+      name: "Widget Inc.",
+      email: "info@widgetinc.com",
+      createdAt: "2023-03-10T14:30:00Z",
+      contactPerson: "Diana Prince",
+      address: "101 Elm St, Anytown, USA",
+      phoneNumber: "555-987-6543"
+    },
+    {
+      id: "b0000000-0000-0000-0000-000000000003",
+      userId: "a0000000-0000-0000-0000-000000000002",
+      name: "Global Solutions",
+      email: "sales@globalsolutions.net",
+      createdAt: "2023-04-05T16:00:00Z",
+      contactPerson: "Eve Green",
+      address: "202 Maple Dr, Otherville, USA",
+      phoneNumber: "555-555-1212"
+    }
+  ])
+  invoice_insertMany(data: [
+    {
+      id: "c0000000-0000-0000-0000-000000000001",
+      userId: "a0000000-0000-0000-0000-000000000001",
+      clientId: "b0000000-0000-0000-0000-000000000001",
+      invoiceNumber: "INV-2023-001",
+      issueDate: "2023-03-15",
+      dueDate: "2023-04-15",
+      status: "Pending",
+      createdAt: "2023-03-15T10:30:00Z",
+      totalAmount: 1500.75
+    },
+    {
+      id: "c0000000-0000-0000-0000-000000000002",
+      userId: "a0000000-0000-0000-0000-000000000001",
+      clientId: "b0000000-0000-0000-0000-000000000002",
+      invoiceNumber: "INV-2023-002",
+      issueDate: "2023-03-20",
+      dueDate: "2023-04-20",
+      status: "Paid",
+      createdAt: "2023-03-20T11:45:00Z",
+      totalAmount: 500.00
+    },
+    {
+      id: "c0000000-0000-0000-0000-000000000003",
+      userId: "a0000000-0000-0000-0000-000000000002",
+      clientId: "b0000000-0000-0000-0000-000000000003",
+      invoiceNumber: "INV-2023-003",
+      issueDate: "2023-04-10",
+      dueDate: "2023-05-10",
+      status: "Overdue",
+      createdAt: "2023-04-10T17:00:00Z",
+      totalAmount: 2200.50
+    }
+  ])
+  invoiceItem_insertMany(data: [
+    {
+      invoiceId: "c0000000-0000-0000-0000-000000000001",
+      description: "Consulting Services",
+      quantity: 10,
+      unitPrice: 100.00,
+      createdAt: "2023-03-15T10:35:00Z",
+      amount: 1000.00
+    },
+    {
+      invoiceId: "c0000000-0000-0000-0000-000000000001",
+      description: "Software License",
+      quantity: 1,
+      unitPrice: 500.75,
+      createdAt: "2023-03-15T10:36:00Z",
+      amount: 500.75
+    },
+    {
+      invoiceId: "c0000000-0000-0000-0000-000000000002",
+      description: "Web Design",
+      quantity: 1,
+      unitPrice: 500.00,
+      createdAt: "2023-03-20T11:50:00Z",
+      amount: 500.00
+    },
+    {
+      invoiceId: "c0000000-0000-0000-0000-000000000003",
+      description: "Marketing Campaign",
+      quantity: 2,
+      unitPrice: 1100.25,
+      createdAt: "2023-04-10T17:05:00Z",
+      amount: 2200.50
+    }
+  ])
+}

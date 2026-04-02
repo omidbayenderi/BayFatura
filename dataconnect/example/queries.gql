@@ -1,0 +1,51 @@
+query AllClients @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  clients {
+    id
+    name
+    email
+    contactPerson
+    phoneNumber
+    address
+    createdAt
+  }
+}
+
+query MyInvoices @auth(level: USER) {
+  invoices(where: { userId: { eq_expr: "auth.uid" } }) {
+    id
+    invoiceNumber
+    issueDate
+    dueDate
+    totalAmount
+    status
+    client {
+      name
+    }
+  }
+}
+
+mutation CreateClient($name: String!, $email: String!, $contactPerson: String, $phoneNumber: String, $address: String) @auth(level: USER) {
+  client_insert(
+    data: {
+      name: $name
+      email: $email
+      contactPerson: $contactPerson
+      phoneNumber: $phoneNumber
+      address: $address
+      userId_expr: "auth.uid"
+      createdAt_expr: "request.time"
+    }
+  ) {
+    id
+  }
+}
+
+mutation UpdateInvoiceStatus($id: UUID!, $status: String!) @auth(level: USER) {
+  invoice_update(
+    key: { id: $id }
+    data: { status: $status }
+    where: { userId: { eq_expr: "auth.uid" } }
+  ) {
+    id
+  }
+}

@@ -1,5 +1,3 @@
-import { supabase } from '../lib/supabase';
-
 export const useStripeCheckout = () => {
     const redirectToCheckout = async (priceId) => {
         try {
@@ -8,27 +6,26 @@ export const useStripeCheckout = () => {
                 return;
             }
 
-            // Call Supabase Edge Function to create checkout session
-            const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-                body: {
+            // TODO: In Firebase version, you would call a Cloud Function or a direct API
+            // For now, we will simulate the behavior or provide a placeholder for the URL
+            // Typically: const response = await fetch('YOUR_FIREBASE_FUNCTION_URL', { ... });
+            
+            console.log('Redirecting to checkout for price:', priceId);
+            alert('🚀 Checkout integration with Firebase Functions needed for production.\n\nIn a real app, this would redirect to Stripe Checkout.');
+            
+            /*
+            const response = await fetch('https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/createCheckoutSession', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     priceId,
-                    successUrl: import.meta.env.VITE_SUCCESS_URL || window.location.origin + '/BayFatura/success',
-                    cancelUrl: import.meta.env.VITE_CANCEL_URL || window.location.origin + '/BayFatura/',
-                },
+                    successUrl: window.location.origin + '/success',
+                    cancelUrl: window.location.origin + '/',
+                })
             });
-
-            if (error) {
-                console.error('Checkout session creation error:', error);
-                alert('❌ Failed to create checkout session: ' + error.message);
-                return;
-            }
-
-            if (data?.url) {
-                // Redirect to Stripe Checkout
-                window.location.href = data.url;
-            } else {
-                throw new Error('No checkout URL returned');
-            }
+            const { url } = await response.json();
+            window.location.href = url;
+            */
         } catch (err) {
             console.error('Stripe checkout error:', err);
             alert('❌ Failed to initialize payment: ' + err.message);

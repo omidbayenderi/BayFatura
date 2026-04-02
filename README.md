@@ -1,16 +1,94 @@
-# React + Vite
+# 🚀 BayFatura - Çok Rollü Şantiye ve Finans Yönetim Uygulaması
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**BayFatura**, inşaat firmaları ve serbest çalışanlar için tasarlanmış, çok dilli, sektör odaklı, modern bir faturalandırma ve şantiye yönetim platformudur. Supabase altyapısından Firebase'e başarıyla taşınmış olup, gerçek zamanlı veri senkronizasyonu ile çalışmaktadır.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠️ Teknoloji Yığını
 
-## React Compiler
+- **Frontend:** React 19 + Vite + React Router 7
+- **Görsel Tasarım:** Vanilla CSS (Glassmorphism & Premium UI Principles)
+- **Animasyon:** Framer Motion
+- **Grafik & Raporlama:** Recharts
+- **Backend:** Firebase (Aktif: Cloud Firestore, Auth, Storage, Analytics)
+- **Gelecek Veri Yapısı:** Firebase Data Connect (PostgreSQL / SQL Desteği)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## ✨ Ana Özellikler
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **🎨 Modern Arayüz:** Göz alıcı glassmorphism tasarımı ve dinamik mikro-animasyonlar.
+- **🌍 Çok Dilli Destek:** TR, DE, EN, FR, ES, PT (6 dil tam senkronizasyon).
+- **📂 Sektörel Esneklik:** Otomotiv, İnşaat ve Genel sektörler için özelleştirilmiş veri alanları.
+- **📑 Akıllı Belge Yönetimi:** PDF Üretimi (jsPDF), HTML2Canvas ile önizleme ve paylaşım.
+- **📊 Finansal Takip:** Gelir/gider takibi, vergi hesaplamaları ve gerçek zamanlı finansal dashboardlar.
+
+---
+
+## 🏗️ Admin Paneli & Yönetim Akışı (MVP Yol Haritası)
+
+İşverenler ve üst düzey yöneticiler için tasarlanan yeni Admin Paneli şu modülleri içermektedir:
+
+### 1. Kullanıcı Yönetimi (HR & Roles)
+- Çalışan listesi, arama ve filtreleme.
+- Rol atama (Admin, Şantiye Şefi, Muhasebe vb.).
+- Şantiye bazlı yetkilendirme sistemi.
+
+### 2. Raporlar Merkezi
+- Günlük şantiye raporları.
+- Gelir-gider ve nakit akış raporları.
+- Stok ve demirbaş durumu.
+- Proje ilerleme yüzdeleri (Gantt/Progress).
+
+### 3. Finansal Dashboard (Executive View)
+- Toplam ciro, bekleyen ödemeler ve güncel borç durumu.
+- Sektörel bazlı finansal performans grafikleri.
+- Vergi ve yasal ödeme planlayıcı.
+
+### 4. Şantiye ve İş Akışı İzleme
+- Tüm projelerin kanban/liste görünümü.
+- Şantiye bazlı ilerleme durumları ve aşama takibi.
+- Kaynak (işçi/makine) dağılımı.
+
+### 5. Mesajlar & Bildirimler
+- Yöneticilere özel not iletme ve sistem bildirimleri.
+- Kritik durum uyarıları (Geciken ödemeler, iş kazası bildirimleri vb.).
+
+---
+
+## 🚀 Başlangıç
+
+### Kurulum
+
+```bash
+# Bağımlılıkları yükle
+npm install
+
+# Gerekli araçları yükle
+npm install -g firebase-tools
+```
+
+### Geliştirme Modu
+
+```bash
+npm run dev
+```
+
+### Dağıtım (GitHub Pages / Firebase Hosting)
+
+```bash
+# GitHub Pages Deployment
+npm run deploy
+
+# Firebase Hosting Deployment
+npm run firebase-deploy
+```
+
+---
+
+## 🔐 DB ve Güvenlik
+Proje şu anda **Cloud Firestore**'u ana veritabanı olarak kullanmaktadır. `/dataconnect` dizini altında bulunan PostgreSQL şemasıyla gelecekteki SQL geçişi için mimari altyapısı hazır durumdadır.
+
+---
+
+*Tasarlayan: Omid Bayenderi / BayFatura Ürün & UX Ekibi*
