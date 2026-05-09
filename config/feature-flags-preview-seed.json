@@ -1,0 +1,92 @@
+{
+  "_comment": "PREVIEW-ONLY seed data for Firestore doc: app_config/feature_flags",
+  "_firestore_path": "app_config/feature_flags",
+  "_warning": "This config is for preview testing only. Do not copy to production without review.",
+
+  "flags": {
+    "mobile_card_layout": {
+      "enabled": false,
+      "type": "beta",
+      "description": "Convert table rows to card layout on mobile",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": [],
+      "locales": [],
+      "countries": [],
+      "rolloutPercentage": 0
+    },
+    "optimized_invoice_list": {
+      "enabled": false,
+      "type": "beta",
+      "description": "Use paginated invoice list for better performance",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": [],
+      "locales": [],
+      "countries": [],
+      "rolloutPercentage": 0
+    },
+    "virtualized_customer_list": {
+      "enabled": false,
+      "type": "beta",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "new_dashboard_metrics": {
+      "enabled": false,
+      "type": "beta",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "beta_invoice_editor": {
+      "enabled": false,
+      "type": "beta",
+      "killSwitch": true,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "native_camera_receipts": {
+      "enabled": false,
+      "type": "native",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "native_push_notifications": {
+      "enabled": false,
+      "type": "native",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    }
+  },
+
+  "_my_account_example": {
+    "mobile_card_layout": {
+      "enabled": true,
+      "allowedEmails": ["YOUR_EMAIL@example.com"],
+      "allowedUserIds": ["YOUR_FIREBASE_UID"],
+      "_note": "Only YOUR_EMAIL sees this flag ON. All others see OFF."
+    },
+    "optimized_invoice_list": {
+      "enabled": true,
+      "allowedEmails": ["YOUR_EMAIL@example.com"],
+      "allowedUserIds": [],
+      "_note": "Only YOUR_EMAIL sees this flag ON."
+    }
+  }
+}

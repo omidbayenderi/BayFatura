@@ -136,13 +136,13 @@ const SeoAgent = ({ websiteData, profile }) => {
                     "itemListElement": websiteData.sections
                         .filter(s => s.type === 'features')
                         .flatMap(s => s.data.items || [])
-                        .map((item, index) => ({
+                            return {
                             "@type": "Offer",
                             "itemOffered": {
                                 "@type": "Service",
                                 "name": item.title,
                                 "description": item.desc
-                            }
+                            };
                         }))
                 }
             })
@@ -166,7 +166,6 @@ const SeoAgent = ({ websiteData, profile }) => {
 
         // Clean up previous script if ID changes or is removed
         const existingScript = document.getElementById('ga-script');
-        const existingConfig = document.getElementById('ga-config');
 
         if (analyticsId && !existingScript) {
             // Inject gtag.js

@@ -2,30 +2,48 @@
   "name": "bayfatura",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://omidbayenderi.github.io/BayFatura",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:preview": "vite build --mode preview",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist",
-    "firebase-deploy": "npm run build && firebase deploy --only hosting"
+    "deploy:production": "echo 'WARNING: Deploying to PRODUCTION live channel!' && npm run build && npx firebase deploy --only hosting,functions,firestore,storage",
+    "deploy:preview": "npm run build && npx firebase hosting:channel:deploy preview --expires 7d",
+    "cap:sync": "npx cap sync",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios",
+    "cap:build:android": "npm run build && npx cap sync android && npx cap open android",
+    "cap:build:ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "native:dev": "npm run build && npx cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.3",
+    "@capacitor/core": "^7.6.3",
+    "@capacitor/ios": "^7.6.3",
+    "@genkit-ai/google-genai": "^1.33.0",
     "firebase": "^12.11.0",
+    "firebase-admin": "^13.8.0",
+    "firebase-functions": "^7.2.5",
     "framer-motion": "^12.4.2",
+    "genkit": "^1.33.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.474.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.1.5",
-    "recharts": "^3.7.0"
+    "recharts": "^3.7.0",
+    "resend": "^6.12.2",
+    "stripe": "^22.1.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.3",
     "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -35,6 +53,7 @@
     "firebase-tools": "^15.12.0",
     "gh-pages": "^6.3.0",
     "globals": "^16.5.0",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.1.5"
   }
 }

@@ -86,9 +86,9 @@ const DashboardChart = ({ revenue, profit, expenses }) => {
             <div className="split-layout" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap' }}>
 
                 {/* --- LEFT: COMPARISON BARS (1/3) --- */}
-                <div className="chart-section left-section" style={{ flex: '1 1 30%', minWidth: '280px', padding: '24px', borderRight: '1px solid #e2e8f0' }}>
+                <div className="chart-section left-section" style={{ flex: '1 1 30%', padding: '24px', borderRight: '1px solid #e2e8f0' }}>
                     <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', color: '#1e293b' }}>
-                        {t('businessStats') || 'Business Statistics'}
+                        {t('businessStats')}
                     </h3>
 
                     <div className="bars-container" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: '200px', gap: '16px' }}>
@@ -111,7 +111,7 @@ const DashboardChart = ({ revenue, profit, expenses }) => {
                                             boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                                         }}
                                     />
-                                    <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '8px', fontWeight: '500' }}>
+                                    <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '8px', fontWeight: '500', textAlign: 'center', wordBreak: 'break-word', whiteSpace: 'normal', lineHeight: '1.2', width: '100%' }}>
                                         {item.label}
                                     </span>
                                 </div>
@@ -121,10 +121,10 @@ const DashboardChart = ({ revenue, profit, expenses }) => {
                 </div>
 
                 {/* --- RIGHT: 6-MONTH TREND LINE (2/3) --- */}
-                <div className="chart-section right-section" style={{ flex: '2 1 60%', minWidth: '300px', padding: '24px', position: 'relative' }}>
+                <div className="chart-section right-section" style={{ flex: '2 1 60%', padding: '24px', position: 'relative' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b' }}>
-                            {t('revenueTrend') || '6-Month Trend'}
+                            {t('revenueTrend')}
                         </h3>
                         {/* Legend */}
                         <div style={{ display: 'flex', gap: '12px' }}>

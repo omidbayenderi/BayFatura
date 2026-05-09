@@ -3,18 +3,18 @@
 
 export const INDUSTRY_FIELDS = {
     automotive: {
-        icon: '🚗',
+        icon: 'Car',
         sectionTitle: 'Fahrzeug-Details',
         sectionTitleTR: 'Araç Detayları',
         fields: [
             { name: 'vehicle', label: 'Fahrzeug', labelTR: 'Araç', type: 'text', placeholder: 'z.B. VW Golf VII' },
             { name: 'plate', label: 'Kennzeichen', labelTR: 'Plaka', type: 'text', placeholder: 'z.B. ESW-AB 123' },
-            { name: 'km', label: 'Kilometerstand', labelTR: 'Kilometre', type: 'number', placeholder: '123456' },
+            { name: 'km', label: 'KM-Stand', labelTR: 'Kilometre (KM)', type: 'number', placeholder: '123456' },
             { name: 'vin', label: 'Fahrgestellnummer (VIN)', labelTR: 'Şase No (VIN)', type: 'text', placeholder: 'Optional' }
         ]
     },
     construction: {
-        icon: '🏗️',
+        icon: 'HardHat',
         sectionTitle: 'Baustellen-Details',
         sectionTitleTR: 'Şantiye Detayları',
         fields: [
@@ -25,7 +25,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     gastronomy: {
-        icon: '🍽️',
+        icon: 'Utensils',
         sectionTitle: 'Veranstaltungs-Details',
         sectionTitleTR: 'Etkinlik Detayları',
         fields: [
@@ -36,7 +36,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     healthcare: {
-        icon: '🏥',
+        icon: 'HeartPulse',
         sectionTitle: 'Patienten-Details',
         sectionTitleTR: 'Hasta Detayları',
         fields: [
@@ -47,7 +47,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     it: {
-        icon: '💻',
+        icon: 'Monitor',
         sectionTitle: 'Projekt-Details',
         sectionTitleTR: 'Proje Detayları',
         fields: [
@@ -58,7 +58,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     retail: {
-        icon: '🛒',
+        icon: 'ShoppingCart',
         sectionTitle: 'Bestell-Details',
         sectionTitleTR: 'Sipariş Detayları',
         fields: [
@@ -69,7 +69,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     crafts: {
-        icon: '🔧',
+        icon: 'Wrench',
         sectionTitle: 'Auftrags-Details',
         sectionTitleTR: 'İş Detayları',
         fields: [
@@ -80,7 +80,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     consulting: {
-        icon: '📊',
+        icon: 'BarChart3',
         sectionTitle: 'Beratungs-Details',
         sectionTitleTR: 'Danışmanlık Detayları',
         fields: [
@@ -91,7 +91,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     education: {
-        icon: '📚',
+        icon: 'BookOpen',
         sectionTitle: 'Kurs-Details',
         sectionTitleTR: 'Kurs Detayları',
         fields: [
@@ -102,7 +102,7 @@ export const INDUSTRY_FIELDS = {
         ]
     },
     general: {
-        icon: '💼',
+        icon: 'Briefcase',
         sectionTitle: 'Projekt-Details',
         sectionTitleTR: 'Proje Detayları',
         fields: [

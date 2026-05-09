@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import '../index.css';
 import InvoiceEditor from './InvoiceEditor';
@@ -90,6 +89,7 @@ const InvoiceForm = () => {
 
     const handleDownloadPdf = async () => {
         const element = invoiceRef.current;
+        const html2canvas = (await import('html2canvas')).default;
         const canvas = await html2canvas(element, { scale: 2, useCORS: true });
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');

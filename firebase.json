@@ -8,18 +8,24 @@
     ],
     "rewrites": [
       {
+        "source": "/api/proxyImage",
+        "function": "proxyImage"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
     ]
   },
-  "emulators": {
-    "dataconnect": {
-      "dataDir": "dataconnect/.dataconnect/pgliteData"
-    }
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs20"
   },
-  "dataconnect": {
-    "source": "dataconnect"
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
   },
   "auth": {
     "providers": {}

@@ -2,19 +2,23 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useInvoice } from '../context/InvoiceContext';
 import InvoicePaper from '../components/InvoicePaper';
-import { Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Printer, ArrowLeft, Plus, Trash2, Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getIndustryFields } from '../config/industryFields';
 
+const INDUSTRY_ICONS = {
+    Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase
+};
+
 const InvoiceEdit = ({ type = 'invoice' }) => {
     const { id } = useParams();
-    const navigate = useNavigate(); // Added navigate to imports above if missing? No, it's there.
-    const { invoices, quotes, companyProfile, updateInvoice, updateQuote } = useInvoice();
-    const { t, appLanguage } = useLanguage();
+    const navigate = useNavigate();
+    const { invoices, quotes, companyProfile, updateInvoice } = useInvoice();
+    const { t, appLanguage, invoiceLanguage } = useLanguage();
     const invoiceRef = useRef();
 
-    // Get industry-specific fields configuration from current settings
     const industryConfig = getIndustryFields(companyProfile.industry || 'general');
+    const IndustryIcon = INDUSTRY_ICONS[industryConfig.icon] || Briefcase;
 
     const list = type === 'quote' ? quotes : invoices;
     const existingInvoice = list.find(inv => inv.id === Number(id) || inv.id === id);
@@ -31,7 +35,8 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
         taxRate: 19,
         status: 'draft',
         items: [{ description: '', quantity: 1, price: 0 }],
-        footerNote: 'Vielen Dank für den Auftrag!',
+        footerNote: '',
+        paymentTerms: '',
         industryData: {} // Dynamic fields based on industry
     });
 
@@ -49,7 +54,8 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
                 taxRate: existingInvoice.taxRate || 19,
                 status: existingInvoice.status || 'draft',
                 items: existingInvoice.items || [{ description: '', quantity: 1, price: 0 }],
-                footerNote: existingInvoice.footerNote || (type === 'quote' ? t('default_quote_footer') : t('default_invoice_footer')),
+                footerNote: existingInvoice.footerNote !== undefined ? existingInvoice.footerNote : '',
+                paymentTerms: existingInvoice.paymentTerms || companyProfile.paymentTerms || '',
                 industryData: existingInvoice.industryData || {}
             });
         }
@@ -109,26 +115,33 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
     };
     const totals = calculateTotals();
 
-    const handleSave = () => {
-        const updateFunc = type === 'quote' ? updateQuote : updateInvoice;
-        updateFunc(existingInvoice.id, {
-            ...invoiceData,
-            ...totals,
-            senderSnapshot: companyProfile
-        });
-        alert(type === 'quote' ? t('quote_updated') : t('invoice_updated'));
-        navigate(type === 'quote' ? '/quotes' : '/archive');
+    // FIX: updateQuote does not exist — both invoice and quote updates use updateInvoice logic.
+    // FIX: await the async update before navigating to avoid race condition.
+    const handleSave = async () => {
+        try {
+            await updateInvoice(existingInvoice.id, {
+                ...invoiceData,
+                ...totals,
+                senderSnapshot: companyProfile,
+                language: invoiceData.language || invoiceLanguage
+            });
+            navigate(`/${type}/${existingInvoice.id}?autoprint=true`);
+        } catch (err) {
+            console.error('Save failed:', err);
+        }
     };
 
     const fullData = {
         logo: companyProfile.logo,
+        signatureUrl: companyProfile.signatureUrl || '',
+        stampUrl: companyProfile.stampUrl || '',
         senderCompany: companyProfile.companyName,
         senderStreet: companyProfile.street,
         senderHouseNum: companyProfile.houseNum,
         senderZip: companyProfile.zip,
         senderCity: companyProfile.city,
-        senderPhone: companyProfile.phone,
-        senderEmail: companyProfile.email,
+        senderPhone: companyProfile.companyPhone,
+        senderEmail: companyProfile.companyEmail,
         senderTaxId: companyProfile.taxId,
         senderVatId: companyProfile.vatId,
         senderBank: companyProfile.bankName,
@@ -136,9 +149,10 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
         senderBic: companyProfile.bic,
         paypalMe: companyProfile.paypalMe,
         stripeLink: companyProfile.stripeLink,
-        industry: companyProfile.industry || 'automotive',
+        industry: companyProfile.industry || 'general',
         logoDisplayMode: companyProfile.logoDisplayMode || 'both',
-        footerPayment: `Bank: ${companyProfile.bankName}\\nIBAN: ${companyProfile.iban}\\n${companyProfile.paymentTerms}`,
+        paymentTerms: invoiceData.paymentTerms,
+        footerPayment: `Bank: ${companyProfile.bankName}\nIBAN: ${companyProfile.iban}\n${invoiceData.paymentTerms}`,
         ...invoiceData,
         ...invoiceData.industryData
     };
@@ -157,8 +171,8 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
                 </div>
                 <div className="actions">
                     <button className="primary-btn" onClick={handleSave}>
-                        <Save size={20} />
-                        {t('save')}
+                        <Printer size={20} />
+                        {t('saveAndPrint')}
                     </button>
                 </div>
             </header>
@@ -194,13 +208,16 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
                     </div>
 
                     <div className="card">
-                        <h3>{industryConfig.icon} {appLanguage === 'tr' ? industryConfig.sectionTitleTR : industryConfig.sectionTitle}</h3>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <IndustryIcon size={18} color="var(--primary)" />
+                            {t((companyProfile.industry || 'general') + 'SectionTitle')}
+                        </h3>
 
                         {/* Dynamic Industry-Specific Fields */}
                         <div className="form-row">
                             {industryConfig.fields.slice(0, 2).map(field => (
                                 <div className="form-group" key={field.name}>
-                                    <label>{appLanguage === 'tr' ? field.labelTR : field.label}</label>
+                                    <label>{t(field.name + 'Label')}</label>
                                     <input
                                         type={field.type}
                                         className="form-input"
@@ -214,7 +231,7 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
                         <div className="form-row">
                             {industryConfig.fields.slice(2, 4).map(field => (
                                 <div className="form-group" key={field.name}>
-                                    <label>{appLanguage === 'tr' ? field.labelTR : field.label}</label>
+                                    <label>{t(field.name + 'Label')}</label>
                                     <input
                                         type={field.type}
                                         className="form-input"
@@ -293,6 +310,31 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
                             <div className="row"><span>{t('subtotal')}:</span> <span>{totals.subtotal.toFixed(2)} {invoiceData.currency === 'TRY' ? '₺' : invoiceData.currency === 'USD' ? '$' : invoiceData.currency === 'GBP' ? '£' : '€'}</span></div>
                             <div className="row"><span>{t('tax')} ({invoiceData.taxRate}%):</span> <span>{totals.tax.toFixed(2)} {invoiceData.currency === 'TRY' ? '₺' : invoiceData.currency === 'USD' ? '$' : invoiceData.currency === 'GBP' ? '£' : '€'}</span></div>
                             <div className="row total"><span>{t('total')}:</span> <span>{totals.total.toFixed(2)} {invoiceData.currency === 'TRY' ? '₺' : invoiceData.currency === 'USD' ? '$' : invoiceData.currency === 'GBP' ? '£' : '€'}</span></div>
+                        </div>
+                    </div>
+
+                    <div className="card full-width">
+                            <h3>{t('paymentTerms')}</h3>
+                        <div className="form-group">
+                            <label>{t('extraNote')}</label>
+                            <input 
+                                className="form-input" 
+                                name="footerNote" 
+                                value={invoiceData.footerNote} 
+                                onChange={handleChange}
+                                placeholder="e.g. Vielen Dank für Ihren Auftrag!"
+                                style={{ marginBottom: '12px' }}
+                            />
+                            
+                            <label>{t('paymentTerms')}</label>
+                            <textarea 
+                                className="form-input" 
+                                name="paymentTerms" 
+                                value={invoiceData.paymentTerms} 
+                                onChange={handleChange}
+                                rows="3"
+                                placeholder={t('paymentTerms')}
+                            />
                         </div>
                     </div>
                 </div>

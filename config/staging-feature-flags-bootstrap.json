@@ -1,0 +1,75 @@
+{
+  "_comment": "BOOTSTRAP CONFIG for staging Firestore app_config/feature_flags",
+  "_warning": "ALL flags OFF by default. Only explicitly listed accounts can see ON.",
+  "_setup": [
+    "1. Open staging Firebase Console → Firestore",
+    "2. Create collection 'app_config' with document 'feature_flags'",
+    "3. Set the content to the flags object below",
+    "4. Replace MY_EMAIL@example.com with your email for my-account-only testing",
+    "5. Replace MY_UID with your Firebase Auth UID (from staging Auth)"
+  ],
+
+  "flags": {
+    "mobile_card_layout": {
+      "enabled": false,
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "optimized_invoice_list": {
+      "enabled": false,
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "virtualized_customer_list": {
+      "enabled": false,
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "new_dashboard_metrics": {
+      "enabled": false,
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "beta_invoice_editor": {
+      "enabled": false,
+      "killSwitch": true,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "native_camera_receipts": {
+      "enabled": false,
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "native_push_notifications": {
+      "enabled": false,
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    }
+  },
+
+  "my_account_testing_config": {
+    "_instruction": "Replace enabled: false with enabled: true and add YOUR email/UID to the appropriate list",
+
+    "mobile_card_layout": {
+      "enabled": true,
+      "killSwitch": false,
+      "allowedEmails": ["MY_EMAIL@example.com"],
+      "allowedUserIds": [],
+      "betaTesters": []
+    }
+  }
+}

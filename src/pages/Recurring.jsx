@@ -26,10 +26,10 @@ const Recurring = () => {
             <header className="page-header">
                 <div>
                     <h1>{t('recurringInvoices')}</h1>
-                    <p>{t('recurringInvoicesDesc')}</p>
+                    <p>{t('recurringDesc')}</p>
                 </div>
                 <div className="actions">
-                    <button className="primary-btn" onClick={() => setShowForm(!showForm)}>
+                    <button className="primary-btn" onClick={() => setShowForm(!showForm)} style={{ height: '42px' }}>
                         <Plus size={20} /> {t('createTemplate')}
                     </button>
                 </div>
@@ -47,11 +47,11 @@ const Recurring = () => {
                                     required
                                     value={formData.recipientName}
                                     onChange={(e) => setFormData({ ...formData, recipientName: e.target.value })}
-                                    placeholder="e.g. Acme Corp"
+                                    placeholder="..."
                                 />
                             </div>
                             <div className="form-group">
-                                <label>{t('amount')} (Netto)</label>
+                                <label>{t('amount')}</label>
                                 <input
                                     type="number"
                                     className="form-input"
@@ -71,8 +71,8 @@ const Recurring = () => {
                                 >
                                     <option value="weekly">{t('weekly')}</option>
                                     <option value="monthly">{t('monthly')}</option>
-                                    <option value="quarterly">{t('quarterly')}</option>
-                                    <option value="yearly">{t('yearly')}</option>
+                                    <option value="quarterly">{t('quarterly') || 'Quartalsweise'}</option>
+                                    <option value="yearly">{t('yearly') || 'Jährlich'}</option>
                                 </select>
                             </div>
                             <div className="form-group" style={{ flex: 2 }}>
@@ -81,13 +81,13 @@ const Recurring = () => {
                                     className="form-input"
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    placeholder="e.g. Monthly Maintenance"
+                                    placeholder="..."
                                 />
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                             <button type="button" className="secondary-btn" onClick={() => setShowForm(false)}>{t('cancel')}</button>
-                            <button type="submit" className="primary-btn">{t('save')} {t('addRow')}</button>
+                            <button type="submit" className="primary-btn">{t('save')}</button>
                         </div>
                     </form>
                 </div>
@@ -100,7 +100,7 @@ const Recurring = () => {
                             <th>{t('customer')}</th>
                             <th>{t('frequency')}</th>
                             <th>{t('amount')}</th>
-                            <th>{t('upcoming')}</th>
+                            <th>{t('nextDate')}</th>
                             <th style={{ textAlign: 'right' }}>{t('actions')}</th>
                         </tr>
                     </thead>
@@ -113,7 +113,7 @@ const Recurring = () => {
                                 </td>
                                 <td>
                                     <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>
-                                        <RefreshCcw size={12} style={{ marginRight: '4px' }} /> {t(tpl.frequency || 'monthly')}
+                                        <RefreshCcw size={12} style={{ marginRight: '4px' }} /> {t(tpl.frequency) || tpl.frequency}
                                     </span>
                                 </td>
                                 <td style={{ fontWeight: '600' }}>
@@ -121,7 +121,7 @@ const Recurring = () => {
                                 </td>
                                 <td>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.9rem' }}>
-                                        <Calendar size={14} /> {t('upcoming')}
+                                        <Calendar size={14} /> {t('active')}
                                     </div>
                                 </td>
                                 <td style={{ textAlign: 'right' }}>
@@ -134,7 +134,7 @@ const Recurring = () => {
                         {recurringTemplates.length === 0 && (
                             <tr>
                                 <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                                    {t('noRecurring')}
+                                    {t('nothingFound') || 'Keine Daten'}
                                 </td>
                             </tr>
                         )}
