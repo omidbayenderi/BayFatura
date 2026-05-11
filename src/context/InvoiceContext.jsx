@@ -1,278 +1,228 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, auth } from '../lib/firebase';
+import { db, storage } from '../lib/firebase';
 import { 
-    collection, 
-    addDoc, 
-    deleteDoc, 
-    doc, 
-    onSnapshot, 
-    query, 
-    where, 
-    orderBy,
-    updateDoc,
-    setDoc,
-    getDoc
+    collection, addDoc, deleteDoc, doc, onSnapshot, query, where, 
+    or, orderBy, updateDoc, setDoc, getDocs, writeBatch 
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { useAuth } from './AuthContext';
+
+/**
+ * Uploads a File object to Firebase Storage and returns the public download URL.
+ * Path: users/{uid}/assets/{filename}
+ */
+export const uploadToStorage = async (uid, file, filename) => {
+    const storageRef = ref(storage, `users/${uid}/assets/${filename}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+};
+
+/**
+ * Deletes a file from Firebase Storage by its download URL.
+ * Silently ignores errors (e.g. file already deleted).
+ */
+export const deleteFromStorage = async (downloadUrl) => {
+    try {
+        const storageRef = ref(storage, downloadUrl);
+        await deleteObject(storageRef);
+    } catch (e) {
+        // Ignore - file may not exist
+    }
+};
 
 const InvoiceContext = createContext();
 
 const INITIAL_COMPANY_PROFILE = {
-    logo: null,
-    companyName: 'SH Bau & Construction',
-    owner: 'Omid Bayenderi',
-    street: 'Schillerstraße',
-    houseNum: '2',
-    zip: '37269',
-    city: 'Eschwege',
-    phone: '+49 (0) 176 841 500 97',
-    email: 'shbau.2026@gmail.com',
-    taxId: '123/456/7890',
-    vatId: 'DE123456789',
-    bankName: 'Deutsche Bank',
-    iban: 'DE73 5227 0024 0859 6561 00',
-    bic: '',
-    paymentTerms: 'Zahlbar innerhalb von 14 Tagen ohne Abzug. \nZahlungsart: Überweisung / Bar',
-    defaultCurrency: 'EUR',
-    defaultTaxRate: 19,
-    paypalMe: '',
-    stripeLink: '',
-    plan: 'premium',
-    industry: 'automotive',
-    logoDisplayMode: 'both'
+    companyName: '', owner: '', companyEmail: '', companyPhone: '', website: '',
+    taxId: '', vatId: '', street: '', houseNum: '', zip: '', city: '',
+    bankName: '', iban: '', bic: '', 
+    logo: null, signature: null, stamp: null, plan: 'standard',
+    paymentTerms: '', industry: 'general'
 };
 
 export const InvoiceProvider = ({ children }) => {
-    const [companyProfile, setCompanyProfile] = useState(INITIAL_COMPANY_PROFILE);
+    const { currentUser } = useAuth();
     const [invoices, setInvoices] = useState([]);
     const [quotes, setQuotes] = useState([]);
     const [expenses, setExpenses] = useState([]);
+    const [deletedInvoices, setDeletedInvoices] = useState([]);
+    const [deletedQuotes, setDeletedQuotes] = useState([]);
+    const [deletedExpenses, setDeletedExpenses] = useState([]);
     const [recurringTemplates, setRecurringTemplates] = useState([]);
-    const [expenseCategories, setExpenseCategories] = useState(['spareParts', 'rent', 'marketing', 'software', 'insurance', 'others']);
+    const [companyProfile, setCompanyProfile] = useState(INITIAL_COMPANY_PROFILE);
     const [invoiceCustomization, setInvoiceCustomization] = useState({
-        primaryColor: '#8B5CF6',
-        accentColor: '#6366F1',
-        brandPalette: [],
-        signatureUrl: null,
-        footerText: '',
-        quoteValidityDays: 30
+        primaryColor: '#3b82f6', secondaryColor: '#1e293b', fontFamily: 'Inter',
+        template: 'classic', showLogo: true, showTax: true, showTotalInWords: false,
+        notes: '', quoteValidityDays: 30
     });
-    const [employees, setEmployees] = useState([]);
-    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // 1. Sync Profile & Customization from Firestore
     useEffect(() => {
-        const user = auth.currentUser;
-        if (!user) return;
+        if (!currentUser) {
+            setInvoices([]); setQuotes([]); setExpenses([]); setRecurringTemplates([]);
+            setDeletedInvoices([]); setDeletedQuotes([]); setDeletedExpenses([]);
+            setLoading(false);
+            return;
+        }
 
-        const profileUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
-            if (snapshot.exists()) {
-                setCompanyProfile(prev => ({ ...prev, ...snapshot.data() }));
+        // Defensive Listener Wrapper
+        const safeListen = (refOrQuery, callback, contextName) => {
+            return onSnapshot(refOrQuery, callback, (err) => {
+                console.warn(`${contextName} listener error:`, err.code);
+                // Silently handle permission-denied during auth transition
+                if (err.code === 'permission-denied') setLoading(false);
+            });
+        };
+
+        // 1. Profile & Settings
+        const unsubProfile = safeListen(doc(db, 'users', currentUser.uid), (s) => {
+            if (s.exists()) {
+                const data = s.data();
+                setCompanyProfile(prev => ({ 
+                    ...prev, 
+                    ...data,
+                    companyEmail: data.companyEmail || data.email || currentUser.email || prev.companyEmail 
+                }));
             } else {
-                // Initialize profile if not exists
-                setDoc(doc(db, 'users', user.uid), INITIAL_COMPANY_PROFILE);
+                // If profile doesn't exist, at least set the email from auth
+                setCompanyProfile(prev => ({ ...prev, companyEmail: currentUser.email || prev.companyEmail }));
             }
-        });
+            setLoading(false);
+        }, "Profile");
 
-        const customizationUnsubscribe = onSnapshot(doc(db, 'customizations', user.uid), (snapshot) => {
-            if (snapshot.exists()) {
-                setInvoiceCustomization(prev => ({ ...prev, ...snapshot.data() }));
-            }
-        });
+        const unsubCustom = safeListen(doc(db, 'customizations', currentUser.uid), (s) => {
+            if (s.exists()) setInvoiceCustomization(prev => ({ ...prev, ...s.data() }));
+        }, "Customization");
+
+        // 2. Data Queries
+        const qParams = where('userId', '==', currentUser.uid);
+        
+        const qInv = query(collection(db, 'invoices'), qParams);
+        const qQuo = query(collection(db, 'quotes'), qParams);
+        const qExp = query(collection(db, 'expenses'), qParams);
+        const qRec = query(collection(db, 'recurring_templates'), qParams);
+
+        const unsubInv = safeListen(qInv, (s) => {
+            const all = s.docs.map(d => ({ id: d.id, ...d.data() }));
+            const active = all.filter(d => !d.isDeleted);
+            const deleted = all.filter(d => d.isDeleted);
+            active.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+            setInvoices(active);
+            setDeletedInvoices(deleted);
+        }, "Invoices");
+
+        const unsubQuo = safeListen(qQuo, (s) => {
+            const all = s.docs.map(d => ({ id: d.id, ...d.data() }));
+            setQuotes(all.filter(d => !d.isDeleted));
+            setDeletedQuotes(all.filter(d => d.isDeleted));
+        }, "Quotes");
+
+        const unsubExp = safeListen(qExp, (s) => {
+            const all = s.docs.map(d => ({ id: d.id, ...d.data() }));
+            setExpenses(all.filter(d => !d.isDeleted));
+            setDeletedExpenses(all.filter(d => d.isDeleted));
+        }, "Expenses");
+
+        const unsubRec = safeListen(qRec, (s) => setRecurringTemplates(s.docs.map(d => ({ id: d.id, ...d.data() }))), "Recurring");
 
         return () => {
-            profileUnsubscribe();
-            customizationUnsubscribe();
+            unsubProfile(); unsubCustom(); unsubInv(); unsubQuo(); unsubExp(); unsubRec();
         };
-    }, [auth.currentUser]);
+    }, [currentUser]);
 
-    // 2. Sync Invoices from Firestore
-    useEffect(() => {
-        const user = auth.currentUser;
-        if (!user) {
-            setInvoices([]);
-            return;
-        }
+    // Data Actions
+    const saveInvoice = async (d) => {
+        const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString() });
+        const ref = await addDoc(collection(db, 'invoices'), payload);
+        return { id: ref.id, ...payload };
+    };
 
-        const q = query(
-            collection(db, 'invoices'), 
-            where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc')
-        );
+    const deleteInvoice = async (id) => await updateDoc(doc(db, 'invoices', id), { isDeleted: true, deletedAt: new Date().toISOString() });
+    const restoreInvoice = async (id) => await updateDoc(doc(db, 'invoices', id), { isDeleted: false, deletedAt: null });
+    const deleteInvoicePermanently = async (id) => await deleteDoc(doc(db, 'invoices', id));
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setInvoices(data);
+    const updateInvoice = async (id, d) => await updateDoc(doc(db, 'invoices', id), cleanData(d));
+    const updateInvoiceStatus = async (id, s) => await updateDoc(doc(db, 'invoices', id), { status: s });
+    
+    const saveQuote = async (d) => {
+        const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString() });
+        const ref = await addDoc(collection(db, 'quotes'), payload);
+        return { id: ref.id, ...payload };
+    };
+    const deleteQuote = async (id) => await updateDoc(doc(db, 'quotes', id), { isDeleted: true, deletedAt: new Date().toISOString() });
+    const restoreQuote = async (id) => await updateDoc(doc(db, 'quotes', id), { isDeleted: false, deletedAt: null });
+    const deleteQuotePermanently = async (id) => await deleteDoc(doc(db, 'quotes', id));
+
+    const saveExpense = async (d) => {
+        const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString() });
+        await addDoc(collection(db, 'expenses'), payload);
+    };
+    const deleteExpense = async (id) => await updateDoc(doc(db, 'expenses', id), { isDeleted: true, deletedAt: new Date().toISOString() });
+    const restoreExpense = async (id) => await updateDoc(doc(db, 'expenses', id), { isDeleted: false, deletedAt: null });
+    const deleteExpensePermanently = async (id) => await deleteDoc(doc(db, 'expenses', id));
+
+    const saveRecurringTemplate = async (d) => {
+        const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString() });
+        await addDoc(collection(db, 'recurring_templates'), payload);
+    };
+    const deleteRecurringTemplate = async (id) => await deleteDoc(doc(db, 'recurring_templates', id));
+
+    // Recursively removes undefined values from data to prevent Firestore errors
+    const cleanData = (obj) => {
+        if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+        const clean = {};
+        Object.keys(obj).forEach(key => {
+            if (obj[key] !== undefined) {
+                // Recursively clean nested objects (e.g. industryData)
+                if (obj[key] !== null && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+                    clean[key] = cleanData(obj[key]);
+                } else if (Array.isArray(obj[key])) {
+                    // Clean arrays of objects too (e.g. invoice items)
+                    clean[key] = obj[key].map(item =>
+                        (item !== null && typeof item === 'object') ? cleanData(item) : item
+                    );
+                } else {
+                    clean[key] = obj[key];
+                }
+            }
         });
+        return clean;
+    };
 
-        return unsubscribe;
-    }, [auth.currentUser]);
+    const updateProfile = async (d) => {
+        if (!currentUser) return;
+        const sanitizedData = cleanData(d);
+        await setDoc(doc(db, 'users', currentUser.uid), sanitizedData, { merge: true });
+    };
 
-    // 3. Sync Quotes from Firestore
-    useEffect(() => {
-        const user = auth.currentUser;
-        if (!user) {
-            setQuotes([]);
-            return;
+    const updateCustomization = async (d) => {
+        if (!currentUser) return;
+        const sanitizedData = cleanData(d);
+        await setDoc(doc(db, 'customizations', currentUser.uid), sanitizedData, { merge: true });
+    };
+
+    const clearAllData = async () => {
+        if (!currentUser) return;
+        const colls = ['invoices', 'quotes', 'expenses', 'recurring_templates'];
+        for (const c of colls) {
+            const q = query(collection(db, c), where('userId', '==', currentUser.uid));
+            const snap = await getDocs(q);
+            const batch = writeBatch(db);
+            snap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
         }
-
-        const q = query(
-            collection(db, 'quotes'),
-            where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setQuotes(data);
-        });
-
-        return unsubscribe;
-    }, [auth.currentUser]);
-
-    // 4. Sync Expenses from Firestore
-    useEffect(() => {
-        const user = auth.currentUser;
-        if (!user) {
-            setExpenses([]);
-            return;
-        }
-
-        const q = query(
-            collection(db, 'expenses'),
-            where('userId', '==', user.uid),
-            orderBy('date', 'desc')
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setExpenses(data);
-        });
-
-        return unsubscribe;
-    }, [auth.currentUser]);
-
-    // Actions
-    const saveInvoice = async (invoiceData) => {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const newInvoice = {
-            ...invoiceData,
-            userId: user.uid,
-            createdAt: new Date().toISOString()
-        };
-
-        const docRef = await addDoc(collection(db, 'invoices'), newInvoice);
-        return { id: docRef.id, ...newInvoice };
-    };
-
-    const deleteInvoice = async (id) => {
-        await deleteDoc(doc(db, 'invoices', id));
-    };
-
-    const saveQuote = async (quoteData) => {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const newQuote = {
-            ...quoteData,
-            userId: user.uid,
-            createdAt: new Date().toISOString()
-        };
-
-        const docRef = await addDoc(collection(db, 'quotes'), newQuote);
-        return { id: docRef.id, ...newQuote };
-    };
-
-    const deleteQuote = async (id) => {
-        await deleteDoc(doc(db, 'quotes', id));
-    };
-
-    const updateQuote = async (id, newData) => {
-        await updateDoc(doc(db, 'quotes', id), newData);
-    };
-
-    const saveExpense = async (expenseData) => {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        await addDoc(collection(db, 'expenses'), {
-            ...expenseData,
-            userId: user.uid,
-            date: expenseData.date || new Date().toISOString().split('T')[0]
-        });
-    };
-
-    const deleteExpense = async (id) => {
-        await deleteDoc(doc(db, 'expenses', id));
-    };
-
-    const updateProfile = async (newData) => {
-        const user = auth.currentUser;
-        if (!user) return;
-        await updateDoc(doc(db, 'users', user.uid), newData);
-    };
-
-    const updateCustomization = async (newData) => {
-        const user = auth.currentUser;
-        if (!user) return;
-        
-        const docRef = doc(db, 'customizations', user.uid);
-        const snapshot = await getDoc(docRef);
-        if (snapshot.exists()) {
-            await updateDoc(docRef, newData);
-        } else {
-            await setDoc(docRef, newData);
-        }
-    };
-
-    const updateInvoice = async (id, newData) => {
-        await updateDoc(doc(db, 'invoices', id), newData);
-    };
-
-    const updateInvoiceStatus = async (id, newStatus) => {
-        await updateDoc(doc(db, 'invoices', id), { status: newStatus });
-    };
-
-    const CURRENCIES = [
-        { code: 'EUR', symbol: '€', label: 'Euro' },
-        { code: 'USD', symbol: '$', label: 'US Dollar' },
-        { code: 'TRY', symbol: '₺', label: 'Türk Lirası' },
-        { code: 'GBP', symbol: '£', label: 'British Pound' }
-    ];
-
-    const STATUSES = {
-        draft: { label: 'Entwurf', color: '#94a3b8' },
-        sent: { label: 'Gesendet', color: '#3b82f6' },
-        paid: { label: 'Bezahlt', color: '#10b981' },
-        partial: { label: 'Teilweise', color: '#f59e0b' },
-        overdue: { label: 'Überfällig', color: '#ef4444' }
     };
 
     return (
-        <InvoiceContext.Provider value={{
-            companyProfile,
-            invoices,
-            quotes,
-            expenses,
-            recurringTemplates,
-            invoiceCustomization,
-            saveInvoice,
-            deleteInvoice,
-            saveQuote,
-            deleteQuote,
-            updateQuote,
-            saveExpense,
-            deleteExpense,
-            updateProfile,
-            updateInvoiceStatus,
-            updateInvoice,
-            updateCustomization,
-            expenseCategories,
-            CURRENCIES,
-            STATUSES,
-            employees,
-            messages
+        <InvoiceContext.Provider value={{ 
+            invoices, quotes, expenses, recurringTemplates, companyProfile, invoiceCustomization, loading, 
+            deletedInvoices, deletedQuotes, deletedExpenses,
+            saveInvoice, deleteInvoice, restoreInvoice, deleteInvoicePermanently, updateInvoice, updateInvoiceStatus,
+            saveQuote, deleteQuote, restoreQuote, deleteQuotePermanently, saveExpense, deleteExpense, restoreExpense, deleteExpensePermanently, saveRecurringTemplate, deleteRecurringTemplate,
+            updateProfile, updateCustomization,
+            clearAllData,
+            CURRENCIES: [{ code: 'EUR', symbol: '€', label: 'Euro' }, { code: 'USD', symbol: '$', label: 'US Dollar' }, { code: 'TRY', symbol: '₺', label: 'Türk Lirası' }],
+            STATUSES: { draft: { label: 'Entwurf', color: '#94a3b8' }, sent: { label: 'Gesendet', color: '#3b82f6' }, paid: { label: 'Bezahlt', color: '#10b981' }, overdue: { label: 'Überfällig', color: '#ef4444' } }
         }}>
             {children}
         </InvoiceContext.Provider>

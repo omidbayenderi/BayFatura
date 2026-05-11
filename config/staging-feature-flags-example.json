@@ -1,0 +1,73 @@
+{
+  "_comment": "Feature flag config for the STAGING Firebase environment.",
+  "_firestore_path": "app_config/feature_flags (in staging project)",
+  "_warning": "This goes in staging Firestore, NOT production Firestore.",
+  "_safety": "All flags default to OFF. Only explicitly listed accounts can enable them.",
+
+  "flags": {
+    "mobile_card_layout": {
+      "enabled": false,
+      "description": "Convert table rows to card layout on mobile",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "optimized_invoice_list": {
+      "enabled": false,
+      "description": "Optimized invoice list rendering",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "virtualized_customer_list": {
+      "enabled": false,
+      "description": "Virtualized customer list",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "new_dashboard_metrics": {
+      "enabled": false,
+      "description": "New dashboard metrics",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "beta_invoice_editor": {
+      "enabled": false,
+      "description": "New invoice editor",
+      "killSwitch": true,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "native_camera_receipts": {
+      "enabled": false,
+      "description": "Native camera for receipts (Capacitor)",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    },
+    "native_push_notifications": {
+      "enabled": false,
+      "description": "Native push notifications (Capacitor)",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": [],
+      "betaTesters": []
+    }
+  },
+
+  "_my_account_testing": {
+    "mobile_card_layout": {
+      "enabled": true,
+      "allowedEmails": ["YOUR_EMAIL@example.com"],
+      "_note": "Only YOUR_EMAIL sees this ON. Everyone else sees OFF."
+    }
+  }
+}

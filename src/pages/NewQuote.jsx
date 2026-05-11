@@ -1,21 +1,27 @@
 import React, { useState, useRef } from 'react';
 import { useInvoice } from '../context/InvoiceContext';
 import InvoicePaper from '../components/InvoicePaper';
-import { Save, Printer, Plus, Trash2 } from 'lucide-react';
+import { Save, Printer, Plus, Trash2, Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { usePanel } from '../context/PanelContext';
 import { getIndustryFields } from '../config/industryFields';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+
+const INDUSTRY_ICONS = {
+    Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase
+};
 
 const NewQuote = () => {
     const { companyProfile, saveQuote } = useInvoice();
     const { t, appLanguage } = useLanguage();
+    const { showToast } = usePanel();
     const navigate = useNavigate();
     const invoiceRef = useRef();
+    const [isSaving, setIsSaving] = useState(false);
 
-    // Get industry-specific fields configuration
     const industryConfig = getIndustryFields(companyProfile.industry || 'general');
+    const IndustryIcon = INDUSTRY_ICONS[industryConfig.icon] || Briefcase;
 
     // Local state - industryData stores dynamic fields based on selected industry
     const [invoiceData, setInvoiceData] = useState({
@@ -31,7 +37,8 @@ const NewQuote = () => {
         taxRate: companyProfile.defaultTaxRate || 19,
         status: 'draft',
         items: [{ description: '', quantity: 1, price: 0 }],
-        footerNote: 'Gerne erwarten wir Ihre Auftragserteilung.',
+        footerNote: '',
+        paymentTerms: companyProfile.paymentTerms || '',
         industryData: {}, // Dynamic fields based on industry
         type: 'quote' // Explicitly set type to quote
     });
@@ -73,13 +80,15 @@ const NewQuote = () => {
     const fullData = {
         // Map Context Profile to Paper Props
         logo: companyProfile.logo,
+        signatureUrl: companyProfile.signatureUrl || '',
+        stampUrl: companyProfile.stampUrl || '',
         senderCompany: companyProfile.companyName,
         senderStreet: companyProfile.street,
         senderHouseNum: companyProfile.houseNum,
         senderZip: companyProfile.zip,
         senderCity: companyProfile.city,
-        senderPhone: companyProfile.phone,
-        senderEmail: companyProfile.email,
+        senderPhone: companyProfile.companyPhone,
+        senderEmail: companyProfile.companyEmail,
         senderTaxId: companyProfile.taxId,
         senderVatId: companyProfile.vatId,
         senderBank: companyProfile.bankName,
@@ -87,11 +96,12 @@ const NewQuote = () => {
         senderBic: companyProfile.bic,
         paypalMe: companyProfile.paypalMe,
         stripeLink: companyProfile.stripeLink,
-        industry: companyProfile.industry || 'automotive',
+        industry: companyProfile.industry || 'general',
         logoDisplayMode: companyProfile.logoDisplayMode || 'both',
 
-        // Footer Data from Profile
-        footerPayment: `Bank: ${companyProfile.bankName}\\nIBAN: ${companyProfile.iban}\\n${companyProfile.paymentTerms}`,
+        // Footer Data
+        paymentTerms: invoiceData.paymentTerms,
+        footerPayment: `Bank: ${companyProfile.bankName}\nIBAN: ${companyProfile.iban}\n${invoiceData.paymentTerms}`,
 
         // Quote Specifics
         ...invoiceData,
@@ -109,18 +119,25 @@ const NewQuote = () => {
     const totals = calculateTotals();
 
     const handleSaveAndPrint = async () => {
-        // 1. Save to Quotes List
-        const newQuote = saveQuote({
-            ...invoiceData,
-            ...totals,
-            senderSnapshot: companyProfile
-        });
+        try {
+            setIsSaving(true);
+            // 1. Save to Quotes List
+            const newQuote = await saveQuote({
+                ...invoiceData,
+                ...totals,
+                senderSnapshot: companyProfile
+            });
 
-        // 2. Navigate to Quote View with autoprint
-        if (newQuote && newQuote.id) {
-            navigate(`/quote/${newQuote.id}?autoprint=true`);
-        } else {
-            navigate('/quotes');
+            // 2. Navigate to Quote View with autoprint
+            if (newQuote && newQuote.id) {
+                navigate(`/quote/${newQuote.id}?autoprint=true`);
+            } else {
+                navigate('/quotes');
+            }
+        } catch (error) {
+            console.error("Error saving quote:", error);
+            showToast(t('saveFailed') + " " + error.message, 'error');
+            setIsSaving(false);
         }
     };
 
@@ -129,9 +146,9 @@ const NewQuote = () => {
             <header className="page-header">
                 <h1>{t('newQuote')}</h1>
                 <div className="actions">
-                    <button className="primary-btn" onClick={handleSaveAndPrint}>
-                        <Printer size={20} />
-                        {t('saveAndPrint')}
+                    <button className="primary-btn" onClick={handleSaveAndPrint} disabled={isSaving}>
+                        <Printer size={20} className={isSaving ? 'animate-spin' : ''} />
+                        {isSaving ? t('saving') : t('saveAndPrint')}
                     </button>
                 </div>
             </header>
@@ -169,13 +186,16 @@ const NewQuote = () => {
                     </div>
 
                     <div className="card">
-                        <h3>{industryConfig.icon} {appLanguage === 'tr' ? industryConfig.sectionTitleTR : industryConfig.sectionTitle}</h3>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <IndustryIcon size={18} color="var(--primary)" />
+                            {t((companyProfile.industry || 'general') + 'SectionTitle')}
+                        </h3>
 
                         {/* Dynamic Industry-Specific Fields */}
                         <div className="form-row">
                             {industryConfig.fields.slice(0, 2).map(field => (
                                 <div className="form-group" key={field.name}>
-                                    <label>{appLanguage === 'tr' ? field.labelTR : field.label}</label>
+                                    <label>{t(field.name + 'Label')}</label>
                                     <input
                                         type={field.type}
                                         className="form-input"
@@ -189,7 +209,7 @@ const NewQuote = () => {
                         <div className="form-row">
                             {industryConfig.fields.slice(2, 4).map(field => (
                                 <div className="form-group" key={field.name}>
-                                    <label>{appLanguage === 'tr' ? field.labelTR : field.label}</label>
+                                    <label>{t(field.name + 'Label')}</label>
                                     <input
                                         type={field.type}
                                         className="form-input"
@@ -225,7 +245,7 @@ const NewQuote = () => {
                         </div>
                         <div className="form-row">
                             <div className="form-group">
-                                <label>{t('taxRate')} (MwSt %)</label>
+                                <label>{t('taxRate')}</label>
                                 <input type="number" className="form-input" name="taxRate" value={invoiceData.taxRate} onChange={handleChange} />
                             </div>
                         </div>
@@ -273,6 +293,31 @@ const NewQuote = () => {
                             <div className="row"><span>{t('subtotal')}:</span> <span>{totals.subtotal.toFixed(2)} {invoiceData.currency === 'TRY' ? '₺' : invoiceData.currency === 'USD' ? '$' : invoiceData.currency === 'GBP' ? '£' : '€'}</span></div>
                             <div className="row"><span>{t('tax')} ({invoiceData.taxRate}%):</span> <span>{totals.tax.toFixed(2)} {invoiceData.currency === 'TRY' ? '₺' : invoiceData.currency === 'USD' ? '$' : invoiceData.currency === 'GBP' ? '£' : '€'}</span></div>
                             <div className="row total"><span>{t('total')}:</span> <span>{totals.total.toFixed(2)} {invoiceData.currency === 'TRY' ? '₺' : invoiceData.currency === 'USD' ? '$' : invoiceData.currency === 'GBP' ? '£' : '€'}</span></div>
+                        </div>
+                    </div>
+
+                    <div className="card full-width">
+                        <h3>{t('paymentTerms')}</h3>
+                        <div className="form-group">
+                            <label>{t('additionalInfo')}</label>
+                            <input 
+                                className="form-input" 
+                                name="footerNote" 
+                                value={invoiceData.footerNote} 
+                                onChange={handleChange}
+                                placeholder={t('thanksPlaceholder')}
+                                style={{ marginBottom: '12px' }}
+                            />
+                            
+                            <label>{t('paymentTerms')}</label>
+                            <textarea 
+                                className="form-input" 
+                                name="paymentTerms" 
+                                value={invoiceData.paymentTerms} 
+                                onChange={handleChange}
+                                rows="3"
+                                placeholder="..."
+                            />
                         </div>
                     </div>
                 </div>

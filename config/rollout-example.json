@@ -1,0 +1,53 @@
+{
+  "_comment": "Example rollout config for feature flags. Copy relevant sections to Firestore doc app_config/feature_flags",
+  "_firestore_path": "app_config/feature_flags",
+
+  "flags": {
+    "mobile_card_layout": {
+      "stage": "internal",
+      "enabled": false,
+      "killSwitch": false,
+      "betaTesters": ["tester@bayfatura.com"],
+      "rolloutPercentage": 0,
+      "locales": [],
+      "countries": [],
+      "_stages": {
+        "internal": { "enabled": false, "betaTesters": ["tester@bayfatura.com"] },
+        "selected_testers": { "enabled": false, "betaTesters": ["tester1@...", "tester2@..."] },
+        "5_percent": { "enabled": true, "rolloutPercentage": 5 },
+        "25_percent": { "enabled": true, "rolloutPercentage": 25 },
+        "50_percent": { "enabled": true, "rolloutPercentage": 50 },
+        "100_percent": { "enabled": true }
+      }
+    },
+
+    "beta_invoice_editor": {
+      "stage": "internal",
+      "enabled": false,
+      "killSwitch": true,
+      "betaTesters": [],
+      "rolloutPercentage": 0,
+      "_stages": {
+        "internal": { "enabled": false, "betaTesters": ["dev@bayfatura.com"] },
+        "selected_testers": { "enabled": false, "betaTesters": ["tester1@..."] },
+        "5_percent": { "enabled": true, "rolloutPercentage": 5 },
+        "25_percent": { "enabled": true, "rolloutPercentage": 25 },
+        "50_percent": { "enabled": true, "rolloutPercentage": 50 },
+        "100_percent": { "enabled": true }
+      }
+    },
+
+    "native_camera_receipts": {
+      "stage": "internal",
+      "enabled": false,
+      "killSwitch": false,
+      "betaTesters": [],
+      "_stages": {
+        "internal": { "enabled": false, "betaTesters": ["dev@bayfatura.com"] },
+        "selected_testers": { "enabled": true, "betaTesters": ["native-tester@..."] },
+        "5_percent": { "enabled": true, "rolloutPercentage": 5 },
+        "100_percent": { "enabled": true }
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "_description": "Seed data for Firestore doc: app_config/feature_flags",
+  "_firestore_path": "app_config/feature_flags",
+  "flags": {
+    "mobile_card_layout": {
+      "enabled": false,
+      "type": "beta",
+      "description": "Convert table rows to card layout on mobile",
+      "killSwitch": false,
+      "betaTesters": [],
+      "locales": [],
+      "countries": [],
+      "rolloutPercentage": 0
+    },
+    "optimized_invoice_list": {
+      "enabled": false,
+      "type": "beta",
+      "killSwitch": false,
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "virtualized_customer_list": {
+      "enabled": false,
+      "type": "beta",
+      "killSwitch": false,
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "new_dashboard_metrics": {
+      "enabled": false,
+      "type": "beta",
+      "killSwitch": false,
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "beta_invoice_editor": {
+      "enabled": false,
+      "type": "beta",
+      "killSwitch": true,
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "native_camera_receipts": {
+      "enabled": false,
+      "type": "native",
+      "killSwitch": false,
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    },
+    "native_push_notifications": {
+      "enabled": false,
+      "type": "native",
+      "killSwitch": false,
+      "betaTesters": [],
+      "rolloutPercentage": 0
+    }
+  },
+  "_company_override_example": {
+    "_firestore_path": "company_config/{tenantId}",
+    "featureOverrides": {
+      "mobile_card_layout": true,
+      "beta_invoice_editor": true
+    }
+  }
+}

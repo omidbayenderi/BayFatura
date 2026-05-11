@@ -1,0 +1,53 @@
+{
+  "_comment": "Feature flag config for MY-ACCOUNT-ONLY testing.",
+  "_firestore_path": "app_config/feature_flags",
+  "_warning": "Only my account gets these flags. All other users see default (OFF) behavior.",
+
+  "flags": {
+    "mobile_card_layout": {
+      "enabled": true,
+      "description": "Card layout for mobile tables",
+      "killSwitch": false,
+      "allowedEmails": ["YOUR_EMAIL@example.com"],
+      "allowedUserIds": ["YOUR_FIREBASE_UID"],
+      "betaTesters": []
+    },
+    "optimized_invoice_list": {
+      "enabled": true,
+      "description": "Optimized invoice list rendering",
+      "killSwitch": false,
+      "allowedEmails": ["YOUR_EMAIL@example.com"],
+      "allowedUserIds": []
+    },
+    "virtualized_customer_list": {
+      "enabled": false,
+      "description": "Virtualized customer list (NOT enabled even for me yet)",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": []
+    },
+    "new_dashboard_metrics": {
+      "enabled": false,
+      "description": "New dashboard metrics (NOT enabled even for me yet)",
+      "killSwitch": false,
+      "allowedEmails": [],
+      "allowedUserIds": []
+    }
+  },
+
+  "_how_to_use": {
+    "step_1": "Open Firestore Console → app_config → feature_flags",
+    "step_2": "Replace YOUR_EMAIL@example.com with your account email",
+    "step_3": "Replace YOUR_FIREBASE_UID with your Firebase Auth UID (optional but recommended)",
+    "step_4": "Set enabled: true only for flags you want to test",
+    "step_5": "Open the preview URL → login with YOUR_EMAIL → feature is active",
+    "step_6": "Any other user → feature stays OFF"
+  },
+
+  "_safety": {
+    "no_global_enable": true,
+    "targets_only_my_account": true,
+    "fallback_to_off": true,
+    "other_users_unaffected": true
+  }
+}

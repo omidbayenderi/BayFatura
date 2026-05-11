@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { Mail, Lock, User, Building, LogIn, AlertCircle, Chrome, Apple } from 'lucide-react';
+import { Mail, Lock, User, Building, LogIn, AlertCircle } from 'lucide-react';
 
 const Auth = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -15,9 +15,16 @@ const Auth = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     
-    const { login, register, signInWithGoogle, signInWithApple } = useAuth();
+    const { login, register, signInWithGoogle, signInWithApple, isAuthenticated } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
+
+    // Auto-redirect when authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -47,82 +54,57 @@ const Auth = () => {
 
     const handleSocialLogin = async (provider) => {
         setError('');
-        setIsLoading(true);
+        // DO NOT set loading to true here! Safari requires the popup to open synchronously
+        // inside the click event handler. Setting state here yields the event loop and
+        // causes Safari to block the popup (auth/popup-closed-by-user).
         try {
-            const res = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
-            if (res.success) navigate('/dashboard');
-            else setError(res.error);
+            // Trigger popup immediately
+            const loginPromise = provider === 'google' ? signInWithGoogle() : signInWithApple();
+            
+            // Now we can set loading safely since the popup is already negotiating
+            setIsLoading(true);
+            
+            const res = await loginPromise;
+            
+            if (res?.success) {
+                navigate('/dashboard');
+            } else if (res?.error) {
+                setError(res.error);
+                setIsLoading(false);
+            }
         } catch (err) {
             setError(err.message);
-        } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="auth-container" style={{
-            minHeight: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
-        }}>
-            <div className="auth-card" style={{
-                width: '100%',
-                maxWidth: '450px',
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '24px',
-                padding: '40px',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-                border: '1px solid rgba(255,255,255,0.2)'
-            }}>
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                    <div style={{ 
-                        width: '64px', 
-                        height: '64px', 
-                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                        borderRadius: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 16px auto',
-                        color: 'white',
-                        boxShadow: '0 10px 20px rgba(99, 102, 241, 0.2)'
-                    }}>
+        <div className="auth-container">
+            <div className="auth-card">
+                <div className="auth-header">
+                    <div className="auth-icon-wrapper">
                         <LogIn size={32} />
                     </div>
-                    <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: '#1e293b' }}>
+                    <h1 className="auth-title">
                         {isLogin ? t('welcomeBack') : t('getStarted')}
                     </h1>
-                    <p style={{ color: '#64748b', marginTop: '8px' }}>
+                    <p className="auth-subtitle">
                         {isLogin ? t('enterDetails') : t('createAccountMsg')}
                     </p>
                 </div>
 
                 {error && (
-                    <div style={{
-                        background: '#fee2e2',
-                        color: '#ef4444',
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        marginBottom: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '0.9rem'
-                    }}>
+                    <div className="auth-error">
                         <AlertCircle size={18} />
                         {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <form onSubmit={handleSubmit} className="auth-form">
                     {!isLogin && (
                         <>
                             <div className="form-group">
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '500' }}>
+                                <label className="auth-label">
                                     <User size={16} /> {t('fullName')}
                                 </label>
                                 <input 
@@ -135,7 +117,7 @@ const Auth = () => {
                                 />
                             </div>
                             <div className="form-group">
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '500' }}>
+                                <label className="auth-label">
                                     <Building size={16} /> {t('companyNameLabel')}
                                 </label>
                                 <input 
@@ -151,7 +133,7 @@ const Auth = () => {
                     )}
 
                     <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '500' }}>
+                        <label className="auth-label">
                             <Mail size={16} /> {t('emailAddress')}
                         </label>
                         <input 
@@ -166,7 +148,7 @@ const Auth = () => {
                     </div>
 
                     <div className="form-group">
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '500' }}>
+                        <label className="auth-label">
                             <Lock size={16} /> {t('passwordLabel')}
                         </label>
                         <input 
@@ -182,51 +164,49 @@ const Auth = () => {
 
                     <button 
                         type="submit" 
-                        className="primary-btn" 
+                        className="primary-btn auth-submit" 
                         disabled={isLoading}
-                        style={{ width: '100%', height: '48px', marginTop: '8px' }}
                     >
                         {isLoading ? t('processing') : isLogin ? t('loginBtn') : t('registerBtn')}
                     </button>
                 </form>
 
-                <div style={{ margin: '24px 0', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
-                    <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{t('orContinueWith')}</span>
-                    <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }}></div>
+                <div className="auth-divider">
+                    <div className="auth-divider-line"></div>
+                    <span>{t('orContinueWith')}</span>
+                    <div className="auth-divider-line"></div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="auth-social-grid">
                     <button 
                         onClick={() => handleSocialLogin('google')}
-                        className="secondary-btn"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', height: '44px' }}
+                        className="secondary-btn auth-social-btn"
                     >
-                        <Chrome size={18} /> Google
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        Google
                     </button>
                     <button 
                         onClick={() => handleSocialLogin('apple')}
-                        className="secondary-btn"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', height: '44px' }}
+                        className="secondary-btn auth-social-btn"
                     >
-                        <Apple size={18} /> iCloud
+                        <svg width="18" height="18" viewBox="0 0 384 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+                        </svg>
+                        iCloud
                     </button>
                 </div>
 
-                <div style={{ textAlign: 'center', marginTop: '24px' }}>
-                    <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                <div className="auth-toggle">
+                    <p>
                         {isLogin ? t('noAccount') : t('haveAccount')}
                         <button 
                             onClick={() => setIsLogin(!isLogin)}
-                            style={{ 
-                                background: 'none', 
-                                border: 'none', 
-                                color: '#6366f1', 
-                                fontWeight: '600', 
-                                padding: '0 4px', 
-                                cursor: 'pointer',
-                                marginLeft: '8px'
-                            }}
+                            className="auth-toggle-btn"
                         >
                             {isLogin ? t('signUp') : t('loginLink')}
                         </button>
@@ -238,3 +218,4 @@ const Auth = () => {
 };
 
 export default Auth;
+

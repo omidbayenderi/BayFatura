@@ -1,0 +1,184 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.email in ['support@bayfatura.com', 'omidbayenderi@gmail.com'];
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // =============================
+    // Users
+    // =============================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow delete: if isAuthenticated() && isSuperAdmin();
+    }
+
+    // =============================
+    // Customers
+    // =============================
+
+    match /customers/{docId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        exists(/databases/$(database)/documents/customers/$(docId)) &&
+        get(/databases/$(database)/documents/customers/$(docId)).data.userId == request.auth.uid || 
+        isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Products
+    // =============================
+
+    match /products/{docId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Invoices
+    // =============================
+
+    match /invoices/{docId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Quotes
+    // =============================
+
+    match /quotes/{docId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Expenses
+    // =============================
+
+    match /expenses/{docId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Recurring Templates
+    // =============================
+
+    match /recurring_templates/{docId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Bank Matches
+    // =============================
+
+    match /bankMatches/{docId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Customizations
+    // =============================
+
+    match /customizations/{orgId} {
+      allow read, write: if isAuthenticated() && (
+        request.auth.uid == orgId || isSuperAdmin()
+      );
+    }
+
+    // =============================
+    // Audit Logs
+    // =============================
+
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSuperAdmin() && request.resource.data.adminEmail == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // =============================
+    // Notifications (Subcollection of Users)
+    // =============================
+
+    match /users/{userId}/notifications/{docId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // =============================
+    // Team (Subcollection of Users)
+    // =============================
+
+    match /users/{userId}/team/{memberId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // =============================
+    // Invites (Subcollection of Users)
+    // =============================
+
+    match /users/{userId}/invites/{inviteId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // =============================
+    // Default Deny
+    // =============================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

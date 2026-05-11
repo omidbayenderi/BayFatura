@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAnalytics } from 'firebase/analytics';
+import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,11 +20,29 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const analytics = getAnalytics(app);
+export const functions = getFunctions(app);
+
+// Analytics - only in production and when measurementId exists
+export let analytics = null;
+if (typeof window !== 'undefined' && firebaseConfig.measurementId && import.meta.env.PROD) {
+    import('firebase/analytics').then(({ getAnalytics }) => {
+        analytics = getAnalytics(app);
+    }).catch(() => {});
+}
 
 // Providers
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+    prompt: 'select_account',
+    // Ensure redirect URI is properly handled
+    access_type: 'online'
+});
 export const appleProvider = new OAuthProvider('apple.com');
+appleProvider.addScope('email');
+appleProvider.addScope('name');
+appleProvider.setCustomParameters({
+    locale: 'en'
+});
 
 export const isFirebaseConfigured = () => {
     return !!(firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_FIREBASE_API_KEY');

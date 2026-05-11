@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ═══════════════════════════════════════
+    // 🛡️ User Assets (Logos, Signatures, Stamps)
+    // ═══════════════════════════════════════
+
+    match /users/{userId}/assets/{filename} {
+      // Read: Public access (needed for invoice display)
+      allow read: if true;
+
+      // Write & Delete: Only the file owner
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // Delete: Only the file owner
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ═══════════════════════════════════════
+    // 📎 Invoice Attachments (PDFs, receipts)
+    // ═══════════════════════════════════════
+
+    match /users/{userId}/invoices/{invoiceId}/{filename} {
+      // Read: Owner only (or public if invoice is shared)
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Write: Owner only, PDF/images only, max 10MB
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('application/pdf') || 
+            request.resource.contentType.matches('image/.*'));
+
+      // Delete: Owner only
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ═══════════════════════════════════════
+    // 📷 Expense Receipts
+    // ═══════════════════════════════════════
+
+    match /users/{userId}/expenses/{expenseId}/{filename} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*') ||
+            request.resource.contentType.matches('application/pdf'));
+
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ═══════════════════════════════════════
+    // 📁 Public Assets (company logos for public invoices)
+    // ═══════════════════════════════════════
+
+    match /public/{orgId}/{filename} {
+      // Read: Public (needed for shared invoice views)
+      allow read: if true;
+
+      // Write: ONLY the owner of this orgId folder
+      allow write: if request.auth != null
+        && request.auth.uid == orgId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // Delete: ONLY the owner of this orgId folder
+      allow delete: if request.auth != null && request.auth.uid == orgId;
+    }
+
+    // ═══════════════════════════════════════
+    // 🚫 Default Deny
+    // ═══════════════════════════════════════
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

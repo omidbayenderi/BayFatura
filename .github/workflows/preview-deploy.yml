@@ -1,0 +1,69 @@
+name: Preview Deploy (Safe — No Live)
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-preview:
+    name: Quality Check + Preview Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      - name: Build (staging mode)
+        run: npm run build:preview
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.STAGING_VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.STAGING_VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.STAGING_VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.STAGING_VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.STAGING_VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.STAGING_VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_SUCCESS_URL: ${{ secrets.VITE_SUCCESS_URL }}
+          VITE_CANCEL_URL: ${{ secrets.VITE_CANCEL_URL }}
+          VITE_FROM_EMAIL: ${{ secrets.VITE_FROM_EMAIL }}
+          VITE_APP_ENV: staging
+
+      - name: Deploy to Firebase Preview Channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          expires: 7d
+
+      - name: Comment Preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const previewUrl = `https://${{ secrets.VITE_FIREBASE_PROJECT_ID }}--pr-${{ github.event.number }}.web.app`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🔬 Preview Deploy Complete (Staging Backend)\n\n**URL:** ${previewUrl}\n**Expires:** 7 days\n**Firebase Backend:** ${{ secrets.STAGING_VITE_FIREBASE_PROJECT_ID || 'Staging (not configured)' }}\n\nThis preview connects to the STAGING Firebase backend. Production data is NOT affected.`
+            });
