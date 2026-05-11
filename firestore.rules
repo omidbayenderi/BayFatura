@@ -106,7 +106,11 @@ service cloud.firestore {
     // =============================
 
     match /recurring_templates/{docId} {
-      allow read, write: if isAuthenticated() && (
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }
@@ -116,7 +120,11 @@ service cloud.firestore {
     // =============================
 
     match /bankMatches/{docId} {
-      allow read, write: if isAuthenticated() && (
+      allow read, list: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }

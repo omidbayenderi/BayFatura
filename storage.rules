@@ -61,13 +61,14 @@ service firebase.storage {
       // Read: Public (needed for shared invoice views)
       allow read: if true;
 
-      // Write: Only authenticated users from the same org
+      // Write: ONLY the owner of this orgId folder
       allow write: if request.auth != null
+        && request.auth.uid == orgId
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
 
-      // Delete: Only authenticated users from the same org
-      allow delete: if request.auth != null;
+      // Delete: ONLY the owner of this orgId folder
+      allow delete: if request.auth != null && request.auth.uid == orgId;
     }
 
     // ═══════════════════════════════════════
