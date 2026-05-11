@@ -1,0 +1,153 @@
+name: iOS Build & TestFlight
+
+# ─────────────────────────────────────────────────────────────
+# Bu workflow FAZ 4 tamamlandıktan sonra aktif olacak.
+# Şu an: ios/ klasörü henüz oluşturulmamış (npx cap add ios bekleniyor).
+# Durum: DEVRE DIŞI (paths filter ile korunuyor)
+# ─────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'           # ios/ klasörü oluştuğunda otomatik devreye girer
+      - 'src/**'
+      - 'capacitor.config.ts'
+  workflow_dispatch:
+    inputs:
+      submitForReview:
+        description: 'App Store Review için gönder?'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build iOS & Upload to TestFlight
+    runs-on: macos-latest      # iOS build sadece macOS'ta çalışır
+
+    steps:
+      # ── 1. Kod al ──────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js kur ─────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # ── 3. Bağımlılıkları yükle ────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. Web uygulamasını build et ───────────────────────
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_FROM_EMAIL: ${{ secrets.VITE_FROM_EMAIL }}
+          VITE_APP_ENV: production
+
+      # ── 5. iOS projesini sync et ───────────────────────────
+      - name: Capacitor sync iOS
+        run: npx cap sync ios
+
+      # ── 6. CocoaPods bağımlılıklarını yükle ────────────────
+      - name: Install CocoaPods
+        run: |
+          cd ios/App
+          pod install
+
+      # ── 7. Apple Developer sertifikasını kur ───────────────
+      - name: Import Code-signing Certificates
+        uses: Apple-Actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DISTRIBUTION_CERT_BASE64 }}
+          p12-password: ${{ secrets.IOS_DISTRIBUTION_CERT_PASSWORD }}
+
+      # ── 8. Provisioning Profile'ı kur ─────────────────────
+      - name: Download Provisioning Profile
+        uses: Apple-Actions/download-provisioning-profiles@v3
+        with:
+          bundle-id: com.bayfatura.app
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
+      # ── 9. Xcode ile Archive oluştur ───────────────────────
+      - name: Build & Archive (Xcode)
+        run: |
+          xcodebuild archive \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath ${{ runner.temp }}/BayFatura.xcarchive \
+            -destination generic/platform=iOS \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
+            PRODUCT_BUNDLE_IDENTIFIER=com.bayfatura.app \
+            MARKETING_VERSION=1.${{ github.run_number }}.0 \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            -allowProvisioningUpdates
+
+      # ── 10. IPA export et ─────────────────────────────────
+      - name: Export IPA
+        run: |
+          cat > /tmp/export-options.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath ${{ runner.temp }}/BayFatura.xcarchive \
+            -exportPath ${{ runner.temp }}/BayFatura-IPA \
+            -exportOptionsPlist /tmp/export-options.plist
+
+      # ── 11. IPA'yı artifact olarak kaydet ─────────────────
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bayfatura-ios-${{ github.run_number }}.ipa
+          path: ${{ runner.temp }}/BayFatura-IPA/App.ipa
+          retention-days: 30
+
+      # ── 12. TestFlight'a yükle ────────────────────────────
+      - name: Upload to TestFlight
+        uses: Apple-Actions/upload-testflight-build@v1
+        with:
+          app-path: ${{ runner.temp }}/BayFatura-IPA/App.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+
+      # ── 13. App Store Review'a gönder (opsiyonel) ─────────
+      - name: Submit for App Store Review
+        if: inputs.submitForReview == true
+        run: |
+          xcrun altool --upload-app \
+            --type ios \
+            --file "${{ runner.temp }}/BayFatura-IPA/App.ipa" \
+            --apiKey ${{ secrets.APPSTORE_KEY_ID }} \
+            --apiIssuer ${{ secrets.APPSTORE_ISSUER_ID }}

@@ -13,12 +13,22 @@ dist-ssr
 *.local
 .env
 
-# Capacitor native platforms
+# ─── Capacitor Native Platforms ─────────────────────────────
+# Strateji: android/ ve ios/ git'te TUTULMUYOR.
+# Sebebi: 'npx cap sync' her zaman yeniden oluşturabilir.
+# CI/CD: workflow'lar bu dizinleri 'npx cap sync' ile oluşturur.
+# Keystore ve sertifikalar GitHub Secrets'ta saklanır.
 android/
 ios/
 capacitor.config.json
 
-# Editor directories and files
+# ─── Android Secrets (asla commit edilmez) ──────────────────
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# ─── Editor ──────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
 .idea

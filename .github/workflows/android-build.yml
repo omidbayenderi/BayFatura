@@ -1,0 +1,146 @@
+name: Android Build & Distribute
+
+# ─────────────────────────────────────────────────────────────
+# Tetikleyiciler:
+#   - push to main → internal Firebase App Distribution
+#   - workflow_dispatch → manuel tetikleme + opsiyonel Play Store
+# ─────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'capacitor.config.ts'
+      - 'android/**'
+  workflow_dispatch:
+    inputs:
+      uploadToPlayStore:
+        description: 'Google Play Internal Track a yükle?'
+        type: boolean
+        default: false
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Kod al ──────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Java 21 kur (Capacitor Camera zorunluluğu) ──────
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      # ── 3. Node.js kur ─────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # ── 4. Bağımlılıkları yükle ────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 5. Lint & Test ─────────────────────────────────────
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      # ── 6. Web uygulamasını build et ───────────────────────
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_FROM_EMAIL: ${{ secrets.VITE_FROM_EMAIL }}
+          VITE_APP_ENV: production
+
+      # ── 7. Android projesini sync et ───────────────────────
+      - name: Capacitor sync Android
+        run: npx cap sync android
+
+      # ── 8. Keystore'u Secret'tan yeniden oluştur ───────────
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode \
+            > android/bayfatura-release.keystore
+
+      # ── 9. gradle.properties'e signing bilgilerini yaz ─────
+      - name: Write signing config
+        run: |
+          cat >> android/gradle.properties << EOF
+          RELEASE_STORE_FILE=bayfatura-release.keystore
+          RELEASE_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}
+          BAYFATURA_VERSION_CODE=${{ github.run_number }}
+          BAYFATURA_VERSION_NAME=1.${{ github.run_number }}.0
+          EOF
+
+      # ── 10. google-services.json'u yaz (Push için FCM) ─────
+      - name: Write google-services.json
+        run: |
+          echo '${{ secrets.ANDROID_GOOGLE_SERVICES_JSON }}' \
+            > android/app/google-services.json
+
+      # ── 11. Android Release AAB build ──────────────────────
+      - name: Build Android AAB (Release)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+      # ── 12. AAB dosyasını artifact olarak kaydet ───────────
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bayfatura-android-${{ github.run_number }}.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      # ── 13. Firebase App Distribution'a yükle (Internal) ───
+      - name: Upload to Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: internal-testers
+          file: android/app/build/outputs/bundle/release/app-release.aab
+          releaseNotes: |
+            Build #${{ github.run_number }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+      # ── 14. Play Store Internal Track (opsiyonel, manuel) ──
+      - name: Upload to Google Play (Internal Track)
+        if: inputs.uploadToPlayStore == true
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.bayfatura.app
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: draft
+          inAppUpdatePriority: 2
