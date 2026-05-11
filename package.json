@@ -23,21 +23,15 @@
     "@capacitor/android": "^7.6.3",
     "@capacitor/core": "^7.6.3",
     "@capacitor/ios": "^7.6.3",
-    "@genkit-ai/google-genai": "^1.33.0",
     "firebase": "^12.11.0",
-    "firebase-admin": "^13.8.0",
-    "firebase-functions": "^7.2.5",
     "framer-motion": "^12.4.2",
-    "genkit": "^1.33.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.474.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.1.5",
-    "recharts": "^3.7.0",
-    "resend": "^6.12.2",
-    "stripe": "^22.1.0"
+    "recharts": "^3.7.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.6.3",
