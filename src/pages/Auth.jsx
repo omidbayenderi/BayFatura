@@ -14,17 +14,39 @@ const Auth = () => {
     });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isRedirecting, setIsRedirecting] = useState(false);
     
     const { login, register, signInWithGoogle, signInWithApple, isAuthenticated } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
 
-    // Auto-redirect when authenticated
+    // iOS redirect sonrası: Google auth tamamlandı, authState değişti → navigate
     useEffect(() => {
         if (isAuthenticated) {
             navigate('/dashboard');
         }
     }, [isAuthenticated, navigate]);
+
+    // iOS redirect bekleme ekranı
+    if (isRedirecting) {
+        return (
+            <div className="auth-container">
+                <div className="auth-card" style={{ textAlign: 'center', padding: '3rem' }}>
+                    <div style={{
+                        width: 48, height: 48, borderRadius: '50%',
+                        border: '3px solid rgba(255,255,255,0.1)',
+                        borderTopColor: '#4F8EF7',
+                        animation: 'spin 0.8s linear infinite',
+                        margin: '0 auto 1.5rem'
+                    }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.95rem' }}>
+                        {t('processing') || 'Signing in...'}
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -58,14 +80,20 @@ const Auth = () => {
         // inside the click event handler. Setting state here yields the event loop and
         // causes Safari to block the popup (auth/popup-closed-by-user).
         try {
-            // Trigger popup immediately
+            // Trigger popup/redirect immediately — sıradaki tick'te state set edilebilir
             const loginPromise = provider === 'google' ? signInWithGoogle() : signInWithApple();
-            
-            // Now we can set loading safely since the popup is already negotiating
             setIsLoading(true);
             
             const res = await loginPromise;
             
+            if (res?.redirecting) {
+                // Capacitor iOS: redirect başlatıldı, uygulama yeniden yüklenecek
+                // getRedirectResult() AuthContext'te otomatik yakalar
+                setIsRedirecting(true);
+                setIsLoading(false);
+                // Spinner'da bekle, onAuthStateChanged navigate edecek
+                return;
+            }
             if (res?.success) {
                 navigate('/dashboard');
             } else if (res?.error) {

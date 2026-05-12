@@ -1,5 +1,12 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, OAuthProvider } from 'firebase/auth';
+import {
+    getAuth,
+    GoogleAuthProvider,
+    OAuthProvider,
+    indexedDBLocalPersistence,
+    browserLocalPersistence,
+    setPersistence
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
@@ -21,6 +28,16 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
+
+// iOS WKWebView localStorage güvenilir değil — IndexedDB kullan
+// Bu yapılmazsa signInWithRedirect sonrası oturum kaybolur
+const isNativePlatform = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
+if (isNativePlatform) {
+    setPersistence(auth, indexedDBLocalPersistence).catch((err) => {
+        console.warn('[Firebase] indexedDB persistence fallback:', err);
+        setPersistence(auth, browserLocalPersistence).catch(() => {});
+    });
+}
 
 // Analytics - only in production and when measurementId exists
 export let analytics = null;

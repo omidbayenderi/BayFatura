@@ -5,6 +5,7 @@ import {
     signInWithEmailAndPassword, 
     signOut,
     signInWithPopup,
+    signInWithRedirect,
     getRedirectResult,
     signInAnonymously,
     updateProfile as firebaseUpdateProfile,
@@ -132,11 +133,17 @@ export const AuthProvider = ({ children }) => {
     const logout = () => signOut(auth);
     const signInWithGoogle = async () => {
         try {
+            // iOS WKWebView signInWithPopup'u desteklemez — Capacitor'da redirect kullan
+            const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
+            if (isNative) {
+                // Redirect flow: sayfa yeniden yüklendiğinde getRedirectResult() yakalar
+                await signInWithRedirect(auth, googleProvider);
+                return { success: true, redirecting: true };
+            }
             const result = await signInWithPopup(auth, googleProvider);
             return { success: true, user: result.user };
         } catch (err) {
             console.error("Google login error:", err);
-            // Handle redirect_uri_mismatch and other OAuth errors
             if (err.code === 'auth/popup-closed-by-user') {
                 return { success: false, error: 'Popup closed. Please allow popups and try again.' };
             }
@@ -150,6 +157,12 @@ export const AuthProvider = ({ children }) => {
     
     const signInWithApple = async () => {
         try {
+            // iOS WKWebView signInWithPopup'u desteklemez — Capacitor'da redirect kullan
+            const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
+            if (isNative) {
+                await signInWithRedirect(auth, appleProvider);
+                return { success: true, redirecting: true };
+            }
             const result = await signInWithPopup(auth, appleProvider);
             return { success: true, user: result.user };
         } catch (err) {
