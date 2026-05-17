@@ -16,6 +16,37 @@ const db = admin.firestore();
 // --- Services Initialization ---
 const getStripe = () => new Stripe(config().stripe?.secret || process.env.STRIPE_SECRET_KEY);
 const getResend = () => new Resend(config().resend?.key || process.env.RESEND_API_KEY);
+const MAX_PROXY_IMAGE_BYTES = 5 * 1024 * 1024;
+const DEFAULT_PROXY_IMAGE_ALLOWED_HOSTS = new Set([
+    'firebasestorage.googleapis.com',
+    'storage.googleapis.com',
+    'lh3.googleusercontent.com',
+    'www.paypalobjects.com',
+    'paypalobjects.com',
+    'quickchart.io',
+    'api.qrserver.com',
+]);
+
+const getProxyImageAllowedHosts = () => {
+    const configuredHostList = config().proxy?.image_allowed_hosts || process.env.PROXY_IMAGE_ALLOWED_HOSTS || '';
+    const configuredHosts = configuredHostList
+        .split(',')
+        .map(host => host.trim().toLowerCase())
+        .filter(Boolean);
+
+    return new Set([...DEFAULT_PROXY_IMAGE_ALLOWED_HOSTS, ...configuredHosts]);
+};
+
+const isBlockedProxyHost = (hostname) => {
+    const host = hostname.toLowerCase();
+    return host === 'localhost' ||
+        host === '0.0.0.0' ||
+        host === '127.0.0.1' ||
+        host === '::1' ||
+        host.startsWith('10.') ||
+        host.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+};
 
 const ai = genkit({
     plugins: [googleAI()],
@@ -417,22 +448,52 @@ export const proxyImage = https.onRequest(async (req, res) => {
         return;
     }
 
-    const imageUrl = req.query.url;
+    const imageUrl = Array.isArray(req.query.url) ? req.query.url[0] : req.query.url;
     if (!imageUrl) {
         res.status(400).send('Missing url parameter');
         return;
     }
 
     try {
+        const parsedUrl = new URL(imageUrl);
+        const hostname = parsedUrl.hostname.toLowerCase();
+        const allowedHosts = getProxyImageAllowedHosts();
+
+        if (!['https:', 'http:'].includes(parsedUrl.protocol)) {
+            res.status(400).send('Unsupported URL protocol');
+            return;
+        }
+
+        if (isBlockedProxyHost(hostname) || !allowedHosts.has(hostname)) {
+            res.status(403).send('Image host is not allowed');
+            return;
+        }
+
         const response = await fetch(imageUrl);
         
         if (!response.ok) {
             throw new Error(`Failed to fetch image: ${response.statusText}`);
         }
 
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
         const contentType = response.headers.get('content-type') || 'image/png';
+        if (!contentType.startsWith('image/')) {
+            res.status(415).send('Unsupported content type');
+            return;
+        }
+
+        const contentLength = Number(response.headers.get('content-length') || 0);
+        if (contentLength > MAX_PROXY_IMAGE_BYTES) {
+            res.status(413).send('Image is too large');
+            return;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer.byteLength > MAX_PROXY_IMAGE_BYTES) {
+            res.status(413).send('Image is too large');
+            return;
+        }
+
+        const buffer = Buffer.from(arrayBuffer);
         
         res.set('Content-Type', contentType);
         res.set('Cache-Control', 'public, max-age=3600');
