@@ -16,6 +16,9 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: Lint & Test & Build
@@ -28,7 +31,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -68,11 +71,13 @@ jobs:
 
       - name: Deploy Cloud Functions
         if: inputs.deployFunctions
-        run: npx firebase deploy --only functions --token "$FIREBASE_DEPLOY_TOKEN"
+        run: npx -y firebase-tools@latest deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_DEPLOY_TOKEN"
         env:
           FIREBASE_DEPLOY_TOKEN: ${{ secrets.FIREBASE_DEPLOY_TOKEN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
 
       - name: Deploy Firestore & Storage Rules
-        run: npx firebase deploy --only firestore,storage --token "$FIREBASE_DEPLOY_TOKEN"
+        run: npx -y firebase-tools@latest deploy --only firestore,storage --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_DEPLOY_TOKEN"
         env:
           FIREBASE_DEPLOY_TOKEN: ${{ secrets.FIREBASE_DEPLOY_TOKEN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

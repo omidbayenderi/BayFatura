@@ -56,7 +56,7 @@ If a bad production deploy somehow happens:
 ```bash
 # Option 1: Revert the triggering workflow run
 # Option 2: Firebase Hosting rollback
-firebase hosting:clone bayfatura-b283c/<previous-hash> bayfatura-b283c/live
+npx -y firebase-tools@latest hosting:clone bayfatura-b283c/<previous-hash> bayfatura-b283c/live
 
 # Option 3: Disable feature flags via Firestore
 # Set killSwitch: true for any problematic flag
@@ -73,7 +73,16 @@ firebase hosting:clone bayfatura-b283c/<previous-hash> bayfatura-b283c/live
 | Run `deploy:production` locally | Team lead | Explicit warning shown |
 | Run `deploy:preview` locally | Any team member | Safe (no live) |
 
-## 7. Verification Checklist (Before Production Deploy)
+## 7. Preview Isolation
+
+PR previews deploy to the staging Firebase project only:
+
+- `preview-deploy.yml` uses `STAGING_VITE_FIREBASE_PROJECT_ID`
+- `preview-deploy.yml` uses `STAGING_FIREBASE_SERVICE_ACCOUNT`
+- Missing staging deploy secrets should fail the workflow instead of falling back to production
+- Production Firebase credentials are reserved for `deploy-production.yml`
+
+## 8. Verification Checklist (Before Production Deploy)
 
 - [ ] All preview tests pass (see `preview-test-checklist.md`)
 - [ ] CI passed on `main`

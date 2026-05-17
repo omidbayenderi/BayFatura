@@ -140,6 +140,24 @@ service cloud.firestore {
     }
 
     // =============================
+    // Feature Flag Configuration
+    // =============================
+
+    match /app_config/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /company_config/{orgId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == orgId ||
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/myTeams/$(orgId)) ||
+        isSuperAdmin()
+      );
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // =============================
     // Audit Logs
     // =============================
 
@@ -171,6 +189,15 @@ service cloud.firestore {
 
     match /users/{userId}/invites/{inviteId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // =============================
+    // Joined Teams (server-managed)
+    // =============================
+
+    match /users/{userId}/myTeams/{teamId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create, update, delete: if false;
     }
 
     // =============================

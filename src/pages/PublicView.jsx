@@ -32,8 +32,6 @@ const PublicView = ({ type = 'invoice' }) => {
     useEffect(() => {
         const fetchInvoice = async () => {
             try {
-                const { doc, getDoc } = await import('firebase/firestore');
-                const { db } = await import('../lib/firebase');
                 const docSnap = await getDoc(doc(db, type === 'quote' ? 'quotes' : 'invoices', id));
                 if (docSnap.exists()) {
                     setInvoice({ id: docSnap.id, ...docSnap.data() });

@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .env
+.firebase-cache/
 
 # ─── Capacitor Native Platforms ─────────────────────────────
 # Strateji: android/ ve ios/ git'te TUTULMUYOR.

@@ -7,32 +7,31 @@
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `ci.yml` | Push to `main`/`develop`, PR to `main`/`develop` | Lint, test, build |
-| `deploy-preview.yml` | PR to `develop`/`main` | Deploy to Firebase preview channel |
-| `deploy-production.yml` | Push to `main` (incl. tags `v*`) | Deploy to production |
+| `preview-deploy.yml` | PR to `develop`/`main` | Deploy to staging Firebase preview channel |
+| `deploy-production.yml` | Manual `workflow_dispatch` | Deploy to production |
 
 ## Pipeline Steps
 
 ### CI (`ci.yml`)
 1. Checkout code
-2. Setup Node.js 20 with npm cache
+2. Setup Node.js 22 with npm cache
 3. `npm ci` (clean install)
 4. `npm run lint`
 5. `npm test`
 6. `npm run build` (verifies production build succeeds)
 
-### Preview Deploy (`deploy-preview.yml`)
+### Preview Deploy (`preview-deploy.yml`)
 1. Checkout
 2. Setup Node.js + npm ci
-3. Build with `VITE_APP_ENV=preview`
-4. Deploy to Firebase Hosting preview channel (expires in 7 days)
+3. Build with `VITE_APP_ENV=staging`
+4. Deploy to the staging Firebase Hosting preview channel (expires in 7 days)
 5. Comment PR with preview URL
 
 ### Production Deploy (`deploy-production.yml`)
 1. CI quality checks (lint, test, build)
 2. Deploy hosting to Firebase `live` channel
-3. Deploy Cloud Functions
+3. Optionally deploy Cloud Functions
 4. Deploy Firestore & Storage rules
-5. Create GitHub Release (if tagged with `v*`)
 
 ## Required GitHub Secrets
 
@@ -50,7 +49,8 @@
 | `VITE_FROM_EMAIL` | Resend from email | All builds |
 | `VITE_SENTRY_DSN` | Sentry DSN | Production only |
 | `VITE_APP_ENV` | Environment name | All builds |
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase deploy service account JSON | Preview & production deploy |
+| `FIREBASE_SERVICE_ACCOUNT` | Production Firebase deploy service account JSON | Production deploy |
+| `STAGING_FIREBASE_SERVICE_ACCOUNT` | Staging Firebase deploy service account JSON | Preview deploy |
 | `FIREBASE_DEPLOY_TOKEN` | Firebase CI token | Production function/rule deploy |
 
 ## Setting Up Firebase for CI
@@ -75,7 +75,7 @@ npx firebase login:ci
 | Environment | `VITE_APP_ENV` | Sentry | Preview URL |
 |-------------|----------------|--------|-------------|
 | Local dev | `development` | Disabled | `localhost:5173` |
-| PR preview | `preview` | Disabled | `project--pr-123.hosting.app` |
+| PR preview | `staging` | Disabled | `staging-project--pr-123.hosting.app` |
 | Production | `production` | Active | `bayfatura.com` |
 
 ## Local CI Simulation
@@ -94,7 +94,7 @@ To rollback a production deploy:
 
 Or use Firebase CLI directly:
 ```bash
-npx firebase hosting:clone bayfatura-b283c/<version-hash> bayfatura-b283c/live
+npx -y firebase-tools@latest hosting:clone bayfatura-b283c/<version-hash> bayfatura-b283c/live
 ```
 
 ## Adding a New Workflow

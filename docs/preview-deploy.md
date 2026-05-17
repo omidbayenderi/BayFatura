@@ -7,12 +7,12 @@
 Every pull request to `develop` or `main` triggers:
 
 1. **Quality checks**: `npm ci` → `npm run lint` → `npm test` → `npm run build`
-2. **Firebase Preview Channel**: Deploys the build to a temporary URL
+2. **Firebase Preview Channel**: Deploys the build to a temporary staging URL
 3. **PR Comment**: Adds a comment with the preview URL
 
 **Preview URL format:**
 ```
-https://bayfatura-b283c--pr-<PR_NUMBER>.web.app
+https://<staging-project-id>--pr-<PR_NUMBER>.web.app
 ```
 
 **Expires:** 7 days after last update.
@@ -22,6 +22,7 @@ https://bayfatura-b283c--pr-<PR_NUMBER>.web.app
 - Does NOT deploy to `live` channel
 - Does NOT deploy Cloud Functions
 - Does NOT update Firestore or Storage rules
+- Does NOT deploy to the production Firebase project
 - Does NOT affect production users
 - Does NOT change any Firebase project settings
 
@@ -56,28 +57,28 @@ steps:
   - npm ci
   - npm run lint
   - npm test
-  - npm run build
+  - npm run build:preview
   - FirebaseExtended/action-hosting-deploy@v0  # NO channelId: live
   - Comment PR with preview URL
 ```
 
 ## Environment Variables
 
-Build uses `VITE_APP_ENV=preview` for preview deploys. No production secrets (Sentry DSN, etc.) are needed.
+Build uses `VITE_APP_ENV=staging` for preview deploys. No production Firebase credentials or production Sentry DSN are needed.
 
 ## Required GitHub Secrets
 
 | Secret | Required For |
 |--------|--------------|
-| `VITE_FIREBASE_API_KEY` | Build |
-| `VITE_FIREBASE_AUTH_DOMAIN` | Build |
-| `VITE_FIREBASE_PROJECT_ID` | Build + Deploy |
-| `VITE_FIREBASE_STORAGE_BUCKET` | Build |
-| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Build |
-| `VITE_FIREBASE_APP_ID` | Build |
-| `VITE_FIREBASE_MEASUREMENT_ID` | Build |
+| `STAGING_VITE_FIREBASE_API_KEY` | Build |
+| `STAGING_VITE_FIREBASE_AUTH_DOMAIN` | Build |
+| `STAGING_VITE_FIREBASE_PROJECT_ID` | Build + Deploy |
+| `STAGING_VITE_FIREBASE_STORAGE_BUCKET` | Build |
+| `STAGING_VITE_FIREBASE_MESSAGING_SENDER_ID` | Build |
+| `STAGING_VITE_FIREBASE_APP_ID` | Build |
+| `STAGING_VITE_FIREBASE_MEASUREMENT_ID` | Build |
 | `VITE_SUCCESS_URL` | Build |
 | `VITE_CANCEL_URL` | Build |
 | `VITE_FROM_EMAIL` | Build |
 | `GITHUB_TOKEN` | Deploy (automatic) |
-| `FIREBASE_SERVICE_ACCOUNT` | Deploy |
+| `STAGING_FIREBASE_SERVICE_ACCOUNT` | Deploy |

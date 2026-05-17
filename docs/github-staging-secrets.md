@@ -6,7 +6,7 @@
 
 GitHub → Your repo → Settings → Secrets and variables → Actions → New repository secret
 
-## The 7 Secrets
+## The 8 Secrets
 
 | # | Secret Name | Value Source | Required? |
 |---|-------------|-------------|-----------|
@@ -17,20 +17,21 @@ GitHub → Your repo → Settings → Secrets and variables → Actions → New 
 | 5 | `STAGING_VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase Console → Web app config → `messagingSenderId` | ✅ Yes |
 | 6 | `STAGING_VITE_FIREBASE_APP_ID` | Firebase Console → Web app config → `appId` | ✅ Yes |
 | 7 | `STAGING_VITE_FIREBASE_MEASUREMENT_ID` | Firebase Console → Web app config → `measurementId` | No (optional) |
+| 8 | `STAGING_FIREBASE_SERVICE_ACCOUNT` | Staging Firebase project service account JSON | ✅ Yes |
 
 ## Existing Secrets (Already Present)
 
-These are already in your GitHub secrets (used by deploy-production.yml and preview-deploy.yml):
+These are already in your GitHub secrets (used by production workflows):
 
 | Secret Name | Purpose |
 |-------------|---------|
-| `FIREBASE_SERVICE_ACCOUNT` | Deploy auth for Firebase Hosting |
-| `VITE_FIREBASE_PROJECT_ID` | Production project ID (used by preview workflow as fallback) |
+| `FIREBASE_SERVICE_ACCOUNT` | Production deploy auth for Firebase Hosting |
+| `VITE_FIREBASE_PROJECT_ID` | Production project ID |
 | `VITE_SUCCESS_URL` | Stripe success URL (from production) |
 | `VITE_CANCEL_URL` | Stripe cancel URL (from production) |
 | `VITE_FROM_EMAIL` | Resend sender email (from production) |
 
-These existing secrets are **NOT staging secrets**. They're used as fallbacks when staging secrets aren't set, or for the production deploy workflow.
+These existing secrets are **NOT staging secrets**. The preview workflow intentionally requires staging secrets and should fail rather than silently deploy preview hosting to production.
 
 ## How the Workflow Uses These Secrets
 
@@ -82,6 +83,7 @@ So yes, the workflow env vars (which set `VITE_FIREBASE_API_KEY` etc. as actual 
    - Secret name: `STAGING_VITE_FIREBASE_API_KEY`
    - Secret value: the `apiKey` value (e.g. `AIzaSy...`)
 5. Repeat for all 7 values
+6. Generate a service account JSON from the staging Firebase project and save it as `STAGING_FIREBASE_SERVICE_ACCOUNT`
 
 ## What If I Skip Adding These Secrets?
 
@@ -90,8 +92,8 @@ If you don't add the staging secrets, the preview workflow's build step will rec
 - `isFirebaseConfigured()` returns `false` (because `apiKey` is empty)
 - The app loads in **demo mode** with fake data
 - No Firebase connection is attempted
-- The preview URL is still created and accessible
+- The preview deploy step fails before creating a URL
 - You can test UI, navigation, responsive layout, etc.
 - You CANNOT test Firebase-dependent features (auth, Firestore, storage)
 
-**This is the safe fallback.** If the staging secrets aren't configured, the preview still works — just with demo data instead of real data.
+**This is the safe fallback.** Missing staging deploy credentials should stop the workflow instead of touching the production Firebase project.

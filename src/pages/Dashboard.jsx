@@ -3,6 +3,7 @@ import { useInvoice } from '../context/InvoiceContext';
 import { motion } from 'framer-motion';
 import { FileText, TrendingUp, TrendingDown, Users, Clock, PlusCircle, Receipt, Sparkles, Lock, ArrowRightLeft, Database } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { usePanel } from '../context/PanelContext';
@@ -11,6 +12,7 @@ import QuickAddExpenseModal from '../components/QuickAddExpenseModal';
 import PremiumModal from '../components/PremiumModal';
 import LoadingPage from '../components/LoadingPage';
 import { generateDemoData } from '../lib/demoDataGenerator';
+import { db } from '../lib/firebase';
 
 const StatCard = ({ title, value, icon: Icon, color }) => (
     <motion.div
@@ -87,9 +89,6 @@ const Dashboard = () => {
 
         setIsMatching(true);
         try {
-            const { doc, updateDoc } = await import('firebase/firestore');
-            const { db } = await import('../lib/firebase');
-            
             // Match up to 3 for demo/speed or all of them
             const toMatch = unpaidInvoices.slice(0, 3);
             
