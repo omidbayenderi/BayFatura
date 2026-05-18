@@ -20,6 +20,7 @@
 |-------|-------|--------|
 | Unit tests | 2 → 40+ | ✅ Phase 6 adds feature flag + formatter tests |
 | Integration | 0 | ❌ Not yet implemented |
+| Firestore rules emulator | 1 suite | ✅ Tenant isolation and config access |
 | E2E | 0 | ❌ Not yet implemented |
 
 ## 3. Unit Tests
@@ -37,6 +38,16 @@
 ```bash
 npm test
 ```
+
+### Firestore Rules Tests
+
+Run the emulator-backed rules suite:
+
+```bash
+npm run test:rules
+```
+
+This starts the Firestore emulator, loads `firestore.rules`, and verifies tenant isolation, feature flag access, company config access, and server-managed team membership rules.
 
 ## 4. Integration Tests
 
