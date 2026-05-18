@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Package, Plus, Search, X, Edit2, Trash2, Tag, Check,
     DollarSign, Hash, Layers, ShoppingBag, Wrench, Code, Zap, Lock,
-    AlertTriangle, ShieldAlert
+    AlertTriangle, ShieldAlert, Box, AlertCircle
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import { useProducts } from '../context/ProductContext';
-import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import { useProducts } from '../../context/ProductContext';
+import { useAuth } from '../../context/AuthContext';
 
 const UNIT_OPTIONS = ['Stück', 'Std.', 'Pauschal', 'kg', 'm²', 'm', 'Tag', 'Monat'];
 
@@ -22,7 +22,8 @@ const CATEGORY_ICONS = {
 
 const EMPTY_PRODUCT = {
     name: '', description: '', price: '', unit: 'Pauschal',
-    taxRate: 19, category: 'service', sku: ''
+    taxRate: 19, category: 'service', sku: '',
+    stock: '', stockAlertThreshold: ''
 };
 
 const ProductModal = ({ product, onClose, onSave, t }) => {
@@ -131,6 +132,18 @@ const ProductModal = ({ product, onClose, onSave, t }) => {
                         </div>
                     </div>
 
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label>{t('stock') || 'Bestand'}</label>
+                            <input className="form-input" type="number" min="0" name="stock" value={form.stock} onChange={handleChange}
+                                placeholder="0" />
+                        </div>
+                        <div className="form-group">
+                            <label>{t('stockAlert') || 'Mindestbestand'}</label>
+                            <input className="form-input" type="number" min="0" name="stockAlertThreshold" value={form.stockAlertThreshold} onChange={handleChange}
+                                placeholder="0 (keine Warnung)" />
+                        </div>
+                    </div>
                     <div className="product-modal-footer">
                         <button type="button" className="secondary-btn" onClick={onClose}>{t('cancel')}</button>
                         <button type="submit" className="primary-btn product-modal-submit" disabled={isSaving}>
@@ -279,6 +292,7 @@ const Products = () => {
                     { label: t('totalProducts'), value: products.length, color: 'var(--success)' },
                     { label: t('services'), value: products.filter(p => p.category === 'service').length, color: '#3b82f6' },
                     { label: t('avgPrice'), value: products.length > 0 ? formatPrice(products.reduce((s, p) => s + (p.price || 0), 0) / products.length) : '—', color: '#6366f1' },
+                    { label: t('lowStock') || 'Niedrigbestand', value: products.filter(p => p.stock !== undefined && p.stock > 0 && p.stock <= (p.stockAlertThreshold || 0)).length, color: '#ef4444' },
                 ].map(({ label, value, color }) => (
                     <motion.div key={label} whileHover={{ y: -3 }} className="card stat-card product-stat-card" style={{ borderTop: `3px solid ${color}` }}>
                         <div className="stat-content product-stat-content">
@@ -395,6 +409,39 @@ const Products = () => {
                                     <p className="product-card-desc">
                                         {product.description}
                                     </p>
+                                )}
+
+                                {product.stock !== undefined && product.stock !== '' && (
+                                    <div className="product-card-stock" style={{
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        fontSize: '0.8rem', marginBottom: '8px',
+                                        color: product.stock <= (product.stockAlertThreshold || 0) ? '#ef4444' : '#10b981'
+                                    }}>
+                                        <Box size={14} />
+                                        <span>{t('stock') || 'Bestand'}: {product.stock}</span>
+                                        <button className="icon-btn" style={{ padding: '2px', marginLeft: '4px' }}
+                                            onClick={async () => {
+                                                await updateProduct(product.id, { stock: (product.stock || 0) + 1 });
+                                                showToast(`${product.name}: +1`, 'success');
+                                            }}
+                                            title={t('addStock') || '+1'}>+</button>
+                                        <button className="icon-btn" style={{ padding: '2px' }}
+                                            onClick={async () => {
+                                                const newVal = Math.max(0, (product.stock || 0) - 1);
+                                                await updateProduct(product.id, { stock: newVal });
+                                            }}
+                                            title={t('removeStock') || '-1'}>-</button>
+                                        {product.stock <= (product.stockAlertThreshold || 0) && product.stock > 0 && (
+                                            <span className="badge" style={{ background: '#fee2e2', color: '#dc2626', fontSize: '0.65rem' }}>
+                                                <AlertCircle size={10} /> {t('lowStock') || 'Niedrig'}
+                                            </span>
+                                        )}
+                                        {product.stock === 0 && (
+                                            <span className="badge" style={{ background: '#fef2f2', color: '#991b1b', fontSize: '0.65rem' }}>
+                                                <AlertCircle size={10} /> {t('outOfStock') || 'Ausverkauft'}
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
 
                                 <div className="product-card-price-row">

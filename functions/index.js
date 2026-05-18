@@ -373,9 +373,8 @@ export const sendInvoiceEmail = https.onCall(async (data, context) => {
     try {
         console.log(`📧 Attempting to send email to: ${to} for invoice: ${invoiceId}`);
         
-        // Resend v3 returns { data, error }
         const { data: resData, error } = await resend.emails.send({
-            from: 'BayFatura <onboarding@resend.dev>', // Default testing address if domain not verified
+            from: 'BayFatura <onboarding@resend.dev>',
             to: [to],
             subject: subject,
             html: html
@@ -388,7 +387,6 @@ export const sendInvoiceEmail = https.onCall(async (data, context) => {
         
         console.log(`✅ Email sent successfully. ID: ${resData.id}`);
 
-        // Log to Firestore
         await db.collection('email_logs').add({
             invoiceId,
             to,
@@ -400,24 +398,269 @@ export const sendInvoiceEmail = https.onCall(async (data, context) => {
         return { success: true, messageId: resData.id };
     } catch (error) {
         console.error('❌ Cloud Function Internal Error:', error);
-        // If it's already a HttpsError, rethrow it
         if (error instanceof https.HttpsError) throw error;
         throw new https.HttpsError('internal', error.message || 'An unknown error occurred while sending email');
     }
 });
 
-// ─── 5. Cloud Operations: Notifications (Overdue Invoices) ───────────────────────
+// ─── 5b. Team Invitation Email ───────────────────────────────────────────────
+const buildInvitationHtml = ({ inviteeName, companyName, senderName, role, acceptLink }) => {
+    const roleLabels = {
+        admin: 'Admin',
+        accountant: 'Accountant',
+        member: 'Member',
+    };
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>You're invited to ${companyName}</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 0">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+      <tr><td style="background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:20px 20px 0 0;padding:36px 40px;text-align:center">
+        <h1 style="margin:0;color:white;font-size:26px;font-weight:800;letter-spacing:-0.5px">BayFatura</h1>
+        <p style="margin:8px 0 0;color:rgba(255,255,255,0.8);font-size:14px">Team Invitation</p>
+      </td></tr>
+      <tr><td style="background:white;padding:36px 40px">
+        <p style="margin:0 0 8px;font-size:16px;color:#334155;line-height:1.7">Hello${inviteeName ? ' ' + inviteeName : ''},</p>
+        <p style="margin:0 0 20px;font-size:15px;color:#64748b;line-height:1.7">
+          <strong>${senderName}</strong> has invited you to join the team at <strong>${companyName}</strong> as a <strong>${roleLabels[role] || role}</strong>.
+        </p>
+        <div style="text-align:center;margin:32px 0">
+          <a href="${acceptLink}" target="_blank" style="display:inline-block;padding:16px 40px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:white;text-decoration:none;border-radius:100px;font-size:15px;font-weight:700;letter-spacing:.3px">
+            Accept Invitation →
+          </a>
+        </div>
+        <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;line-height:1.6">
+          This invitation will expire in 7 days. If you were not expecting this invitation, you can safely ignore this email.
+        </p>
+      </td></tr>
+      <tr><td style="background:#f1f5f9;border-radius:0 0 20px 20px;padding:24px 40px;text-align:center">
+        <p style="margin:0;font-size:12px;color:#94a3b8">Powered by <strong>BayFatura</strong> · bayfatura.com</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>
+    `.trim();
+};
+
+export const sendInvitationEmail = https.onCall(async (data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    const { inviteeEmail, inviteeName, role, invitedBy, invitationId, companyName, senderName } = data;
+
+    if (!inviteeEmail || !invitationId || !invitedBy) {
+        throw new https.HttpsError('invalid-argument', 'Missing required fields: inviteeEmail, invitationId, invitedBy');
+    }
+
+    const resend = getResend();
+    if (!resend.key) {
+        console.error('❌ Resend API Key is missing from config');
+        throw new https.HttpsError('failed-precondition', 'Resend API key not configured');
+    }
+
+    const acceptLink = `${config().app?.url || 'https://bayfatura.com'}/accept-invite?token=${invitationId}&tenant=${invitedBy}&email=${encodeURIComponent(inviteeEmail)}`;
+
+    const html = buildInvitationHtml({
+        inviteeName,
+        companyName: companyName || 'the company',
+        senderName: senderName || 'Your team member',
+        role,
+        acceptLink,
+    });
+
+    const subject = `${senderName || 'Someone'} invited you to join ${companyName || 'a team'} on BayFatura`;
+
+    try {
+        console.log(`📧 Sending invitation email to: ${inviteeEmail}`);
+
+        const { data: resData, error } = await resend.emails.send({
+            from: 'BayFatura <onboarding@resend.dev>',
+            to: [inviteeEmail],
+            subject,
+            html,
+        });
+
+        if (error) {
+            console.error('❌ Resend API Error:', error);
+            throw new https.HttpsError('internal', `Resend Error: ${error.message}`);
+        }
+
+        console.log(`✅ Invitation email sent successfully. ID: ${resData.id}`);
+
+        await db.collection('email_logs').add({
+            type: 'invitation',
+            invitationId,
+            to: inviteeEmail,
+            invitedBy,
+            role,
+            subject,
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            resendId: resData.id
+        });
+
+        return { success: true, messageId: resData.id };
+    } catch (error) {
+        console.error('❌ Invitation Email Error:', error);
+        if (error instanceof https.HttpsError) throw error;
+        throw new https.HttpsError('internal', error.message || 'Failed to send invitation email');
+    }
+});
+
+// ─── 5c. Accept Team Invitation ──────────────────────────────────────────────
+export const acceptTeamInvitation = https.onCall(async (data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    const { token, tenantId } = data;
+
+    if (!token || !tenantId) {
+        throw new https.HttpsError('invalid-argument', 'Missing required fields: token, tenantId');
+    }
+
+    const uid = context.auth.uid;
+    const email = context.auth.token.email;
+
+    try {
+        const memberRef = db.collection('users').doc(tenantId).collection('team').doc(token);
+        const memberDoc = await memberRef.get();
+
+        if (!memberDoc.exists) {
+            throw new https.HttpsError('not-found', 'Invitation not found or has been revoked');
+        }
+
+        const memberData = memberDoc.data();
+
+        if (memberData.status !== 'pending') {
+            throw new https.HttpsError('failed-precondition', 'This invitation has already been used or revoked');
+        }
+
+        if (memberData.email !== email) {
+            throw new https.HttpsError('permission-denied', 'This invitation was sent to a different email address');
+        }
+
+        await memberRef.update({
+            status: 'active',
+            userId: uid,
+            joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await db.collection('users').doc(uid).collection('myTeams').doc(tenantId).set({
+            tenantId,
+            role: memberData.role,
+            joinedAt: admin.firestore.FieldValue.serverTimestamp(),
+            invitedBy: memberData.invitedBy,
+        });
+
+        console.log(`✅ User ${uid} accepted team invitation for tenant ${tenantId}`);
+
+        return { success: true, teamMemberId: token, tenantId };
+    } catch (error) {
+        console.error('❌ Accept Invitation Error:', error);
+        if (error instanceof https.HttpsError) throw error;
+        throw new https.HttpsError('internal', error.message || 'Failed to accept invitation');
+    }
+});
+
+// ─── 5. Recurring Invoice Automation ──────────────────────────────────────────
+// Runs every day at 02:00 AM - generates invoices from due recurring templates
+export const processRecurringTemplates = pubsub.schedule('0 2 * * *').timeZone('Europe/Berlin').onRun(async () => {
+    const now = new Date();
+    let processed = 0;
+
+    try {
+        const templatesRef = db.collectionGroup('recurring_templates');
+        const snapshot = await templatesRef.where('active', '==', true).get();
+
+        const addInterval = (date, freq) => {
+            const d = new Date(date);
+            switch (freq) {
+                case 'weekly': d.setDate(d.getDate() + 7); break;
+                case 'monthly': d.setMonth(d.getMonth() + 1); break;
+                case 'quarterly': d.setMonth(d.getMonth() + 3); break;
+                case 'yearly': d.setFullYear(d.getFullYear() + 1); break;
+            }
+            return d.toISOString();
+        };
+
+        for (const tpl of snapshot.docs) {
+            const data = tpl.data();
+            const nextDate = data.nextInvoiceDate || data.createdAt;
+            const dueDate = new Date(nextDate);
+
+            if (dueDate <= now && data.userId) {
+                const invoiceRef = db.collection('invoices').doc();
+                const invoiceNumber = `R-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(processed + 1).padStart(4, '0')}`;
+
+                const baseInvoice = {
+                    userId: data.userId,
+                    recipientName: data.recipientName || '',
+                    amount: data.amount || 0,
+                    description: data.description || '',
+                    status: 'draft',
+                    invoiceNumber,
+                    currency: data.currency || 'EUR',
+                    items: data.items || [{ description: data.description || 'Recurring', quantity: 1, unitPrice: data.amount || 0, taxRate: 19 }],
+                    subtotal: data.amount || 0,
+                    taxAmount: (data.amount || 0) * 0.19,
+                    total: (data.amount || 0) * 1.19,
+                    dueDate: addInterval(now, data.frequency || 'monthly'),
+                    isRecurring: true,
+                    recurringTemplateId: tpl.id,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                };
+
+                await invoiceRef.set(baseInvoice);
+
+                const newNextDate = addInterval(now, data.frequency || 'monthly');
+                await tpl.ref.update({
+                    lastGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    nextInvoiceDate: newNextDate,
+                    lastInvoiceId: invoiceRef.id,
+                    lastInvoiceNumber: invoiceNumber,
+                });
+
+                processed++;
+            }
+        }
+
+        console.log(`✅ Processed ${processed} recurring templates`);
+        return null;
+    } catch (error) {
+        console.error('Recurring processing failed:', error);
+        return null;
+    }
+});
+
+// ─── 6. Cloud Operations: Notifications (Overdue Invoices) ───────────────────────
 // Runs every day at 09:00 AM
 export const checkOverdueInvoices = pubsub.schedule('0 9 * * *').timeZone('Europe/Berlin').onRun(async () => {
-    const now = new Date();
+    const nowIso = new Date().toISOString();
+    const unpaidStatuses = new Set(['pending', 'sent', 'overdue']);
     try {
-        const invoicesRef = db.collectionGroup('invoices'); // Requires indexing
-        const snapshot = await invoicesRef.where('status', '==', 'PENDING').where('dueDate', '<', now.toISOString()).get();
+        const snapshot = await db.collection('invoices').where('dueDate', '<', nowIso).get();
 
         const batch = db.batch();
+        let notificationCount = 0;
+
         snapshot.forEach(doc => {
             const invoice = doc.data();
-            const notificationRef = db.collection('users').doc(invoice.tenantId).collection('notifications').doc();
+            const status = String(invoice.status || '').toLowerCase();
+            if (!unpaidStatuses.has(status)) return;
+
+            const ownerId = invoice.userId || invoice.tenantId;
+            if (!ownerId) {
+                console.warn(`Skipping overdue invoice ${doc.id}: missing userId/tenantId`);
+                return;
+            }
+
+            const notificationRef = db.collection('users').doc(ownerId).collection('notifications').doc();
             
             batch.set(notificationRef, {
                 title: 'Fatura Vadesi Geçti',
@@ -425,12 +668,13 @@ export const checkOverdueInvoices = pubsub.schedule('0 9 * * *').timeZone('Europ
                 type: 'warning',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 read: false,
-                link: `/invoices/${doc.id}`
+                link: `/invoice/${doc.id}`
             });
+            notificationCount++;
         });
 
         await batch.commit();
-        console.log(`✅ Sent ${snapshot.size} overdue notifications`);
+        console.log(`✅ Sent ${notificationCount} overdue notifications`);
         return null;
     } catch (error) {
         console.error('Overdue check failed:', error);
@@ -439,7 +683,6 @@ export const checkOverdueInvoices = pubsub.schedule('0 9 * * *').timeZone('Europ
 });
 // --- 🛡️ Image Proxy for CORS Bypass ---
 export const proxyImage = https.onRequest(async (req, res) => {
-    // Permissive CORS headers for the proxy
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { Mail, Lock, User, Building, LogIn, AlertCircle } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { Mail, Lock, User, Building, LogIn, AlertCircle, Sparkles } from 'lucide-react';
 
 const Auth = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -16,16 +16,18 @@ const Auth = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isRedirecting, setIsRedirecting] = useState(false);
     
-    const { login, register, signInWithGoogle, signInWithApple, isAuthenticated } = useAuth();
+    const { login, register, signInWithGoogle, signInWithApple, signInAsDemo, isAuthenticated } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const redirectTo = searchParams.get('redirect') || '/dashboard';
 
     // iOS redirect sonrası: Google auth tamamlandı, authState değişti → navigate
     useEffect(() => {
         if (isAuthenticated) {
-            navigate('/dashboard');
+            navigate(redirectTo);
         }
-    }, [isAuthenticated, navigate]);
+    }, [isAuthenticated, navigate, redirectTo]);
 
     // iOS redirect bekleme ekranı
     if (isRedirecting) {
@@ -60,11 +62,11 @@ const Auth = () => {
         try {
             if (isLogin) {
                 const success = await login(formData.email, formData.password);
-                if (success) navigate('/dashboard');
+                if (success) navigate(redirectTo);
                 else setError(t('invalidEmailPass'));
             } else {
                 const res = await register(formData);
-                if (res.success) navigate('/dashboard');
+                if (res.success) navigate(redirectTo);
                 else setError(res.error);
             }
         } catch (err) {
@@ -76,26 +78,19 @@ const Auth = () => {
 
     const handleSocialLogin = async (provider) => {
         setError('');
-        // DO NOT set loading to true here! Safari requires the popup to open synchronously
-        // inside the click event handler. Setting state here yields the event loop and
-        // causes Safari to block the popup (auth/popup-closed-by-user).
         try {
-            // Trigger popup/redirect immediately — sıradaki tick'te state set edilebilir
             const loginPromise = provider === 'google' ? signInWithGoogle() : signInWithApple();
             setIsLoading(true);
             
             const res = await loginPromise;
             
             if (res?.redirecting) {
-                // Capacitor iOS: redirect başlatıldı, uygulama yeniden yüklenecek
-                // getRedirectResult() AuthContext'te otomatik yakalar
                 setIsRedirecting(true);
                 setIsLoading(false);
-                // Spinner'da bekle, onAuthStateChanged navigate edecek
                 return;
             }
             if (res?.success) {
-                navigate('/dashboard');
+                navigate(redirectTo);
             } else if (res?.error) {
                 setError(res.error);
                 setIsLoading(false);
@@ -240,6 +235,34 @@ const Auth = () => {
                         </button>
                     </p>
                 </div>
+
+                <div className="auth-divider">
+                    <div className="auth-divider-line"></div>
+                    <span>{t('or') || 'veya'}</span>
+                    <div className="auth-divider-line"></div>
+                </div>
+
+                <button
+                    onClick={async () => {
+                        setError('');
+                        setIsLoading(true);
+                        try {
+                            const res = await signInAsDemo();
+                            if (res.success) navigate('/dashboard');
+                            else setError(res.error || t('loginFailed'));
+                        } catch (err) {
+                            setError(err?.message || t('loginFailed'));
+                        } finally {
+                            setIsLoading(false);
+                        }
+                    }}
+                    className="secondary-btn auth-social-btn"
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
+                    disabled={isLoading}
+                >
+                    <Sparkles size={18} />
+                    {t('demoLogin') || 'Demo ile Giriş Yap'}
+                </button>
             </div>
         </div>
     );

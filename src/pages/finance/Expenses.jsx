@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useInvoice } from '../context/InvoiceContext';
-import { useAuth } from '../context/AuthContext';
+import { useInvoice } from '../../context/InvoiceContext';
+import { useAuth } from '../../context/AuthContext';
 import { Plus, Trash2, Download, Receipt, Camera, Image as ImageIcon, X, Eye, FileSpreadsheet, Sparkles, Lock, RotateCcw } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import PremiumModal from '../components/PremiumModal';
-import { scanReceipt } from '../lib/geminiService';
-import ConfirmDialog from '../components/ConfirmDialog';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import PremiumModal from '../../components/PremiumModal';
+import { scanReceipt } from '../../lib/geminiService';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const Expenses = () => {
     const {

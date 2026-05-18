@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useInvoice } from '../context/InvoiceContext';
+import { useInvoice } from '../../context/InvoiceContext';
 import { Download, TrendingUp, TrendingDown, AlertCircle, Receipt, BarChart3, Calendar } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 const Reports = () => {
     const { invoices, expenses, exportToCSV, STATUSES } = useInvoice();

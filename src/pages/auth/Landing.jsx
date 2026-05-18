@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Command, CheckCircle, Smartphone, Globe, Shield, Zap, ArrowRight, Star, Play, ChevronDown, Menu, X } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import '../styles/auth-landing.css';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import '../../styles/auth-landing.css';
 
 const Landing = () => {
     const { currentUser, signInAsDemo } = useAuth();

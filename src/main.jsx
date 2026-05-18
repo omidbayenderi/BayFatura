@@ -10,7 +10,7 @@ import { registerServiceWorker } from './utils/serviceWorker.js';
 import { initSentry } from './utils/sentry.js';
 import './index.css';
 import App from './App.jsx';
-import { ErrorBoundary } from './components/ErrorBoundary.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Global error handlers
 window.addEventListener('error', (event) => {

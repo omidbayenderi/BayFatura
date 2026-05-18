@@ -5804,3 +5804,99 @@ a:focus-visible {
 .delete-confirm-actions .danger-btn:active {
     transform: translateY(0);
 }
+
+/* ========== ACCEPT INVITE PAGE ========== */
+.accept-invite-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 24px;
+}
+
+.accept-invite-card {
+    background: white;
+    border-radius: 24px;
+    padding: 48px 40px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+}
+
+.accept-invite-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+}
+
+.accept-invite-icon-primary {
+    background: #e0e7ff;
+    color: #4f46e5;
+}
+
+.accept-invite-icon-success {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.accept-invite-icon-error {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.accept-invite-card h2 {
+    margin: 0 0 12px;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #1e293b;
+}
+
+.accept-invite-desc {
+    color: #64748b;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0 0 24px;
+}
+
+.accept-invite-hint {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    margin: 0 0 20px;
+}
+
+.accept-invite-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 24px;
+    border-radius: 14px;
+    font-size: 1rem;
+}
+
+.accept-invite-register {
+    margin: 16px 0 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.accept-invite-register .link-btn {
+    background: none;
+    border: none;
+    color: #4f46e5;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.85rem;
+}
+
+.accept-invite-card .spinner {
+    animation: spin 1s linear infinite;
+}

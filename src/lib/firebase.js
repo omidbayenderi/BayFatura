@@ -7,9 +7,14 @@ import {
     browserLocalPersistence,
     setPersistence
 } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+    initializeFirestore,
+    persistentLocalCache,
+    persistentSingleTabManager,
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { logger } from './logger';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -24,27 +29,57 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+import { Capacitor } from '@capacitor/core';
+import {
+    initializeAuth,
+    browserPopupRedirectResolver
+} from 'firebase/auth';
+
+// Initialize Auth platform-specifically to prevent WKWebView ITP sync hangs
+export const auth = (() => {
+    if (Capacitor.isNativePlatform()) {
+        // iOS & Android: iframe-based sync breaks/hangs. Use direct indexedDB initialization.
+        // We MUST pass browserPopupRedirectResolver so signInWithRedirect doesn't throw argument-error!
+        return initializeAuth(app, {
+            persistence: indexedDBLocalPersistence,
+            popupRedirectResolver: browserPopupRedirectResolver
+        });
+    } else {
+        // Web: Standard browser flow
+        return getAuth(app);
+    }
+})();
+
+// Firestore - offline persistence aktif (mobil için kritik)
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentSingleTabManager()
+    })
+});
+
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
-
-// iOS WKWebView localStorage güvenilir değil — IndexedDB kullan
-// Bu yapılmazsa signInWithRedirect sonrası oturum kaybolur
-const isNativePlatform = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
-if (isNativePlatform) {
-    setPersistence(auth, indexedDBLocalPersistence).catch((err) => {
-        console.warn('[Firebase] indexedDB persistence fallback:', err);
-        setPersistence(auth, browserLocalPersistence).catch(() => {});
-    });
-}
 
 // Analytics - only in production and when measurementId exists
 export let analytics = null;
 if (typeof window !== 'undefined' && firebaseConfig.measurementId && import.meta.env.PROD) {
     import('firebase/analytics').then(({ getAnalytics }) => {
         analytics = getAnalytics(app);
-    }).catch(() => {});
+    }).catch((err) => {
+        logger.warn('Firebase', 'Analytics yüklenemedi', err);
+    });
+}
+
+// App Check — güvenlik katmanı (console'da etkinleştirilmeli)
+if (import.meta.env.VITE_FIREBASE_APP_CHECK_KEY) {
+    import('firebase/app-check').then(({ initializeAppCheck, ReCaptchaV3Provider }) => {
+        initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(import.meta.env.VITE_FIREBASE_APP_CHECK_KEY),
+            isTokenAutoRefreshEnabled: true
+        });
+    }).catch((err) => {
+        logger.warn('Firebase', 'App Check yüklenemedi', err);
+    });
 }
 
 // Providers

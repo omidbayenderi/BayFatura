@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Globe, Mail, MapPin, Star, Award, Shield } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 /**
  * Impressum — Legally required in EU/DE for commercial websites (TMG §5)

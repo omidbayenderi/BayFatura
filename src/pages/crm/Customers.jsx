@@ -5,11 +5,11 @@ import {
     MapPin, Building2, FileText, TrendingUp, ChevronRight, User, Check, Lock,
     AlertTriangle, ShieldAlert
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import { useCustomers } from '../context/CustomerContext';
-import { useInvoice } from '../context/InvoiceContext';
-import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import { useCustomers } from '../../context/CustomerContext';
+import { useInvoice } from '../../context/InvoiceContext';
+import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const EMPTY_CUSTOMER = {

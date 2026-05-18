@@ -66,11 +66,17 @@ Platform, **Avrupa (Portekiz, Almanya) ve Global pazarların tüm yasal gereksin
 - **6 Dil:** DE, TR, EN, FR, ES, PT — tüm fatura ve arayüz metinleri.
 - **Dinamik Vergi Etiketi:** Ülkeye göre IVA / TVA / MwSt / VAT otomatik değişir.
 
+### 📱 Native Mobile (iOS & Android)
+- **Native Authentication:** Firebase Auth ve `@capacitor-firebase/authentication` ile tarayıcısız native FaceID/TouchID ve Google Play girişleri.
+- **Platform Persistence:** WKWebView cookie blokajlarını aşan IndexedDB Local Persistence.
+
+
 ## 🛠️ Teknik Altyapı
 
 | Katman | Teknoloji |
 |--------|-----------|
 | Frontend | React + Vite + Framer Motion (OLED Dark Mode) |
+| Mobile Native | Capacitor 6 + iOS (SPM) + Android (Gradle) |
 | Backend | Firebase (Auth, Cloud Functions v5, Firestore, Storage) |
 | AI Engine | Google Genkit + Gemini 1.5 Flash (Server-side) |
 | Emailing | Resend API (Automated HTML Templates) |
@@ -80,6 +86,7 @@ Platform, **Avrupa (Portekiz, Almanya) ve Global pazarların tüm yasal gereksin
 | Security | Multi-tenant isolation, GDPR Cookie Consent |
 | Error Handling | React ErrorBoundary + Global unhandledrejection |
 | Code Quality | ESLint (0 errors, 0 warnings) |
+
 
 ## 📁 Compliance Kütüphaneleri
 
@@ -132,5 +139,39 @@ src/lib/
 - **Kesintisiz Kullanım:** `componentDidMount` kancası ile uygulama başarıyla yüklendiğinde bayrak temizlenerek sonsuz döngü engellendi.
 
 ---
+## 🚀 31. Native Mobile Evolution (iOS & Android Native) (Completed — 15 Mayıs 2026)
+
+### 🔐 31.1 Native Auth & Persistency (iOS & Android)
+- **IndexedDB Persistence:** iOS WKWebView ITP engelini aşan platform duyarlı yetkilendirme yönetimi.
+- **Native Sheet Engine:** Google ve Apple butonlarında native iOS ve Google Play Services doğrulama alt ekranları aktif edildi.
+- **Hybrid Context Bridge:** `AuthContext.jsx` üzerinden akıllı web/native fallback yönlendirmesi kuruldu.
+
+### 🍎 31.2 iOS & Xcode Infrastructure (Fixed)
+- **Xcode project.pbxproj Repair:** Xcode üzerinde kaybolan `GoogleService-Info.plist` bağlantıları dinamik olarak düzeltildi.
+- **URL Scheme Sync:** OAuth Deep-Link URL şemaları güncel `REVERSED_CLIENT_ID` ile senkronize edildi.
+- **SPM Resolver:** `xcodebuild -resolvePackageDependencies` ile Swift Package Manager kütüphanesi başarıyla derlendi.
+
+### 🤖 31.3 Android Hardening (Completed)
+- **Firebase Assets:** Canlı `google-services.json` dosyası app modülüne kilitlendi.
+- **Gradle Injection:** `rgcfaIncludeGoogle` bayrağı Gradle yapılandırmasına enjekte edilerek derleme sağlandı (`BUILD SUCCESSFUL`).
+
+---
+
+## ☁️ 32. Cloud Infrastructure & Team Workflow (Completed — 17 Mayıs 2026)
+
+### 🛠️ 32.1 Functions Stability & Node.js 22 Upgrade
+- **Module Not Found Fix:** `functions/node_modules` dizinindeki kopmalar çözülerek, paketler güvenle yeniden kuruldu.
+- **Node Engine Upgrade:** Firebase Functions çalışma ortamı (runtime) Node 20'den (deprecated) Node 22 sürümüne yükseltildi.
+- **Successful Deployment:** Tüm Cloud Functions (AI, Stripe, Email, Auth) sorunsuz olarak production'a aktarıldı.
+
+### 📧 32.2 Team Invitation Architecture
+- **Cloud Execution:** `sendInvitationEmail` ve `acceptTeamInvitation` Cloud Function'ları Resend entegrasyonuyla aktif edildi.
+- **Client Routing:** Davetiyelerin güvenli bir şekilde kabul edilmesi için `AcceptInvite.jsx` UI bileşeni oluşturuldu ve `/accept-invite` rotası `App.jsx` üzerinden tanımlandı.
+
+### 🛡️ 32.3 CSP & AdSense Hardening
+- **Content Security Policy (CSP):** `index.html` içerisindeki CSP meta etiketi güncellendi.
+- **Allowed Domains:** Google AdSense reklam ağı (`pagead2.googlesyndication.com`) ve Google Profil Görselleri (`lh3.googleusercontent.com`) güvenli (`img-src`, `connect-src`, `frame-src`) listelerine eklendi.
+
+---
 © 2026 BayFatura Cloud — Innovation in Finance.
-*Last Updated: 06 Mayıs 2026 (PDF Engine 3.0 & PWA Recovery)*
+*Last Updated: 17 Mayıs 2026 (Cloud & Team Infrastructure)*

@@ -246,3 +246,39 @@ export const sendInvoiceEmail = async ({ toEmail, toName, invoice, senderName, s
         throw new Error(error.message || "Email send failed via Cloud Function");
     }
 };
+
+/**
+ * Ekip davetiyesi e-postası gönderir
+ */
+export const sendInvitationEmail = async ({ inviteeEmail, inviteeName, role, invitedBy, invitationId, companyName, senderName }) => {
+    try {
+        const sendInviteFn = httpsCallable(functions, 'sendInvitationEmail');
+        const result = await sendInviteFn({
+            inviteeEmail,
+            inviteeName,
+            role,
+            invitedBy,
+            invitationId,
+            companyName,
+            senderName,
+        });
+        return result.data;
+    } catch (error) {
+        console.error("Invitation Email Error:", error);
+        throw new Error(error.message || "Failed to send invitation email");
+    }
+};
+
+/**
+ * Ekip davetiyesini kabul eder
+ */
+export const acceptInvitation = async ({ token, tenantId }) => {
+    try {
+        const acceptFn = httpsCallable(functions, 'acceptTeamInvitation');
+        const result = await acceptFn({ token, tenantId });
+        return result.data;
+    } catch (error) {
+        console.error("Accept Invitation Error:", error);
+        throw new Error(error.message || "Failed to accept invitation");
+    }
+};

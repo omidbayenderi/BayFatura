@@ -19,9 +19,9 @@
 | Layer | Count | Status |
 |-------|-------|--------|
 | Unit tests | 2 → 40+ | ✅ Phase 6 adds feature flag + formatter tests |
-| Integration | 0 | ❌ Not yet implemented |
-| Firestore rules emulator | 1 suite | ✅ Tenant isolation and config access |
+| Integration | 2 suites | ✅ Auth and route guard smoke flows |
 | E2E | 0 | ❌ Not yet implemented |
+| Firestore rules emulator | 1 suite | ✅ Added for tenant isolation and config access |
 
 ## 3. Unit Tests
 
@@ -47,14 +47,21 @@ Run the emulator-backed rules suite:
 npm run test:rules
 ```
 
-This starts the Firestore emulator, loads `firestore.rules`, and verifies tenant isolation, feature flag access, company config access, and server-managed team membership rules.
+This starts the Firestore emulator, loads `firestore.rules`, and verifies:
+
+- users can access their own business documents only
+- super admins can read protected business documents
+- `app_config` feature flags are readable but writable only by super admins
+- `company_config` can be read by owners and joined team members
+- `myTeams` is readable by the user but client writes are denied
 
 ## 4. Integration Tests
 
 ### Target Flows
-1. **Login flow**: AuthContext integration (mocked Firebase)
-2. **Invoice creation**: Form submission → Firestore write
-3. **Invoice listing**: Data fetch → rendering
+1. **Login flow**: Auth page integration (mocked Firebase) — ✅ Added
+2. **Route guard**: ProtectedRoute redirect/loading/authenticated states — ✅ Added
+3. **Invoice creation**: Form submission → Firestore write
+4. **Invoice listing**: Data fetch → rendering
 
 ### Implementation Notes
 - Use `@testing-library/react` for component rendering

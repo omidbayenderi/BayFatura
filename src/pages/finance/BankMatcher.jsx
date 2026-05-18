@@ -5,16 +5,16 @@ import {
     RefreshCw, ChevronRight, FileText, Search, Check, X,
     TrendingUp, DollarSign, Clock, Sparkles, ArrowRight, Lock
 } from 'lucide-react';
-import { useInvoice } from '../context/InvoiceContext';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import { useAuth } from '../context/AuthContext';
+import { useInvoice } from '../../context/InvoiceContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import { useAuth } from '../../context/AuthContext';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../lib/firebase';
+import { functions } from '../../lib/firebase';
 import {
     confidenceColor,
     confidenceLabel,
-} from '../lib/bankMatcher';
+} from '../../lib/bankMatcher';
 
 // ─── Sample data for demo ────────────────────────────────────────────────────
 const DEMO_CSV = `Buchungsdatum;Auftraggeber / Beguenstigter;Verwendungszweck;Betrag

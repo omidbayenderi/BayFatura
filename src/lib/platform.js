@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+
 let _isNative = null;
 
 export function isNativePlatform() {
@@ -8,7 +10,7 @@ export function isNativePlatform() {
     return false;
   }
 
-  _isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform());
+  _isNative = Capacitor.isNativePlatform();
   return _isNative;
 }
 
@@ -16,10 +18,7 @@ export function getPlatform() {
   if (typeof navigator === 'undefined') return 'server';
 
   if (isNativePlatform()) {
-    if (window.Capacitor?.getPlatform) {
-      return window.Capacitor.getPlatform();
-    }
-    return 'native';
+    return Capacitor.getPlatform();
   }
 
   const ua = navigator.userAgent || '';

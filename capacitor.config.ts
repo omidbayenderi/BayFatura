@@ -11,7 +11,7 @@ const config: CapacitorConfig = {
   plugins: {
     // ─── Splash Screen ───────────────────────────────────
     SplashScreen: {
-      launchAutoHide: false,        // Manuel hide → animasyonlu geçiş
+      launchAutoHide: true,
       launchShowDuration: 2000,
       launchFadeOutDuration: 400,
       backgroundColor: '#6366f1',
@@ -42,6 +42,19 @@ const config: CapacitorConfig = {
     Camera: {
       useSupportActionModeInsteadOfDefaultEditorImageSelector: true,
     },
+
+    // ─── Firebase Authentication ─────────────────────────
+    FirebaseAuthentication: {
+      providers: ['google.com', 'apple.com'],
+    },
+  },
+
+  // ─── iOS Native Ayarları ──────────────────────────────
+  ios: {
+    allowsLinkPreview: false,             // Uzun basma link önizlemesini kapat (daha temiz UX)
+    preferredContentMode: 'mobile',        // Mobil görünüm
+    contentInset: 'never',                 // Safe area inset yönetimini web katmanına bırak
+    scrollEnabled: true,                   // Scroll aktif
   },
 };
 

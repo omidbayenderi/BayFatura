@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useInvoice } from '../context/InvoiceContext';
-import { useLanguage } from '../context/LanguageContext';
-import { useAuth } from '../context/AuthContext';
-import { usePanel } from '../context/PanelContext';
+import { useInvoice } from '../../context/InvoiceContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { usePanel } from '../../context/PanelContext';
 import { Eye, Trash2, Edit, ArrowRightCircle, FileInput, Lock, RotateCcw } from 'lucide-react';
-import { getIndustryFields } from '../config/industryFields';
-import ConfirmDialog from '../components/ConfirmDialog';
-import '../index.css';
+import { getIndustryFields } from '../../config/industryFields';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import '../../index.css';
 
 const Quotes = () => {
     const { 
