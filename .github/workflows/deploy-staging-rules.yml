@@ -1,0 +1,43 @@
+name: Deploy Staging Rules (Manual)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: staging-rules-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-staging-rules:
+    name: Validate & Deploy Staging Rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Firestore rules with emulator
+        run: npm run test:rules
+
+      - name: Prepare staging Firebase credentials
+        run: |
+          printf '%s' "$STAGING_FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/staging-service-account.json"
+        env:
+          STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy Firestore rules to staging
+        run: npx -y firebase-tools@latest deploy --only firestore:rules --project "$STAGING_FIREBASE_PROJECT_ID"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/staging-service-account.json
+          STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_VITE_FIREBASE_PROJECT_ID }}
