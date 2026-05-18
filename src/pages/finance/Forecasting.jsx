@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useInvoice } from '../context/InvoiceContext';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import { useAuth } from '../context/AuthContext';
-import { analyzeFinancials } from '../lib/geminiService';
+import { useInvoice } from '../../context/InvoiceContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import { useAuth } from '../../context/AuthContext';
+import { analyzeFinancials } from '../../lib/geminiService';
 import { 
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';

@@ -98,13 +98,27 @@ export const generateDemoData = async (saveInvoice, saveExpense, saveQuote, save
     }
     // 4. Generate Recurring Templates
     if (saveRecurringTemplate) {
-        for (let i = 0; i < 3; i++) {
-            const isMonthly = Math.random() > 0.3;
+        const freqData = [
+            { freq: 'monthly', desc: 'Premium Cloud Hosting & Support', currency: 'EUR' },
+            { freq: 'quarterly', desc: 'Wartungsvertrag Quartal', currency: 'EUR' },
+            { freq: 'yearly', desc: 'Annual License Renewal', currency: 'USD' },
+        ];
+        for (const fd of freqData) {
+            const today = new Date();
+            const nextDate = new Date(today);
+            switch (fd.freq) {
+                case 'monthly': nextDate.setDate(nextDate.getDate() + 7); break;
+                case 'quarterly': nextDate.setMonth(nextDate.getMonth() + 1); break;
+                case 'yearly': nextDate.setMonth(nextDate.getMonth() + 2); break;
+            }
             await saveRecurringTemplate({
                 recipientName: getRandomItem(CUSTOMERS),
                 amount: Math.floor(Math.random() * 500) + 99,
-                frequency: isMonthly ? 'monthly' : 'yearly',
-                description: isMonthly ? "Premium Cloud Hosting & Support" : "Annual License Renewal",
+                frequency: fd.freq,
+                description: fd.desc,
+                currency: fd.currency,
+                active: true,
+                nextInvoiceDate: nextDate.toISOString().split('T')[0],
             });
         }
     }

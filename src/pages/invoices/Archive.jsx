@@ -1,18 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useInvoice } from '../context/InvoiceContext';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
+import { useInvoice } from '../../context/InvoiceContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Eye, Trash2, Edit, AlertTriangle, Bell, Search, Filter,
     Download, Mail, Clock, CheckCircle, FileText, TrendingUp,
     Send, X, Loader, Check, ChevronDown, AlertOctagon, RotateCcw
 } from 'lucide-react';
-import { getIndustryFields } from '../config/industryFields';
-import ConfirmDialog from '../components/ConfirmDialog';
-import { sendInvoiceEmail } from '../lib/emailService';
-import '../index.css';
+import { getIndustryFields } from '../../config/industryFields';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { sendInvoiceEmail } from '../../lib/emailService';
+import '../../index.css';
 
 // ─── DATEV Export ────────────────────────────────────────────────────────────
 const exportDATEV = (invoices, companyProfile) => {

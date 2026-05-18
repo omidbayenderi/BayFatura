@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useInvoice } from '../context/InvoiceContext';
-import InvoicePaper from '../components/InvoicePaper';
+import { useInvoice } from '../../context/InvoiceContext';
+import InvoicePaper from '../../components/InvoicePaper';
 import { Download, ArrowLeft, Trash2, ArrowRightCircle, Edit, MessageCircle, FileCode, Building2, Loader2 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { generateUBL21, downloadUBL } from '../lib/ublGenerator';
-import { generateXRechnungXML, downloadXRechnungXML } from '../lib/xrechnungGenerator';
+import { generateUBL21, downloadUBL } from '../../lib/ublGenerator';
+import { generateXRechnungXML, downloadXRechnungXML } from '../../lib/xrechnungGenerator';
 
 const InvoiceSkeleton = () => (
     <div className="page-container">
@@ -58,32 +58,6 @@ const InvoiceView = ({ type = 'invoice' }) => {
 
     const list = type === 'quote' ? quotes : invoices;
     const invoice = list.find(inv => inv.id === Number(id) || inv.id === id);
-
-    useEffect(() => {
-        if (shouldAutoPrint && invoice) {
-            const timer = setTimeout(() => {
-                handleDownloadPDF();
-            }, 800);
-            return () => clearTimeout(timer);
-        }
-    }, [shouldAutoPrint, invoice]);
-
-    if (isLoading) {
-        return <InvoiceSkeleton />;
-    }
-
-    if (!invoice) {
-        return (
-            <div className="page-container">
-                <div className="empty-state">
-                    <h2>{type === 'quote' ? t('quoteNotFound') : t('invoiceNotFound')}</h2>
-                    <button className="primary-btn" onClick={() => navigate(type === 'quote' ? '/quotes' : '/archive')}>
-                        {type === 'quote' ? t('backToQuotes') : t('backToArchive')}
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     const handleDownloadPDF = async () => {
         setIsGeneratingPDF(true);
@@ -152,6 +126,15 @@ const InvoiceView = ({ type = 'invoice' }) => {
             setIsGeneratingPDF(false);
         }
     };
+
+    useEffect(() => {
+        if (shouldAutoPrint && invoice) {
+            const timer = setTimeout(() => {
+                handleDownloadPDF();
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+    }, [shouldAutoPrint, invoice]);
 
     const handlePrint = async () => {
         await handleDownloadPDF();
@@ -238,6 +221,23 @@ const InvoiceView = ({ type = 'invoice' }) => {
 
     const isPortugal = (companyProfile.country || 'PT') === 'PT';
     const isGermany = companyProfile.country === 'DE';
+
+    if (isLoading) {
+        return <InvoiceSkeleton />;
+    }
+
+    if (!invoice) {
+        return (
+            <div className="page-container">
+                <div className="empty-state">
+                    <h2>{type === 'quote' ? t('quoteNotFound') : t('invoiceNotFound')}</h2>
+                    <button className="primary-btn" onClick={() => navigate(type === 'quote' ? '/quotes' : '/archive')}>
+                        {type === 'quote' ? t('backToQuotes') : t('backToArchive')}
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const sender = invoice.senderSnapshot || {};
 

@@ -1,47 +1,78 @@
-import React, { useState, useRef } from 'react';
-import { useInvoice } from '../context/InvoiceContext';
-import InvoicePaper from '../components/InvoicePaper';
-import { Save, Printer, Plus, Trash2, Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import { getIndustryFields } from '../config/industryFields';
-import jsPDF from 'jspdf';
+import React, { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useInvoice } from '../../context/InvoiceContext';
+import InvoicePaper from '../../components/InvoicePaper';
+import { Printer, ArrowLeft, Plus, Trash2, Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
+import { getIndustryFields } from '../../config/industryFields';
 
 const INDUSTRY_ICONS = {
     Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase
 };
 
-const NewQuote = () => {
-    const { companyProfile, saveQuote } = useInvoice();
-    const { t, appLanguage } = useLanguage();
-    const { showToast } = usePanel();
+const InvoiceEdit = ({ type = 'invoice' }) => {
+    const { id } = useParams();
     const navigate = useNavigate();
+    const { invoices, quotes, companyProfile, updateInvoice } = useInvoice();
+    const { t, appLanguage, invoiceLanguage } = useLanguage();
     const invoiceRef = useRef();
-    const [isSaving, setIsSaving] = useState(false);
 
     const industryConfig = getIndustryFields(companyProfile.industry || 'general');
     const IndustryIcon = INDUSTRY_ICONS[industryConfig.icon] || Briefcase;
 
-    // Local state - industryData stores dynamic fields based on selected industry
+    const list = type === 'quote' ? quotes : invoices;
+    const existingInvoice = list.find(inv => inv.id === Number(id) || inv.id === id);
+
     const [invoiceData, setInvoiceData] = useState({
         recipientName: '',
         recipientStreet: '',
         recipientHouseNum: '',
         recipientZip: '',
         recipientCity: '',
-        // Format: AN-YYYY-XXXX (AN for "Angebot" or something similar)
-        invoiceNumber: 'AN-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 1000)).padStart(4, '0'),
-        date: new Date().toISOString().split('T')[0],
-        currency: companyProfile.defaultCurrency || 'EUR',
-        taxRate: companyProfile.defaultTaxRate || 19,
+        invoiceNumber: '',
+        date: '',
+        currency: 'EUR',
+        taxRate: 19,
         status: 'draft',
         items: [{ description: '', quantity: 1, price: 0 }],
         footerNote: '',
-        paymentTerms: companyProfile.paymentTerms || '',
-        industryData: {}, // Dynamic fields based on industry
-        type: 'quote' // Explicitly set type to quote
+        paymentTerms: '',
+        industryData: {} // Dynamic fields based on industry
     });
+
+    useEffect(() => {
+        if (existingInvoice) {
+            setInvoiceData({
+                recipientName: existingInvoice.recipientName || '',
+                recipientStreet: existingInvoice.recipientStreet || '',
+                recipientHouseNum: existingInvoice.recipientHouseNum || '',
+                recipientZip: existingInvoice.recipientZip || '',
+                recipientCity: existingInvoice.recipientCity || '',
+                invoiceNumber: existingInvoice.invoiceNumber || '',
+                date: existingInvoice.date || '',
+                currency: existingInvoice.currency || 'EUR',
+                taxRate: existingInvoice.taxRate || 19,
+                status: existingInvoice.status || 'draft',
+                items: existingInvoice.items || [{ description: '', quantity: 1, price: 0 }],
+                footerNote: existingInvoice.footerNote !== undefined ? existingInvoice.footerNote : '',
+                paymentTerms: existingInvoice.paymentTerms || companyProfile.paymentTerms || '',
+                industryData: existingInvoice.industryData || {}
+            });
+        }
+    }, [existingInvoice, type]);
+
+    if (!existingInvoice) {
+        return (
+            <div className="page-container">
+                <div className="empty-state">
+                    <h2>{type === 'quote' ? t('quoteNotFound') : t('invoiceNotFound')}</h2>
+                    <button className="primary-btn" onClick={() => navigate(type === 'quote' ? '/quotes' : '/archive')}>
+                        {type === 'quote' ? t('backToQuotes') : t('backToArchive')}
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -58,7 +89,7 @@ const NewQuote = () => {
 
     const handleItemChange = (index, field, value) => {
         const newItems = [...invoiceData.items];
-        newItems[index][field] = field === 'description' ? value : value;
+        newItems[index][field] = value;
         setInvoiceData(prev => ({ ...prev, items: newItems }));
     };
 
@@ -76,9 +107,31 @@ const NewQuote = () => {
         }));
     };
 
-    // Merge Profile + Invoice Data for the Paper
+    const calculateTotals = () => {
+        const subtotal = invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.quantity || 0) * parseFloat(item.price || 0)), 0);
+        const tax = subtotal * (parseFloat(invoiceData.taxRate || 0) / 100);
+        const total = subtotal + tax;
+        return { subtotal, tax, total };
+    };
+    const totals = calculateTotals();
+
+    // FIX: updateQuote does not exist — both invoice and quote updates use updateInvoice logic.
+    // FIX: await the async update before navigating to avoid race condition.
+    const handleSave = async () => {
+        try {
+            await updateInvoice(existingInvoice.id, {
+                ...invoiceData,
+                ...totals,
+                senderSnapshot: companyProfile,
+                language: invoiceData.language || invoiceLanguage
+            });
+            navigate(`/${type}/${existingInvoice.id}?autoprint=true`);
+        } catch (err) {
+            console.error('Save failed:', err);
+        }
+    };
+
     const fullData = {
-        // Map Context Profile to Paper Props
         logo: companyProfile.logo,
         signatureUrl: companyProfile.signatureUrl || '',
         stampUrl: companyProfile.stampUrl || '',
@@ -98,70 +151,39 @@ const NewQuote = () => {
         stripeLink: companyProfile.stripeLink,
         industry: companyProfile.industry || 'general',
         logoDisplayMode: companyProfile.logoDisplayMode || 'both',
-
-        // Footer Data
         paymentTerms: invoiceData.paymentTerms,
         footerPayment: `Bank: ${companyProfile.bankName}\nIBAN: ${companyProfile.iban}\n${invoiceData.paymentTerms}`,
-
-        // Quote Specifics
         ...invoiceData,
-        // Flatten industryData for paper
         ...invoiceData.industryData
-    };
-
-    // Calculate totals for UI
-    const calculateTotals = () => {
-        const subtotal = invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.quantity || 0) * parseFloat(item.price || 0)), 0);
-        const tax = subtotal * (parseFloat(invoiceData.taxRate || 0) / 100);
-        const total = subtotal + tax;
-        return { subtotal, tax, total };
-    };
-    const totals = calculateTotals();
-
-    const handleSaveAndPrint = async () => {
-        try {
-            setIsSaving(true);
-            // 1. Save to Quotes List
-            const newQuote = await saveQuote({
-                ...invoiceData,
-                ...totals,
-                senderSnapshot: companyProfile
-            });
-
-            // 2. Navigate to Quote View with autoprint
-            if (newQuote && newQuote.id) {
-                navigate(`/quote/${newQuote.id}?autoprint=true`);
-            } else {
-                navigate('/quotes');
-            }
-        } catch (error) {
-            console.error("Error saving quote:", error);
-            showToast(t('saveFailed') + " " + error.message, 'error');
-            setIsSaving(false);
-        }
     };
 
     return (
         <div className="page-container">
             <header className="page-header">
-                <h1>{t('newQuote')}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <button className="icon-btn" onClick={() => navigate(-1)}>
+                        <ArrowLeft />
+                    </button>
+                    <div>
+                        <h1>{type === 'quote' ? t('editQuote') : t('editInvoice')}</h1>
+                        <p>{invoiceData.invoiceNumber}</p>
+                    </div>
+                </div>
                 <div className="actions">
-                    <button className="primary-btn" onClick={handleSaveAndPrint} disabled={isSaving}>
-                        <Printer size={20} className={isSaving ? 'animate-spin' : ''} />
-                        {isSaving ? t('saving') : t('saveAndPrint')}
+                    <button className="primary-btn" onClick={handleSave}>
+                        <Printer size={20} />
+                        {t('saveAndPrint')}
                     </button>
                 </div>
             </header>
 
             <div className="editor-layout">
-                {/* Linke Seite: Eingabeformular */}
                 <div className="input-section">
-
                     <div className="card">
                         <h3>{t('customerInfo')}</h3>
                         <div className="form-group">
                             <label>{t('customer')}</label>
-                            <input className="form-input" name="recipientName" value={invoiceData.recipientName} onChange={handleChange} placeholder="e.g. Max Mustermann" />
+                            <input className="form-input" name="recipientName" value={invoiceData.recipientName} onChange={handleChange} />
                         </div>
                         <div className="form-row">
                             <div className="form-group" style={{ flex: 2 }}>
@@ -224,7 +246,7 @@ const NewQuote = () => {
                         {/* Standard Invoice Fields */}
                         <div className="form-row" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                             <div className="form-group">
-                                <label>{t('quoteNumber')}</label>
+                                <label>{t('invoiceNumber')}</label>
                                 <input className="form-input" name="invoiceNumber" value={invoiceData.invoiceNumber} onChange={handleChange} />
                             </div>
                             <div className="form-group">
@@ -234,19 +256,14 @@ const NewQuote = () => {
                         </div>
                         <div className="form-row">
                             <div className="form-group">
-                                <label>{t('currency')}</label>
-                                <select className="form-input" name="currency" value={invoiceData.currency} onChange={handleChange}>
-                                    <option value="EUR">Euro (€)</option>
-                                    <option value="USD">US Dollar ($)</option>
-                                    <option value="TRY">Türk Lirası (₺)</option>
-                                    <option value="GBP">British Pound (£)</option>
+                                <label>{t('status')}</label>
+                                <select className="form-input" name="status" value={invoiceData.status} onChange={handleChange}>
+                                    <option value="draft">{t('draft')}</option>
+                                    <option value="sent">{t('sent')}</option>
+                                    <option value="paid">{t('paid')}</option>
+                                    <option value="partial">{t('partial')}</option>
+                                    <option value="overdue">{t('overdue')}</option>
                                 </select>
-                            </div>
-                        </div>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>{t('taxRate')}</label>
-                                <input type="number" className="form-input" name="taxRate" value={invoiceData.taxRate} onChange={handleChange} />
                             </div>
                         </div>
                     </div>
@@ -260,7 +277,7 @@ const NewQuote = () => {
                                 <tr>
                                     <th>{t('description')}</th>
                                     <th style={{ width: '80px' }}>{t('quantity')}</th>
-                                    <th style={{ width: '100px' }}>{t('price')} ({invoiceData.currency === 'TRY' ? '₺' : invoiceData.currency === 'USD' ? '$' : invoiceData.currency === 'GBP' ? '£' : '€'})</th>
+                                    <th style={{ width: '100px' }}>{t('price')}</th>
                                     <th style={{ width: '40px' }}></th>
                                 </tr>
                             </thead>
@@ -297,15 +314,15 @@ const NewQuote = () => {
                     </div>
 
                     <div className="card full-width">
-                        <h3>{t('paymentTerms')}</h3>
+                            <h3>{t('paymentTerms')}</h3>
                         <div className="form-group">
-                            <label>{t('additionalInfo')}</label>
+                            <label>{t('extraNote')}</label>
                             <input 
                                 className="form-input" 
                                 name="footerNote" 
                                 value={invoiceData.footerNote} 
                                 onChange={handleChange}
-                                placeholder={t('thanksPlaceholder')}
+                                placeholder="e.g. Vielen Dank für Ihren Auftrag!"
                                 style={{ marginBottom: '12px' }}
                             />
                             
@@ -316,23 +333,18 @@ const NewQuote = () => {
                                 value={invoiceData.paymentTerms} 
                                 onChange={handleChange}
                                 rows="3"
-                                placeholder="..."
+                                placeholder={t('paymentTerms')}
                             />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Hidden Print Area */}
             <div className="hidden-print-container">
-                <InvoicePaper
-                    data={fullData}
-                    totals={totals}
-                    ref={invoiceRef}
-                />
+                <InvoicePaper data={fullData} totals={totals} ref={invoiceRef} />
             </div>
         </div>
     );
 };
 
-export default NewQuote;
+export default InvoiceEdit;

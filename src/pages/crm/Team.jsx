@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import { db } from '../lib/firebase';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import { db } from '../../lib/firebase';
+import { sendInvitationEmail } from '../../lib/emailService';
 import {
     collection,
     query,
@@ -123,7 +124,7 @@ const Team = () => {
         const teamRef = collection(db, 'users', currentUser.uid, 'team');
 
         try {
-            await addDoc(teamRef, {
+            const docRef = await addDoc(teamRef, {
                 name: inviteData.email.split('@')[0],
                 email: inviteData.email,
                 role: inviteData.role,
@@ -132,6 +133,21 @@ const Team = () => {
                 invitedAt: new Date().toISOString(),
                 joinedAt: null
             });
+
+            try {
+                await sendInvitationEmail({
+                    inviteeEmail: inviteData.email,
+                    inviteeName: inviteData.email.split('@')[0],
+                    role: inviteData.role,
+                    invitedBy: currentUser.uid,
+                    invitationId: docRef.id,
+                    companyName: currentUser.companyName || currentUser.name || 'BayFatura',
+                    senderName: currentUser.name || currentUser.email || 'Team Admin',
+                });
+            } catch (emailError) {
+                console.error('Email send failed but Firestore doc created:', emailError);
+            }
+
             showToast(t('inviteSent'));
             setShowInviteModal(false);
             setInviteData({ email: '', role: 'member' });

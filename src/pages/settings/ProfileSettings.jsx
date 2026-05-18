@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
 import { ArrowLeft, Camera, User, Mail, Shield, Key, Save, Check, Globe, CreditCard, AlertTriangle, Trash2 } from 'lucide-react';
 
 const ProfileSettings = () => {

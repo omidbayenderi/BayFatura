@@ -16,17 +16,24 @@
     font-src 'self' https://fonts.gstatic.com;
     img-src 'self' data: blob:
       https://*.googleapis.com
+      https://*.googleusercontent.com
+      https://lh3.googleusercontent.com
       https://*.firebasestorage.app
       https://images.weserv.nl
       https://quickchart.io;
     connect-src 'self'
       https://*.googleapis.com
+      https://*.google.com
+      https://*.gstatic.com
       https://*.firebaseio.com
       https://*.firebasestorage.app
+      https://*.cloudfunctions.net
       https://identitytoolkit.googleapis.com
       https://securetoken.googleapis.com
+      https://pagead2.googlesyndication.com
+      https://bayfatura.com
       wss://*.firebaseio.com;
-    frame-src https://*.firebaseapp.com https://js.stripe.com;
+    frame-src https://*.firebaseapp.com https://bayfatura.com https://js.stripe.com https://pagead2.googlesyndication.com https://*.google.com;
     worker-src 'self' blob:;
   " />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />

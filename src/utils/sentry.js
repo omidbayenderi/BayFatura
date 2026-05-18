@@ -98,7 +98,7 @@ export function captureException(error, context) {
           timestamp: new Date().toISOString(),
           ...context,
         }),
-      }).catch(() => {});
+      }).catch(() => {/* fire-and-forget */});
     } catch (_) {
       // fetch error is intentionally swallowed
     }

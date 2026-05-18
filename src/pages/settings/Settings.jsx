@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { validateNIF } from '../lib/portugalCompliance';
+import { validateNIF } from '../../lib/portugalCompliance';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useInvoice, uploadToStorage, deleteFromStorage } from '../context/InvoiceContext';
-import { useAuth } from '../context/AuthContext';
+import { useInvoice, uploadToStorage, deleteFromStorage } from '../../context/InvoiceContext';
+import { useAuth } from '../../context/AuthContext';
 import { Save, Languages, User, Camera, LayoutDashboard, Mail, Shield, ChevronRight, XCircle, Trash2, X, Palette, RotateCcw, Check, Lock, Crown, Zap, CheckCircle, CheckCircle2, Gem, Package, Building2, CreditCard } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import PremiumModal from '../components/PremiumModal';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import PremiumModal from '../../components/PremiumModal';
 
 const TABS = ['general', 'finance', 'premium'];
 
@@ -36,22 +36,15 @@ const Settings = () => {
         }
     }, [loading, companyProfile, invoiceCustomization, isInitialized]);
 
-    useEffect(() => {
-        if (formData.logo && (!customizationData.brandPalette || customizationData.brandPalette.length === 0)) {
-            extractColors(formData.logo).then(palette => {
-                setCustomizationData(prev => ({ ...prev, brandPalette: palette }));
-            });
-        }
-    }, [formData.logo]);
-
     const extractColors = (imageSrc) => {
         return new Promise((resolve) => {
             const img = new Image();
-            img.crossOrigin = "Anonymous";
+            img.crossOrigin = 'Anonymous';
+            img.src = imageSrc;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = 50; // High performance small scale
+                canvas.width = 50;
                 canvas.height = 50;
                 ctx.drawImage(img, 0, 0, 50, 50);
 
@@ -64,19 +57,16 @@ const Settings = () => {
                     const b = imageData[i + 2];
                     const a = imageData[i + 3];
 
-                    if (a < 128) continue; // Skip transparency
+                    if (a < 128) continue;
 
-                    // Simple grouping to avoid too many similar colors
                     const rG = Math.round(r / 20) * 20;
                     const gG = Math.round(g / 20) * 20;
                     const bG = Math.round(b / 20) * 20;
                     const rgb = `rgb(${rG},${gG},${bG})`;
 
-                    // Filter out greys (too close to each other)
                     const diff = Math.max(r, g, b) - Math.min(r, g, b);
                     if (diff < 30) continue;
 
-                    // Filter out very light colors (backgrounds)
                     if (r > 240 && g > 240 && b > 240) continue;
 
                     colorMap[rgb] = (colorMap[rgb] || 0) + 1;
@@ -93,8 +83,7 @@ const Settings = () => {
                 console.warn('Failed to extract colors from image due to CORS or load error.');
                 resolve([]);
             };
-            
-            // Bypass CORS using proxy if it's an http/https url (not base64 data)
+
             if (imageSrc && (imageSrc.startsWith('http://') || imageSrc.startsWith('https://'))) {
                 img.src = `https://images.weserv.nl/?url=${encodeURIComponent(imageSrc)}`;
             } else {

@@ -39,7 +39,6 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
       allow delete: if isAuthenticated() && (
-        exists(/databases/$(database)/documents/customers/$(docId)) &&
         get(/databases/$(database)/documents/customers/$(docId)).data.userId == request.auth.uid || 
         isSuperAdmin()
       );

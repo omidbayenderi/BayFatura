@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useAuth } from './AuthContext';
+import { logger } from '../lib/logger';
 
 /**
  * Uploads a File object to Firebase Storage and returns the public download URL.
@@ -55,6 +56,9 @@ export const InvoiceProvider = ({ children }) => {
         template: 'classic', showLogo: true, showTax: true, showTotalInWords: false,
         notes: '', quoteValidityDays: 30
     });
+    const [expenseCategories, setExpenseCategories] = useState([
+        'spareParts', 'rent', 'marketing', 'software', 'insurance', 'materials', 'fuel', 'food', 'office', 'other'
+    ]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -91,7 +95,11 @@ export const InvoiceProvider = ({ children }) => {
         }, "Profile");
 
         const unsubCustom = safeListen(doc(db, 'customizations', currentUser.uid), (s) => {
-            if (s.exists()) setInvoiceCustomization(prev => ({ ...prev, ...s.data() }));
+            if (s.exists()) {
+                const data = s.data();
+                setInvoiceCustomization(prev => ({ ...prev, ...data }));
+                if (data.expenseCategories) setExpenseCategories(data.expenseCategories);
+            }
         }, "Customization");
 
         // 2. Data Queries
@@ -162,8 +170,11 @@ export const InvoiceProvider = ({ children }) => {
     const deleteExpensePermanently = async (id) => await deleteDoc(doc(db, 'expenses', id));
 
     const saveRecurringTemplate = async (d) => {
-        const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString() });
+        const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString(), active: true });
         await addDoc(collection(db, 'recurring_templates'), payload);
+    };
+    const updateRecurringTemplate = async (id, data) => {
+        await updateDoc(doc(db, 'recurring_templates', id), cleanData({ ...data, updatedAt: new Date().toISOString() }));
     };
     const deleteRecurringTemplate = async (id) => await deleteDoc(doc(db, 'recurring_templates', id));
 
@@ -213,14 +224,48 @@ export const InvoiceProvider = ({ children }) => {
         }
     };
 
+    const addExpenseCategory = async (cat) => {
+        if (!cat) return;
+        if (!expenseCategories.includes(cat)) {
+            const newCategories = [...expenseCategories, cat];
+            setExpenseCategories(newCategories);
+            if (currentUser) {
+                await setDoc(doc(db, 'customizations', currentUser.uid), { expenseCategories: newCategories }, { merge: true });
+            }
+        }
+    };
+
+    const exportToCSV = (data, filename) => {
+        if (!data || data.length === 0) return;
+
+        const headers = Object.keys(data[0]).join(',');
+        const rows = data.map(obj => {
+            return Object.values(obj).map(val => {
+                const str = String(val).replace(/"/g, '""');
+                return `"${str}"`;
+            }).join(',');
+        });
+
+        const csv = `${headers}\n${rows.join('\n')}`;
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${filename}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <InvoiceContext.Provider value={{ 
             invoices, quotes, expenses, recurringTemplates, companyProfile, invoiceCustomization, loading, 
             deletedInvoices, deletedQuotes, deletedExpenses,
             saveInvoice, deleteInvoice, restoreInvoice, deleteInvoicePermanently, updateInvoice, updateInvoiceStatus,
-            saveQuote, deleteQuote, restoreQuote, deleteQuotePermanently, saveExpense, deleteExpense, restoreExpense, deleteExpensePermanently, saveRecurringTemplate, deleteRecurringTemplate,
+            saveQuote, deleteQuote, restoreQuote, deleteQuotePermanently, saveExpense, deleteExpense, restoreExpense, deleteExpensePermanently, saveRecurringTemplate, updateRecurringTemplate, deleteRecurringTemplate,
             updateProfile, updateCustomization,
             clearAllData,
+            expenseCategories, addExpenseCategory, exportToCSV,
             CURRENCIES: [{ code: 'EUR', symbol: '€', label: 'Euro' }, { code: 'USD', symbol: '$', label: 'US Dollar' }, { code: 'TRY', symbol: '₺', label: 'Türk Lirası' }],
             STATUSES: { draft: { label: 'Entwurf', color: '#94a3b8' }, sent: { label: 'Gesendet', color: '#3b82f6' }, paid: { label: 'Bezahlt', color: '#10b981' }, overdue: { label: 'Überfällig', color: '#ef4444' } }
         }}>

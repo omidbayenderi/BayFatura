@@ -36,6 +36,8 @@ export const ProductProvider = ({ children }) => {
         if (!currentUser) return;
         const ref = await addDoc(collection(db, 'products'), {
             ...data,
+            stock: parseInt(data.stock) || 0,
+            stockAlertThreshold: parseInt(data.stockAlertThreshold) || 0,
             userId: currentUser.uid,
             createdAt: new Date().toISOString()
         });
@@ -43,15 +45,25 @@ export const ProductProvider = ({ children }) => {
     };
 
     const updateProduct = async (id, data) => {
-        await updateDoc(doc(db, 'products', id), { ...data, updatedAt: new Date().toISOString() });
+        const payload = { ...data };
+        if (data.stock !== undefined) payload.stock = parseInt(data.stock) || 0;
+        if (data.stockAlertThreshold !== undefined) payload.stockAlertThreshold = parseInt(data.stockAlertThreshold) || 0;
+        await updateDoc(doc(db, 'products', id), { ...payload, updatedAt: new Date().toISOString() });
     };
 
     const deleteProduct = async (id) => {
         await deleteDoc(doc(db, 'products', id));
     };
 
+    const decrementStock = async (id, quantity = 1) => {
+        const product = products.find(p => p.id === id);
+        if (!product || !product.stock) return;
+        const newStock = Math.max(0, (product.stock || 0) - quantity);
+        await updateDoc(doc(db, 'products', id), { stock: newStock, updatedAt: new Date().toISOString() });
+    };
+
     return (
-        <ProductContext.Provider value={{ products, loading, saveProduct, updateProduct, deleteProduct }}>
+        <ProductContext.Provider value={{ products, loading, saveProduct, updateProduct, deleteProduct, decrementStock }}>
             {children}
         </ProductContext.Provider>
     );

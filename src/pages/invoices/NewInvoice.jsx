@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react';
-import { useInvoice } from '../context/InvoiceContext';
-import InvoicePaper from '../components/InvoicePaper';
+import { useInvoice } from '../../context/InvoiceContext';
+import InvoicePaper from '../../components/InvoicePaper';
 import { Save, Download, Plus, Trash2, Search, X, Package, Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useLanguage } from '../context/LanguageContext';
-import { usePanel } from '../context/PanelContext';
-import { useCustomers } from '../context/CustomerContext';
-import { useProducts } from '../context/ProductContext';
-import { getIndustryFields } from '../config/industryFields';
+import { useLanguage } from '../../context/LanguageContext';
+import { usePanel } from '../../context/PanelContext';
+import { useCustomers } from '../../context/CustomerContext';
+import { useProducts } from '../../context/ProductContext';
+import { getIndustryFields } from '../../config/industryFields';
+import { convertAmount, formatCurrency, getRate } from '../../lib/exchangeRate';
 import jsPDF from 'jspdf';
 
 const INDUSTRY_ICONS = {
@@ -547,6 +548,8 @@ const NewInvoice = () => {
     const industryConfig = getIndustryFields(companyProfile.industry || 'general');
     const IndustryIcon = INDUSTRY_ICONS[industryConfig.icon] || Briefcase;
 
+    const [conversionHint, setConversionHint] = useState('');
+
     // Local state - industryData stores dynamic fields based on selected industry
     const [invoiceData, setInvoiceData] = useState({
         recipientName: prefillData.recipientName || '',
@@ -572,6 +575,18 @@ const NewInvoice = () => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setInvoiceData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleCurrencyChange = async (e) => {
+        const newCurrency = e.target.value;
+        setInvoiceData(prev => ({ ...prev, currency: newCurrency }));
+        const base = companyProfile.defaultCurrency || 'EUR';
+        if (newCurrency !== base) {
+            const rate = await getRate(base, newCurrency);
+            setConversionHint(`1 ${base} ≈ ${rate.toFixed(4)} ${newCurrency}`);
+        } else {
+            setConversionHint('');
+        }
     };
 
     const handleSelectCustomer = (customer) => {
@@ -911,12 +926,17 @@ const NewInvoice = () => {
                         <div className="form-row">
                             <div className="form-group">
                                 <label>{t('currency')}</label>
-                                <select className="form-input" name="currency" value={invoiceData.currency} onChange={handleChange}>
+                                <select className="form-input" name="currency" value={invoiceData.currency} onChange={handleCurrencyChange}>
                                     <option value="EUR">Euro (€)</option>
                                     <option value="USD">US Dollar ($)</option>
                                     <option value="TRY">Türk Lirası (₺)</option>
                                     <option value="GBP">British Pound (£)</option>
                                 </select>
+                                {conversionHint && (
+                                    <small style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '2px', display: 'block' }}>
+                                        {conversionHint}
+                                    </small>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label>{t('status')}</label>

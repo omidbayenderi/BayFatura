@@ -1,12 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db, isFirebaseConfigured, googleProvider, appleProvider } from '../lib/firebase';
-import { 
-    onAuthStateChanged, 
-    signInWithEmailAndPassword, 
+import {
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
     signOut,
     signInWithPopup,
     signInWithRedirect,
     getRedirectResult,
+    signInWithCredential,
+    createUserWithEmailAndPassword,
+    GoogleAuthProvider,
+    OAuthProvider,
     signInAnonymously,
     updateProfile as firebaseUpdateProfile,
     updatePassword,
@@ -15,6 +19,9 @@ import {
     deleteUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { isNativePlatform } from '../lib/platform';
+import { nativeSignInWithGoogle, nativeSignInWithApple, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
+import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
 
 const AuthContext = createContext();
 
@@ -87,6 +94,7 @@ export const AuthProvider = ({ children }) => {
                     // Minimal fail-safe user
                     setCurrentUser({ uid: user.uid, email: user.email || 'guest@bayfatura.com', role: 'admin', tenantId: user.uid, plan: user.isAnonymous ? 'elite' : 'standard' });
                 }
+                setCrashlyticsUserId(user.uid);
             } else {
                 setCurrentUser(null);
             }
@@ -101,8 +109,26 @@ export const AuthProvider = ({ children }) => {
             await signInWithEmailAndPassword(auth, e, p);
             return { success: true };
         } catch (err) {
-            console.error("Login error:", err);
-            throw err; // Re-throw to be caught by the page components
+            const errCode = err?.code || '';
+            const errMsg = err?.message || 'Login failed.';
+            console.error("[Auth] Email login error:", { code: errCode, message: errMsg });
+            // Platform-agnostic error messages
+            if (errCode === 'auth/invalid-credential' || errCode === 'auth/user-not-found' || errCode === 'auth/wrong-password') {
+                throw new Error('Invalid email or password.');
+            }
+            if (errCode === 'auth/too-many-requests') {
+                throw new Error('Too many attempts. Please try again later.');
+            }
+            if (errCode === 'auth/user-disabled') {
+                throw new Error('This account has been disabled.');
+            }
+            if (errCode === 'auth/invalid-email') {
+                throw new Error('Invalid email address.');
+            }
+            if (errCode === 'auth/network-request-failed') {
+                throw new Error('Network error. Check your connection.');
+            }
+            throw new Error(errMsg);
         }
     };
     
@@ -133,55 +159,147 @@ export const AuthProvider = ({ children }) => {
     const logout = () => signOut(auth);
     const signInWithGoogle = async () => {
         try {
-            // iOS WKWebView signInWithPopup'u desteklemez — Capacitor'da redirect kullan
-            const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
+            const isNative = isNativeAuthAvailable();
             if (isNative) {
-                // Redirect flow: sayfa yeniden yüklendiğinde getRedirectResult() yakalar
+                try {
+                    const result = await nativeSignInWithGoogle();
+                    if (result?.credential?.idToken) {
+                        const credential = GoogleAuthProvider.credential(result.credential.idToken);
+                        await signInWithCredential(auth, credential);
+                        return { success: true };
+                    }
+                } catch (nativeErr) {
+                    if (nativeErr?.type === NativeAuthError.USER_CANCELLED) {
+                        return { success: false, error: 'Sign in was cancelled.' };
+                    }
+                    if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
+                        console.warn('[Auth] Native Google plugin unavailable, using web SDK directly');
+                        const result = await signInWithPopup(auth, googleProvider);
+                        return { success: true, user: result.user };
+                    }
+                    if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
+                        console.warn('[Auth] Native Google not configured, falling back to redirect:', nativeErr.message);
+                    } else {
+                        console.warn('[Auth] Native Google login failed, falling back to redirect:', nativeErr);
+                    }
+                }
                 await signInWithRedirect(auth, googleProvider);
                 return { success: true, redirecting: true };
             }
             const result = await signInWithPopup(auth, googleProvider);
             return { success: true, user: result.user };
         } catch (err) {
-            console.error("Google login error:", err);
-            if (err.code === 'auth/popup-closed-by-user') {
+            const errMsg = err?.message || '';
+            const errCode = err?.code || '';
+            console.error("[Auth] Google login error:", { code: errCode, message: errMsg });
+            if (errCode === 'auth/popup-closed-by-user') {
                 return { success: false, error: 'Popup closed. Please allow popups and try again.' };
             }
-            if (err.message?.includes('redirect_uri_mismatch')) {
-                console.warn('Redirect URI mismatch. Check Firebase Console > Authentication > Authorized domains');
+            if (errMsg.includes('redirect_uri_mismatch')) {
+                console.warn('[Auth] Redirect URI mismatch. Check Firebase Console > Authentication > Authorized domains');
                 return { success: false, error: 'OAuth configuration error. Please contact support.' };
             }
-            return { success: false, error: err.message };
+            return { success: false, error: errMsg || 'Google sign-in failed.' };
         }
     };
     
     const signInWithApple = async () => {
         try {
-            // iOS WKWebView signInWithPopup'u desteklemez — Capacitor'da redirect kullan
-            const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform();
+            const isNative = isNativeAuthAvailable();
             if (isNative) {
+                try {
+                    const result = await nativeSignInWithApple();
+                    if (result?.credential?.idToken) {
+                        const credential = OAuthProvider.credential({
+                            providerId: 'apple.com',
+                            idToken: result.credential.idToken,
+                            rawNonce: result.credential.secret,
+                        });
+                        await signInWithCredential(auth, credential);
+                        return { success: true };
+                    }
+                } catch (nativeErr) {
+                    if (nativeErr?.type === NativeAuthError.USER_CANCELLED) {
+                        return { success: false, error: 'Sign in was cancelled.' };
+                    }
+                    if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
+                        console.warn('[Auth] Native Apple plugin unavailable, using web SDK directly');
+                        const result = await signInWithPopup(auth, appleProvider);
+                        return { success: true, user: result.user };
+                    }
+                    if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
+                        console.warn('[Auth] Native Apple not configured, falling back to redirect:', nativeErr.message);
+                    } else {
+                        console.warn('[Auth] Native Apple login failed, falling back to redirect:', nativeErr);
+                    }
+                }
                 await signInWithRedirect(auth, appleProvider);
                 return { success: true, redirecting: true };
             }
             const result = await signInWithPopup(auth, appleProvider);
             return { success: true, user: result.user };
         } catch (err) {
-            console.error("Apple login error:", err);
-            if (err.code === 'auth/popup-closed-by-user') {
+            const errMsg = err?.message || '';
+            const errCode = err?.code || '';
+            console.error("[Auth] Apple login error:", { code: errCode, message: errMsg });
+            if (errCode === 'auth/popup-closed-by-user') {
                 return { success: false, error: 'Popup closed. Please allow popups and try again.' };
             }
-            return { success: false, error: err.message };
+            return { success: false, error: errMsg || 'Apple sign-in failed.' };
         }
     };
     const signInAsDemo = async () => {
+        const demoEmail = import.meta.env.VITE_DEMO_EMAIL || 'demo@bayfatura.com';
+        const demoPassword = import.meta.env.VITE_DEMO_PASSWORD || 'DemoPassword123!';
         try {
-            const demoEmail = 'demo@bayfatura.com';
-            const demoPassword = 'DemoPassword123!'; // Bu hesabı Firebase Console'dan oluşturmalısınız
             await signInWithEmailAndPassword(auth, demoEmail, demoPassword);
             return { success: true };
         } catch (err) {
-            console.error("Demo login failed. Make sure demo@bayfatura.com exists in Firebase Auth:", err.message);
-            return { success: false, error: "Demo account is currently undergoing maintenance." };
+            if (err.code === 'auth/user-not-found') {
+                try {
+                    const { user } = await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
+                    await setDoc(doc(db, 'users', user.uid), {
+                        name: 'Demo Kullanıcı',
+                        email: demoEmail,
+                        plan: 'elite',
+                        role: 'admin',
+                        tenantId: user.uid,
+                        createdAt: new Date().toISOString()
+                    });
+                    return { success: true };
+                } catch (createErr) {
+                    console.error("Demo account creation failed:", createErr);
+                    return { success: false, error: "Demo hesabı oluşturulamadı: " + createErr.message };
+                }
+            }
+            if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                console.error("Demo wrong password, attempting to re-create account");
+                try {
+                    const currentUser = auth.currentUser;
+                    if (currentUser) {
+                        await currentUser.delete();
+                    }
+                } catch (deleteErr) {
+                    console.warn("Demo account cleanup skipped:", deleteErr?.message || deleteErr);
+                }
+                try {
+                    const { user } = await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
+                    await setDoc(doc(db, 'users', user.uid), {
+                        name: 'Demo Kullanıcı',
+                        email: demoEmail,
+                        plan: 'elite',
+                        role: 'admin',
+                        tenantId: user.uid,
+                        createdAt: new Date().toISOString()
+                    });
+                    return { success: true };
+                } catch (recreateErr) {
+                    console.error("Demo account re-creation failed:", recreateErr);
+                    return { success: false, error: "Demo hesabı şifresi değişmiş. Firebase Console'dan manuel olarak silin veya farklı bir email ile kaydolun." };
+                }
+            }
+            console.error("Demo login failed:", err.code, err.message);
+            return { success: false, error: "Demo giriş hatası: " + err.message };
         }
     };
 

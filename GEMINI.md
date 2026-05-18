@@ -251,6 +251,43 @@ Bu dosya, **BayFatura** projesinin yapay zeka tarafından yönetilen gelişim s�
 - **Kesintisiz Kullanım:** `componentDidMount` kancası ile uygulama başarıyla yüklendiğinde bayrak temizlenerek sonsuz döngü engellendi. Uygulama artık her güncellendiğinde kullanıcı hissetmeden en yeni kod paketlerine geçer.
 
 ---
-*Son Güncelleme: 06 Mayıs 2026 (PDF Engine 3.0 & PWA Recovery)*
+
+## 🚀 31. Native Mobile Evolution (iOS & Android Native) (Completed — 15 Mayıs 2026)
+
+### 🔐 31.1 Native Authentication & Persistency
+- **WKWebView ITP Solved:** Safari webview / WKWebView bazlı ITP (Intelligent Tracking Prevention) çerez engellemeleri ve donmaları, standart Firebase `getAuth` yerine platform duyarlı `initializeAuth` ve `indexedDBLocalPersistence` kullanılarak kalıcı olarak çözüldü.
+- **Native Engine Reintegration:** iOS ve Android için resmi `@capacitor-firebase/authentication` native motoru projeye tekrar kazandırıldı ve `AuthContext.jsx` üzerinde hibrit (Web / Native fallback) bir mimariyle birleştirildi.
+- **Orijinal Giriş Ekranları:** Google ve Apple butonları artık tarayıcı yönlendirmesi yerine Apple ve Google Play Services'in kendi orijinal, güvenli native alttan açılan (FaceID/TouchID destekli) kimlik doğrulama pencerelerini tetikler.
+
+### 🍎 31.2 iOS Architecture & Xcode Repair
+- **Xcode configuration (pbxproj) Patch:** Xcode dosya ağacındaki bozuk veya kayıp `GoogleService-Info.plist` bağlantı hataları doğrudan projenin beynine (`project.pbxproj`) yapılan müdahale ile dinamik olarak tamir edildi ve ana üretim dosyasına kilitlendi.
+- **Info.plist URL Schemes:** Firebase OAuth yönlendirmeleri için hayati önem taşıyan `Info.plist` URL şemaları, güncel `REVERSED_CLIENT_ID` ile kusursuzca senkronize edildi.
+- **Xcode SPM Resolver:** Xcode'un Swift Package Manager (SPM) hafıza sorunları, terminal üzerinden `xcodebuild -resolvePackageDependencies` komutu tetiklenerek çözüldü ve native kütüphaneler derleme hattına dahil edildi.
+
+### 🤖 31.3 Android Hardening
+- **Firebase Services Integration:** Üretim aşaması `google-services.json` dosyası `android/app` klasörüne entegre edildi.
+- **Gradle Engine Config:** Proje seviyesi `build.gradle` dosyası `rgcfaIncludeGoogle = true` kuralıyla güncellenerek native Google eklentisinin Android derleme paketine kusursuzca dahil edilmesi sağlandı.
+- **Dry-Run Verification:** Android Gradle motoru (`gradlew`) üzerinde yapılan denetim başarıyla tamamlandı (`BUILD SUCCESSFUL`).
+
+---
+
+## ☁️ 32. Cloud Infrastructure & Team Workflow (Completed — 17 Mayıs 2026)
+
+### 🛠️ 32.1 Functions Stability & Node.js 22 Upgrade
+- **Module Not Found Fix:** `functions/node_modules` klasöründeki bağımlılık kopmaları giderilip, paketler sıfırdan güvenle kuruldu.
+- **Node Engine Upgrade:** Firebase Functions çalışma ortamı (runtime) Node 20'den (deprecated) Node 22 sürümüne yükseltildi.
+- **Successful Deployment:** Tüm AI (Genkit), Stripe, Email ve Auth tetikleyicileri sorunsuz olarak production ortamına deploy edildi.
+
+### 📧 32.2 Team Invitation Architecture
+- **Resend API Integration:** `sendInvitationEmail` ve `acceptTeamInvitation` Cloud Function'ları aktif edildi.
+- **Accept Invite Routing:** Gelen davetiyelerin karşılanması için `AcceptInvite.jsx` UI bileşeni ve `/accept-invite` rotası tanımlandı.
+- **End-to-End Workflow:** E-posta onayı ve Firestore `team` alt koleksiyon yetkilendirme süreci kusursuzlaştırıldı.
+
+### 🛡️ 32.3 CSP & AdSense Hardening
+- **Content Security Policy (CSP):** `index.html` içerisindeki katı CSP kuralları güncellendi.
+- **Allowed Domains:** Google AdSense (`pagead2.googlesyndication.com`) ve Google Auth profil görselleri (`lh3.googleusercontent.com`) güvenli (`img-src`, `connect-src`, `frame-src`) listelerine dahil edildi.
+
+---
+*Son Güncelleme: 17 Mayıs 2026 (Cloud & Team Infrastructure)*
 *Antigravity AI Agent*
 创新

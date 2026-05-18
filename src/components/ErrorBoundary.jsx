@@ -1,6 +1,8 @@
 import React from 'react';
+import { logger } from '../lib/logger';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
-export class ErrorBoundary extends React.Component {
+export default class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
         this.state = { hasError: false, error: null };
@@ -10,45 +12,31 @@ export class ErrorBoundary extends React.Component {
         return { hasError: true, error };
     }
 
-    componentDidMount() {
-        // Clear the reload flag when the app loads successfully
-        sessionStorage.removeItem('chunk_load_reload');
-    }
-
     componentDidCatch(error, errorInfo) {
-        console.error('ErrorBoundary caught:', error, errorInfo);
-        
-        // Auto-reload for ChunkLoadError / MIME type errors (common in Vite after new deploys)
-        const errorMessage = error?.message?.toLowerCase() || '';
-        if (
-            errorMessage.includes('failed to fetch dynamically imported module') ||
-            errorMessage.includes('importing a module script failed') ||
-            errorMessage.includes('text/html') ||
-            errorMessage.includes('mime type')
-        ) {
-            const hasReloaded = sessionStorage.getItem('chunk_load_reload');
-            if (!hasReloaded) {
-                sessionStorage.setItem('chunk_load_reload', 'true');
-                window.location.reload();
-            }
-        }
+        logger.error('ErrorBoundary', 'Uncaught error', error);
     }
 
     render() {
         if (this.state.hasError) {
             return (
-                <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
-                    <h1>Bir hata oluştu</h1>
-                    <pre style={{ color: 'red', whiteSpace: 'pre-wrap' }}>
-                        {this.state.error?.message || 'Bilinmeyen hata'}
-                    </pre>
-                    <button onClick={() => window.location.reload()}>
-                        Sayfayı Yenile
+                <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    minHeight: '300px', padding: '40px', textAlign: 'center'
+                }}>
+                    <AlertTriangle size={48} color="#ef4444" style={{ marginBottom: '16px' }} />
+                    <h2 style={{ marginBottom: '8px' }}>Ein Fehler ist aufgetreten</h2>
+                    <p style={{ color: '#64748b', marginBottom: '24px', maxWidth: '400px' }}>
+                        Etwas ist schiefgelaufen. Bitte versuche es erneut.
+                    </p>
+                    <button className="primary-btn" onClick={() => {
+                        this.setState({ hasError: false, error: null });
+                        window.location.reload();
+                    }}>
+                        <RefreshCcw size={16} /> Sayfayı Yenile
                     </button>
                 </div>
             );
         }
-
         return this.props.children;
     }
 }
