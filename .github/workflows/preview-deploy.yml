@@ -2,7 +2,7 @@ name: Preview Deploy (Safe — No Live)
 
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [preview-test-staging, main]
 
 concurrency:
   group: preview-${{ github.ref }}
