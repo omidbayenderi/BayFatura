@@ -28,6 +28,7 @@ capacitor.config.json
 *.jks
 google-services.json
 GoogleService-Info.plist
+*-firebase-adminsdk-*.json
 
 # ─── Editor ──────────────────────────────────────────────────
 .vscode/*
