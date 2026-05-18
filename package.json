@@ -9,6 +9,7 @@
     "build:preview": "vite build --mode preview",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:rules": "XDG_CONFIG_HOME=.firebase-cache npx -y firebase-tools@latest --project bayfatura-rules-test emulators:exec --only firestore \"vitest run src/__tests__/firestoreRules.emulator.test.js\"",
     "preview": "vite preview",
     "deploy:production": "echo 'WARNING: Deploying to PRODUCTION live channel!' && npm run build && npx firebase deploy --only hosting,functions,firestore,storage",
     "deploy:preview": "npm run build && npx firebase hosting:channel:deploy preview --expires 7d",
@@ -44,6 +45,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.3.3",
     "@eslint/js": "^9.39.1",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.5",
