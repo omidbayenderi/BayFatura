@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Validate Firestore rules guardrails
-        run: npx vitest run src/__tests__/securityRules.test.js
+        run: npm run test:rules
 
       - name: Prepare staging Firebase credentials
         run: |
