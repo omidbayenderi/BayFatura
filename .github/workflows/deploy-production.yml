@@ -34,6 +34,12 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Install dependencies
         run: npm ci
 
@@ -44,6 +50,9 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
+
+      - name: Validate Firestore rules guardrails
+        run: npm run test:rules
 
       - name: Build
         run: npm run build
@@ -69,15 +78,21 @@ jobs:
           projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           channelId: live
 
+      - name: Prepare production Firebase credentials
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/production-service-account.json"
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
       - name: Deploy Cloud Functions
         if: inputs.deployFunctions
-        run: npx -y firebase-tools@latest deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_DEPLOY_TOKEN"
+        run: npx -y firebase-tools@latest deploy --only functions --project "$FIREBASE_PROJECT_ID"
         env:
-          FIREBASE_DEPLOY_TOKEN: ${{ secrets.FIREBASE_DEPLOY_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
           FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
 
       - name: Deploy Firestore & Storage Rules
-        run: npx -y firebase-tools@latest deploy --only firestore,storage --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_DEPLOY_TOKEN"
+        run: npx -y firebase-tools@latest deploy --only firestore,storage --project "$FIREBASE_PROJECT_ID"
         env:
-          FIREBASE_DEPLOY_TOKEN: ${{ secrets.FIREBASE_DEPLOY_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
           FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

@@ -6,32 +6,38 @@
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | Push to `main`/`develop`, PR to `main`/`develop` | Lint, test, build |
-| `preview-deploy.yml` | PR to `develop`/`main` | Deploy to staging Firebase preview channel |
-| `deploy-production.yml` | Manual `workflow_dispatch` | Deploy to production |
+| `ci.yml` | Push/PR to `preview-test-staging`, `main`, `develop` | Lint, test, Firestore rules test, build |
+| `preview-deploy.yml` | PR to `preview-test-staging`/`main` | Validate app + rules, deploy to staging Firebase preview channel |
+| `deploy-staging-rules.yml` | Manual `workflow_dispatch` | Validate and deploy Firestore/Storage rules to staging |
+| `deploy-staging-functions.yml` | Manual `workflow_dispatch` | Validate and deploy Cloud Functions to staging |
+| `deploy-production.yml` | Manual `workflow_dispatch` | Validate and deploy to production |
 
 ## Pipeline Steps
 
 ### CI (`ci.yml`)
 1. Checkout code
 2. Setup Node.js 22 with npm cache
-3. `npm ci` (clean install)
-4. `npm run lint`
-5. `npm test`
-6. `npm run build` (verifies production build succeeds)
+3. Setup Java 21 for Firebase Emulator
+4. `npm ci` (clean install)
+5. `npm run lint`
+6. `npm test`
+7. `npm run test:rules`
+8. `npm run build` (verifies production build succeeds)
 
 ### Preview Deploy (`preview-deploy.yml`)
 1. Checkout
 2. Setup Node.js + npm ci
-3. Build with `VITE_APP_ENV=staging`
-4. Deploy to the staging Firebase Hosting preview channel (expires in 7 days)
-5. Comment PR with preview URL
+3. Run lint, tests, and Firestore rules emulator tests
+4. Build with `VITE_APP_ENV=staging`
+5. Deploy to the staging Firebase Hosting preview channel (expires in 7 days)
+6. Comment PR with preview URL
 
 ### Production Deploy (`deploy-production.yml`)
-1. CI quality checks (lint, test, build)
+1. CI quality checks (lint, test, Firestore rules test, build)
 2. Deploy hosting to Firebase `live` channel
-3. Optionally deploy Cloud Functions
-4. Deploy Firestore & Storage rules
+3. Prepare production Firebase service account credentials
+4. Optionally deploy Cloud Functions
+5. Deploy Firestore & Storage rules
 
 ## Required GitHub Secrets
 
@@ -51,22 +57,15 @@
 | `VITE_APP_ENV` | Environment name | All builds |
 | `FIREBASE_SERVICE_ACCOUNT` | Production Firebase deploy service account JSON | Production deploy |
 | `STAGING_FIREBASE_SERVICE_ACCOUNT` | Staging Firebase deploy service account JSON | Preview deploy |
-| `FIREBASE_DEPLOY_TOKEN` | Firebase CI token | Production function/rule deploy |
 
 ## Setting Up Firebase for CI
 
-### 1. Generate a Firebase CI Token
-```bash
-npx firebase login:ci
-# Copy the token output
-```
-
-### 2. Create a Service Account
+### 1. Create a Service Account
 - Go to: Firebase Console → Project Settings → Service Accounts
 - Click "Generate New Private Key"
 - Copy the JSON content
 
-### 3. Add Secrets to GitHub
+### 2. Add Secrets to GitHub
 - Go to: GitHub repo → Settings → Secrets and variables → Actions
 - Add each secret from the table above
 
@@ -88,9 +87,9 @@ npm run lint && npm test && npm run build
 ## Rollback via CI
 
 To rollback a production deploy:
-1. Revert the merge commit on `main`
-2. Push the revert
-3. CI will auto-deploy the reverted version
+1. Revert the merge commit on the release branch
+2. Run the manual production deploy workflow after review
+3. Verify Firebase Hosting, rules, and functions state
 
 Or use Firebase CLI directly:
 ```bash
