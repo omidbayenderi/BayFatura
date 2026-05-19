@@ -42,8 +42,8 @@ jobs:
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy Firestore rules to staging
-        run: npx -y firebase-tools@latest deploy --only firestore:rules --project "$STAGING_FIREBASE_PROJECT_ID"
+      - name: Deploy Firestore & Storage rules to staging
+        run: npx -y firebase-tools@latest deploy --only firestore:rules,storage --project "$STAGING_FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/staging-service-account.json
           STAGING_FIREBASE_PROJECT_ID: ${{ secrets.STAGING_VITE_FIREBASE_PROJECT_ID }}

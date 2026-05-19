@@ -2,7 +2,22 @@
 
 Bu dosya, **BayFatura** projesinin yapay zeka tarafından yönetilen gelişim sürecini, tamamlanan modülleri ve "Gerçek Dünya" üretim aşamasına geçiş için gereken tüm optimizasyonları belgeler.
 
-## 🚀 LANSMAN HAZIRLIĞI (Mayıs 2026) - %100 TAMAMLANDI ✅
+## 🚀 MEVCUT STRATEJİK DURUM (19 Mayıs 2026)
+
+BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygulamasıdır; güncel odak artık **kontrollü staging doğrulaması, CI/CD sertleştirme ve production'a güvenli geçiş planı** üzerindedir.
+
+### ✅ Staging Hazır Bileşenler
+- `preview-test-staging` aktif geliştirme ve staging doğrulama dalıdır.
+- GitHub Actions üzerinde app validation, Firestore/Storage rules deploy ve Cloud Functions deploy hatları çalışır durumdadır.
+- Firebase staging projesinde Cloud Functions deploy başarıyla tamamlanmıştır.
+- Firestore rules için emulator destekli test hattı kurulmuştur.
+
+### ⚠️ Production Guardrail
+- `main` dalı production kaynağı olarak kullanılmadan önce bilinçli şekilde reconcile edilmelidir.
+- Production deploy manuel ve ayrı onaylı tutulmalıdır.
+- Staging IAM/secrets modeli production'a birebir kopyalanmamalı; ayrı servis hesabı ve ayrı yetki setiyle kurulmalıdır.
+
+## 🚀 LANSMAN HAZIRLIĞI (Mayıs 2026) - STAGING STABILIZATION ✅
 
 ### 🏛️ 25. EU Compliance Full Stack (Completed)
 - **Portekiz (AT):** ATCUD, QR-PT (Portaria 195/2020), NIF doğrulama ve eSPap (UBL 2.1) XML üretimi tam aktif.
@@ -288,6 +303,43 @@ Bu dosya, **BayFatura** projesinin yapay zeka tarafından yönetilen gelişim s�
 - **Allowed Domains:** Google AdSense (`pagead2.googlesyndication.com`) ve Google Auth profil görselleri (`lh3.googleusercontent.com`) güvenli (`img-src`, `connect-src`, `frame-src`) listelerine dahil edildi.
 
 ---
-*Son Güncelleme: 17 Mayıs 2026 (Cloud & Team Infrastructure)*
-*Antigravity AI Agent*
-创新
+## 🧪 33. Staging CI/CD Stabilization & Firebase Deployment Guardrails (Completed — 19 Mayıs 2026)
+
+### 🌿 33.1 Branch Strategy & Source of Truth
+- **Aktif geliştirme dalı:** `preview-test-staging` staging stabilizasyonu için ana kaynak olarak belirlendi.
+- **Production guardrail:** `main` dalı, bilinçli reconciliation tamamlanmadan release source of truth olarak kullanılmamalıdır.
+- **PR tabanlı akış:** Özellik ve altyapı değişiklikleri küçük dallar üzerinden `preview-test-staging` hedefine açılmalı, CI ve staging doğrulaması geçmeden merge edilmemelidir.
+- **Referans dokümanlar:** `docs/branch-strategy.md`, `docs/release-hygiene.md`, `docs/production-guardrails.md`.
+
+### 🧰 33.2 GitHub Actions Pipeline
+- **Preview deploy:** `preview-deploy.yml` staging/preview hosting doğrulaması için yapılandırıldı.
+- **Rules deploy:** `deploy-staging-rules.yml`, manuel çalıştırılan ve deploy öncesi `npm run test:rules` koşan güvenlik hattı olarak eklendi.
+- **Functions deploy:** `deploy-staging-functions.yml`, app validation ve functions syntax kontrolünden sonra staging Cloud Functions deploy edecek şekilde eklendi.
+- **Yerel doğrulama standardı:** `npm ci`, `npm run lint`, `npm test`, `npm run build`, `npm run test:rules`, `node --check functions/index.js`.
+
+### 🔥 33.3 Firebase Rules & Emulator Safety
+- **Rules emulator suite:** Firestore rules testleri Firebase Emulator ile çalışacak şekilde pipeline'a bağlandı.
+- **Test kapsamı:** Kullanıcı izolasyonu, super admin erişimi, `app_config`, `company_config`, `myTeams` ve protected business document erişimleri doğrulanır.
+- **Deploy disiplini:** Rules deploy artık doğrudan manuel CLI alışkanlığına değil, tekrarlanabilir GitHub Actions workflow'una bağlıdır.
+
+### ☁️ 33.4 Staging Cloud Functions Deployment
+- **Runtime:** Functions Node.js 22 runtime üzerinde deploy edildi.
+- **Deploy komutu:** `npx -y firebase-tools@latest deploy --only functions --project bayfatura-staging`.
+- **Deploy edilen functions:** `stripeWebhook`, `proxyImage`, `scanReceipt`, `sendInvoiceEmail`, `sendInvitationEmail`, `syncUserPlan`, `syncAllAuthUsers`, `analyzeFinancials`, `analyzeBankStatement`, `acceptTeamInvitation`, `checkOverdueInvoices`, `processRecurringTemplates`.
+- **Doğrulama:** `npx -y firebase-tools@latest functions:list --project bayfatura-staging` ile staging projesindeki function listesi teyit edildi.
+
+### 🔐 33.5 IAM & Secret Model
+- **GitHub secret standardı:** Staging değerleri `STAGING_*` isim alanında tutulur.
+- **Service account:** `STAGING_FIREBASE_SERVICE_ACCOUNT` GitHub Actions secret olarak kullanılmaktadır; JSON dosyaları repoya commit edilmemelidir.
+- **Gerekli staging IAM izinleri:** Cloud Functions deploy, Service Account User, Artifact Registry erişimi, Cloud Run listeleme/görüntüleme ve Cloud Functions Admin izinleri doğrulanmıştır.
+- **API enablement:** `cloudfunctions.googleapis.com`, `cloudbuild.googleapis.com`, `artifactregistry.googleapis.com`, `firebaseextensions.googleapis.com`, `cloudscheduler.googleapis.com`, `cloudbilling.googleapis.com` staging deploy sürecinde etkinleştirilmiştir.
+
+### 📌 33.6 Kalan Yol Haritası
+- **Staging smoke test:** Login, onboarding sihirbazı, fatura oluşturma, davet kabulü, e-posta gönderimi ve Stripe webhook akışları canlı staging üzerinde test edilmeli.
+- **Dependency hardening:** Functions tarafındaki npm audit uyarıları ayrı bir güvenlik çalışması olarak ele alınmalı.
+- **Observability:** Functions logları, hata takip sistemi ve kritik event alarm yapısı production öncesi netleştirilmeli.
+- **Production reconciliation:** `main` dalı ve production deploy hattı küçük, denetlenebilir PR'larla güncel staging mimarisine yaklaştırılmalı.
+
+---
+*Son Güncelleme: 19 Mayıs 2026 (Staging CI/CD Stabilization)*
+*Codex AI Agent*
