@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users,
     UserPlus,
+    User,
     Mail,
     Shield,
     MoreHorizontal,
@@ -74,7 +75,7 @@ const Team = () => {
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isInviting, setIsInviting] = useState(false);
-    const [inviteData, setInviteData] = useState({ email: '', role: 'member' });
+    const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'member' });
     const [isLoading, setIsLoading] = useState(true);
     const [teamMembers, setTeamMembers] = useState([]);
 
@@ -122,11 +123,13 @@ const Team = () => {
 
         setIsInviting(true);
         const teamRef = collection(db, 'users', currentUser.uid, 'team');
+        const inviteeEmail = inviteData.email.trim();
+        const inviteeName = inviteData.name.trim() || inviteeEmail.split('@')[0];
 
         try {
             const docRef = await addDoc(teamRef, {
-                name: inviteData.email.split('@')[0],
-                email: inviteData.email,
+                name: inviteeName,
+                email: inviteeEmail,
                 role: inviteData.role,
                 status: 'pending',
                 invitedBy: currentUser.uid,
@@ -136,8 +139,8 @@ const Team = () => {
 
             try {
                 await sendInvitationEmail({
-                    inviteeEmail: inviteData.email,
-                    inviteeName: inviteData.email.split('@')[0],
+                    inviteeEmail,
+                    inviteeName,
                     role: inviteData.role,
                     invitedBy: currentUser.uid,
                     invitationId: docRef.id,
@@ -157,7 +160,7 @@ const Team = () => {
 
             showToast(t('inviteSent'));
             setShowInviteModal(false);
-            setInviteData({ email: '', role: 'member' });
+            setInviteData({ name: '', email: '', role: 'member' });
         } catch (error) {
             showToast(t('inviteFailed'), 'error');
         } finally {
@@ -196,9 +199,21 @@ const Team = () => {
     };
 
     const filteredMembers = teamMembers.filter(m =>
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.email.toLowerCase().includes(searchQuery.toLowerCase())
+        String(m.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(m.email || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const getMemberStatus = (status) => {
+        if (status === 'active') {
+            return { className: 'success', label: t('active') };
+        }
+
+        if (status === 'email_failed') {
+            return { className: 'danger', label: t('inviteFailed') };
+        }
+
+        return { className: 'info', label: t('pending') };
+    };
 
     return (
         <div className="team-page-container">
@@ -251,7 +266,12 @@ const Team = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredMembers.map((member) => (
+                            {filteredMembers.map((member) => {
+                                const memberName = member.name || member.email || '-';
+                                const memberRole = roles[member.role] || roles.member;
+                                const memberStatus = getMemberStatus(member.status);
+
+                                return (
                                 <motion.tr
                                     layout
                                     initial={{ opacity: 0 }}
@@ -261,23 +281,23 @@ const Team = () => {
                                     <td>
                                         <div className="member-info">
                                             <div className={`member-avatar-base ${member.role === 'owner' ? 'member-avatar-owner' : ''}`}>
-                                                {member.name.charAt(0)}
+                                                {memberName.charAt(0).toUpperCase()}
                                             </div>
                                             <div>
-                                                <div className="member-name">{member.name}</div>
+                                                <div className="member-name">{memberName}</div>
                                                 <div className="member-email">{member.email}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td>
                                         <div className={`role-badge-base role-badge-${member.role}`}>
-                                            {roles[member.role].icon}
-                                            {roles[member.role].label}
+                                            {memberRole.icon}
+                                            {memberRole.label}
                                         </div>
                                     </td>
                                     <td>
-                                        <div className={`badge ${member.status === 'active' ? 'success' : 'info'}`}>
-                                            {member.status === 'active' ? t('active') : t('pending')}
+                                        <div className={`badge ${memberStatus.className}`}>
+                                            {memberStatus.label}
                                         </div>
                                     </td>
                                     <td className="joined-date">
@@ -294,7 +314,8 @@ const Team = () => {
                                         )}
                                     </td>
                                 </motion.tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -325,6 +346,21 @@ const Team = () => {
                             </div>
 
                             <form onSubmit={handleInvite} className="invite-form">
+                                <div className="form-group form-group-mb-lg">
+                                    <label className="form-label-bold">{t('fullName')}</label>
+                                    <div className="input-container">
+                                        <User size={18} className="input-icon" />
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            required
+                                            placeholder="Ahmet Yilmaz"
+                                            value={inviteData.name}
+                                            onChange={(e) => setInviteData({...inviteData, name: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="form-group form-group-mb-lg">
                                     <label className="form-label-bold">{t('emailAddress')}</label>
                                     <div className="input-container">
