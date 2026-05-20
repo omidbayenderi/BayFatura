@@ -261,6 +261,7 @@ export const sendInvitationEmail = async ({ inviteeEmail, inviteeName, role, inv
             invitationId,
             companyName,
             senderName,
+            appUrl: window.location.origin,
         });
         return result.data;
     } catch (error) {

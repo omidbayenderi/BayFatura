@@ -84,6 +84,20 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Prepare production functions environment
+        run: |
+          {
+            printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
+            printf 'STRIPE_SECRET_KEY=%s\n' "$STRIPE_SECRET_KEY"
+            printf 'STRIPE_WEBHOOK_SECRET=%s\n' "$STRIPE_WEBHOOK_SECRET"
+            printf 'APP_URL=%s\n' "$APP_URL"
+          } > functions/.env
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+
       - name: Deploy Cloud Functions
         if: inputs.deployFunctions
         run: npx -y firebase-tools@latest deploy --only functions --project "$FIREBASE_PROJECT_ID"

@@ -3,7 +3,7 @@
  * Stripe Webhook, Genkit AI, Email Automation & Notifications
  */
 
-import { https, pubsub, config, auth } from 'firebase-functions/v1';
+import { https, pubsub, auth } from 'firebase-functions/v1';
 import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { genkit, z } from 'genkit';
@@ -14,8 +14,11 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // --- Services Initialization ---
-const getStripe = () => new Stripe(config().stripe?.secret || process.env.STRIPE_SECRET_KEY);
-const getResend = () => new Resend(config().resend?.key || process.env.RESEND_API_KEY);
+const getStripeSecret = () => process.env.STRIPE_SECRET_KEY || '';
+const getStripeWebhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || '';
+const getResendKey = () => process.env.RESEND_API_KEY || '';
+const getStripe = () => new Stripe(getStripeSecret());
+const getResend = () => new Resend(getResendKey());
 const MAX_PROXY_IMAGE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_PROXY_IMAGE_ALLOWED_HOSTS = new Set([
     'firebasestorage.googleapis.com',
@@ -28,7 +31,7 @@ const DEFAULT_PROXY_IMAGE_ALLOWED_HOSTS = new Set([
 ]);
 
 const getProxyImageAllowedHosts = () => {
-    const configuredHostList = config().proxy?.image_allowed_hosts || process.env.PROXY_IMAGE_ALLOWED_HOSTS || '';
+    const configuredHostList = process.env.PROXY_IMAGE_ALLOWED_HOSTS || '';
     const configuredHosts = configuredHostList
         .split(',')
         .map(host => host.trim().toLowerCase())
@@ -54,8 +57,17 @@ const ai = genkit({
 
 // ─── 1. Stripe Webhook Handler ────────────────────────────────────────────────────
 export const stripeWebhook = https.onRequest(async (req, res) => {
+    if (!getStripeSecret()) {
+        console.error('Stripe secret key is missing from environment');
+        return res.status(500).send('Stripe secret key not configured');
+    }
+
     const stripeInstance = getStripe();
-    const webhookSecret = config().stripe?.webhook_secret || process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret = getStripeWebhookSecret();
+    if (!webhookSecret) {
+        console.error('Stripe webhook secret is missing from environment');
+        return res.status(500).send('Stripe webhook secret not configured');
+    }
 
     let event;
     try {
@@ -142,6 +154,7 @@ export const stripeWebhook = https.onRequest(async (req, res) => {
 
 export const syncUserPlan = https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    if (!getStripeSecret()) throw new https.HttpsError('failed-precondition', 'Stripe secret key not configured');
     
     const { sessionId } = data;
     if (!sessionId) throw new https.HttpsError('invalid-argument', 'sessionId required');
@@ -364,11 +377,12 @@ export const sendInvoiceEmail = https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const { to, subject, html, invoiceId } = data;
 
-    const resend = getResend();
-    if (!resend.key) {
-        console.error('❌ Resend API Key is missing from config');
+    if (!getResendKey()) {
+        console.error('❌ Resend API Key is missing from environment');
         throw new https.HttpsError('failed-precondition', 'Resend API key not configured');
     }
+
+    const resend = getResend();
 
     try {
         console.log(`📧 Attempting to send email to: ${to} for invoice: ${invoiceId}`);
@@ -452,21 +466,47 @@ const buildInvitationHtml = ({ inviteeName, companyName, senderName, role, accep
     `.trim();
 };
 
+const normalizeAppUrl = (value) => {
+    if (!value || typeof value !== 'string') return '';
+
+    try {
+        const url = new URL(value);
+        const host = url.hostname.toLowerCase();
+        const isAllowedHost =
+            host === 'bayfatura.com' ||
+            host === 'www.bayfatura.com' ||
+            host.endsWith('.web.app') ||
+            host.endsWith('.firebaseapp.com') ||
+            host === 'localhost' ||
+            host === '127.0.0.1';
+
+        if (!['https:', 'http:'].includes(url.protocol) || !isAllowedHost) {
+            return '';
+        }
+
+        return url.origin;
+    } catch {
+        return '';
+    }
+};
+
 export const sendInvitationEmail = https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
-    const { inviteeEmail, inviteeName, role, invitedBy, invitationId, companyName, senderName } = data;
+    const { inviteeEmail, inviteeName, role, invitedBy, invitationId, companyName, senderName, appUrl } = data;
 
     if (!inviteeEmail || !invitationId || !invitedBy) {
         throw new https.HttpsError('invalid-argument', 'Missing required fields: inviteeEmail, invitationId, invitedBy');
     }
 
-    const resend = getResend();
-    if (!resend.key) {
-        console.error('❌ Resend API Key is missing from config');
+    if (!getResendKey()) {
+        console.error('❌ Resend API Key is missing from environment');
         throw new https.HttpsError('failed-precondition', 'Resend API key not configured');
     }
 
-    const acceptLink = `${config().app?.url || 'https://bayfatura.com'}/accept-invite?token=${invitationId}&tenant=${invitedBy}&email=${encodeURIComponent(inviteeEmail)}`;
+    const resend = getResend();
+    const appBaseUrl = normalizeAppUrl(appUrl) || normalizeAppUrl(process.env.APP_URL) || 'https://bayfatura.com';
+
+    const acceptLink = `${appBaseUrl}/accept-invite?token=${invitationId}&tenant=${invitedBy}&email=${encodeURIComponent(inviteeEmail)}`;
 
     const html = buildInvitationHtml({
         inviteeName,

@@ -146,6 +146,13 @@ const Team = () => {
                 });
             } catch (emailError) {
                 console.error('Email send failed but Firestore doc created:', emailError);
+                await updateDoc(docRef, {
+                    status: 'email_failed',
+                    emailError: emailError?.message || 'Email send failed',
+                    emailFailedAt: new Date().toISOString()
+                });
+                showToast(emailError?.message || t('inviteFailed'), 'error');
+                return;
             }
 
             showToast(t('inviteSent'));
