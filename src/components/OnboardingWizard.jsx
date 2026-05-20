@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInvoice } from '../context/InvoiceContext';
 import { useLanguage } from '../context/LanguageContext';
-import { Building, Globe, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Building, Globe, CheckCircle2, ArrowRight, Phone, MapPin } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePanel } from '../context/PanelContext';
 
@@ -15,6 +15,10 @@ const OnboardingWizard = ({ onComplete }) => {
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         companyName: '',
+        companyPhone: '',
+        street: '',
+        zip: '',
+        city: '',
         industry: 'general',
         owner: currentUser?.name || '',
     });
@@ -35,6 +39,10 @@ const OnboardingWizard = ({ onComplete }) => {
                 ...companyProfile,
                 // Ensure we don't overwrite user input if they started typing
                 companyName: prev.companyName || companyProfile.companyName || '',
+                companyPhone: prev.companyPhone || companyProfile.companyPhone || '',
+                street: prev.street || companyProfile.street || '',
+                zip: prev.zip || companyProfile.zip || '',
+                city: prev.city || companyProfile.city || '',
                 owner: prev.owner || companyProfile.owner || currentUser?.name || ''
             }));
         }
@@ -91,7 +99,7 @@ const OnboardingWizard = ({ onComplete }) => {
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 className="modal-content"
-                style={{ maxWidth: '500px', width: '90%', padding: '2rem', borderRadius: '24px', overflow: 'hidden' }}
+                style={{ maxWidth: '560px', width: '90%', padding: '2rem', borderRadius: '24px', overflow: 'hidden' }}
             >
                 {/* Progress Bar */}
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '2rem' }}>
@@ -151,6 +159,62 @@ const OnboardingWizard = ({ onComplete }) => {
                                     <option value="healthcare">{t('healthcare') || getLocalText('Sağlık', 'Gesundheitswesen', 'Healthcare')}</option>
                                     <option value="it">{t('it') || 'IT & Tech'}</option>
                                 </select>
+                            </div>
+
+                            <div className="form-group" style={{ marginTop: '1rem' }}>
+                                <label style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Phone size={16} />
+                                    {t('phone') || getLocalText('Telefon', 'Telefon', 'Phone')}
+                                    <span style={{ color: '#94a3b8', fontWeight: 500 }}>
+                                        {getLocalText('(opsiyonel)', '(optional)', '(optional)')}
+                                    </span>
+                                </label>
+                                <input
+                                    className="form-input"
+                                    name="companyPhone"
+                                    value={formData.companyPhone}
+                                    onChange={handleChange}
+                                    placeholder={getLocalText('+90 555 123 45 67', '+49 30 123456', '+1 555 123 4567')}
+                                    style={{ padding: '12px', fontSize: '1rem' }}
+                                />
+                            </div>
+
+                            <div className="form-group" style={{ marginTop: '1rem' }}>
+                                <label style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <MapPin size={16} />
+                                    {getLocalText('Adres', 'Adresse', 'Address')}
+                                    <span style={{ color: '#94a3b8', fontWeight: 500 }}>
+                                        {getLocalText('(opsiyonel)', '(optional)', '(optional)')}
+                                    </span>
+                                </label>
+                                <div style={{ display: 'grid', gap: '10px' }}>
+                                    <input
+                                        className="form-input"
+                                        name="street"
+                                        value={formData.street}
+                                        onChange={handleChange}
+                                        placeholder={t('street') || getLocalText('Sokak / Cadde', 'Straße', 'Street')}
+                                        style={{ padding: '12px', fontSize: '1rem' }}
+                                    />
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: '10px' }}>
+                                        <input
+                                            className="form-input"
+                                            name="zip"
+                                            value={formData.zip}
+                                            onChange={handleChange}
+                                            placeholder={t('zip') || getLocalText('Posta Kodu', 'PLZ', 'ZIP')}
+                                            style={{ padding: '12px', fontSize: '1rem', minWidth: 0 }}
+                                        />
+                                        <input
+                                            className="form-input"
+                                            name="city"
+                                            value={formData.city}
+                                            onChange={handleChange}
+                                            placeholder={t('city') || getLocalText('Şehir', 'Stadt', 'City')}
+                                            style={{ padding: '12px', fontSize: '1rem', minWidth: 0 }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             <button 
