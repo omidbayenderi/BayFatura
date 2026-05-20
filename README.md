@@ -61,7 +61,7 @@ BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kod
 
 ### 💳 Ödeme & SaaS
 - **Müşteri Self-Servis Portalı:** Public fatura izleme + Stripe ve PayPal entegrasyonu.
-- **Three-Tier Pricing:** Free (0€), Elite (9€/Ay), Lifetime (299€).
+- **Subscription Pricing:** Free (0€), Elite Monthly (9€/Ay), Elite Yearly (77€/Yıl). Lifetime paket yeni satıştan kaldırıldı; mevcut lifetime/test hakları korunur.
 - **One-Click Social Login:** Google ve Apple (iCloud) için tek tıkla giriş.
 
 ### 🌍 Lokalizasyon

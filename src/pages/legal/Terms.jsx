@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
  * Required for commercial SaaS platforms in EU
  */
 const Terms = () => {
-    const lastUpdated = '05. Mai 2026';
+    const lastUpdated = '21. Mai 2026';
 
     const sections = [
         {
@@ -28,15 +28,14 @@ Der Anbieter übernimmt keine Haftung für steuerliche oder rechtliche Korrekthe
         },
         {
             title: '§3 Vertragsschluss / Contract Formation',
-            content: `Der Vertrag kommt durch die Registrierung und Bestätigung der E-Mail-Adresse zustande. Für kostenpflichtige Pakete (Elite/Lifetime) kommt der Vertrag mit der Zahlungsbestätigung zustande.
+            content: `Der Vertrag kommt durch die Registrierung und Bestätigung der E-Mail-Adresse zustande. Für kostenpflichtige Pakete (Elite) kommt der Vertrag mit der Zahlungsbestätigung zustande.
 
 Nutzer müssen mindestens 18 Jahre alt sein und dürfen die Plattform nur für geschäftliche Zwecke nutzen.`
         },
         {
             title: '§4 Preise & Zahlungsbedingungen / Pricing',
             content: `Free-Paket: Kostenlos, eingeschränkte Funktionen.
-Elite-Paket: €9/Monat, automatische monatliche Abrechnung über Stripe.
-Lifetime-Paket: Einmalig €299, dauerhafter Zugang.
+Elite-Paket: €9/Monat oder €77/Jahr, automatische Abrechnung über Stripe.
 
 Alle Preise verstehen sich zzgl. der gesetzlichen Mehrwertsteuer (falls anwendbar).
 Zahlungen werden über Stripe Inc. verarbeitet. Rechnungen werden automatisch per E-Mail zugesandt.`
