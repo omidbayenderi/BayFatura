@@ -37,7 +37,7 @@ const INITIAL_COMPANY_PROFILE = {
     companyName: '', owner: '', companyEmail: '', companyPhone: '', website: '',
     taxId: '', vatId: '', street: '', houseNum: '', zip: '', city: '',
     bankName: '', iban: '', bic: '', 
-    logo: null, signature: null, stamp: null, plan: 'standard',
+    logo: null, signature: null, stamp: null,
     paymentTerms: '', industry: 'general'
 };
 
@@ -203,6 +203,21 @@ export const InvoiceProvider = ({ children }) => {
     const updateProfile = async (d) => {
         if (!currentUser) return;
         const sanitizedData = cleanData(d);
+        [
+            'plan',
+            'subscriptionType',
+            'stripeCustomerId',
+            'subscriptionId',
+            'planActivatedAt',
+            'planExpiresAt',
+            'planDowngradedAt',
+            'lastPaymentAt',
+            'featureAccess',
+            'testingEnabled',
+            'trialOverride',
+            'status'
+        ].forEach(field => delete sanitizedData[field]);
+
         await setDoc(doc(db, 'users', currentUser.uid), sanitizedData, { merge: true });
     };
 
