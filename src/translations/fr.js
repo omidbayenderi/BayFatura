@@ -87,6 +87,7 @@ export default {
     inviteToTeam: 'Inviter dans l\'équipe',
     inviteDesc: 'Envoyez une invitation à un nouveau membre.',
     emailAddress: 'Adresse e-mail',
+    backToLanding: 'Retour à l\'accueil Web App',
     sending: 'Envoi en cours...',
     sendInvite: 'Envoyer l\'invitation',
 
