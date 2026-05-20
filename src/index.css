@@ -754,6 +754,16 @@ label {
   color: #10b981;
 }
 
+.badge.info {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.badge.danger {
+  background: var(--danger-50);
+  color: var(--danger);
+}
+
 .invoice-chip {
   background: #f1f5f9;
   padding: 4px 8px;
