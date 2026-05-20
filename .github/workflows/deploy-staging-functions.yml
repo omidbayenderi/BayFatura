@@ -45,6 +45,20 @@ jobs:
         env:
           STAGING_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Prepare staging functions environment
+        run: |
+          {
+            printf 'RESEND_API_KEY=%s\n' "$STAGING_RESEND_API_KEY"
+            printf 'STRIPE_SECRET_KEY=%s\n' "$STAGING_STRIPE_SECRET_KEY"
+            printf 'STRIPE_WEBHOOK_SECRET=%s\n' "$STAGING_STRIPE_WEBHOOK_SECRET"
+            printf 'APP_URL=%s\n' "$STAGING_APP_URL"
+          } > functions/.env
+        env:
+          STAGING_RESEND_API_KEY: ${{ secrets.STAGING_RESEND_API_KEY }}
+          STAGING_STRIPE_SECRET_KEY: ${{ secrets.STAGING_STRIPE_SECRET_KEY }}
+          STAGING_STRIPE_WEBHOOK_SECRET: ${{ secrets.STAGING_STRIPE_WEBHOOK_SECRET }}
+          STAGING_APP_URL: ${{ secrets.STAGING_APP_URL }}
+
       - name: Deploy functions to staging
         run: npx -y firebase-tools@latest deploy --only functions --project "$STAGING_FIREBASE_PROJECT_ID"
         env:
