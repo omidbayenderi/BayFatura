@@ -4,8 +4,6 @@ import {
     GoogleAuthProvider,
     OAuthProvider,
     indexedDBLocalPersistence,
-    browserLocalPersistence,
-    setPersistence
 } from 'firebase/auth';
 import {
     initializeFirestore,
@@ -63,7 +61,12 @@ export const functions = getFunctions(app);
 // Analytics - only in production and when measurementId exists
 export let analytics = null;
 if (typeof window !== 'undefined' && firebaseConfig.measurementId && import.meta.env.PROD) {
-    import('firebase/analytics').then(({ getAnalytics }) => {
+    import('firebase/analytics').then(async ({ getAnalytics, isSupported }) => {
+        if (!(await isSupported())) {
+            logger.info('Firebase', 'Analytics desteklenmeyen ortamda atlandı');
+            return;
+        }
+
         analytics = getAnalytics(app);
     }).catch((err) => {
         logger.warn('Firebase', 'Analytics yüklenemedi', err);

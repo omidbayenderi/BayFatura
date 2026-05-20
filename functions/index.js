@@ -17,6 +17,7 @@ const db = admin.firestore();
 const getStripeSecret = () => process.env.STRIPE_SECRET_KEY || '';
 const getStripeWebhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || '';
 const getResendKey = () => process.env.RESEND_API_KEY || '';
+const getResendFromEmail = () => process.env.RESEND_FROM_EMAIL || 'BayFatura <onboarding@resend.dev>';
 const getStripe = () => new Stripe(getStripeSecret());
 const getResend = () => new Resend(getResendKey());
 const MAX_PROXY_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -388,7 +389,7 @@ export const sendInvoiceEmail = https.onCall(async (data, context) => {
         console.log(`📧 Attempting to send email to: ${to} for invoice: ${invoiceId}`);
         
         const { data: resData, error } = await resend.emails.send({
-            from: 'BayFatura <onboarding@resend.dev>',
+            from: getResendFromEmail(),
             to: [to],
             subject: subject,
             html: html
@@ -522,7 +523,7 @@ export const sendInvitationEmail = https.onCall(async (data, context) => {
         console.log(`📧 Sending invitation email to: ${inviteeEmail}`);
 
         const { data: resData, error } = await resend.emails.send({
-            from: 'BayFatura <onboarding@resend.dev>',
+            from: getResendFromEmail(),
             to: [inviteeEmail],
             subject,
             html,
