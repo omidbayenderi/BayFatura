@@ -49,12 +49,14 @@ jobs:
         run: |
           {
             printf 'RESEND_API_KEY=%s\n' "$STAGING_RESEND_API_KEY"
+            printf 'RESEND_FROM_EMAIL=%s\n' "$STAGING_RESEND_FROM_EMAIL"
             printf 'STRIPE_SECRET_KEY=%s\n' "$STAGING_STRIPE_SECRET_KEY"
             printf 'STRIPE_WEBHOOK_SECRET=%s\n' "$STAGING_STRIPE_WEBHOOK_SECRET"
             printf 'APP_URL=%s\n' "$STAGING_APP_URL"
           } > functions/.env
         env:
           STAGING_RESEND_API_KEY: ${{ secrets.STAGING_RESEND_API_KEY }}
+          STAGING_RESEND_FROM_EMAIL: ${{ secrets.STAGING_RESEND_FROM_EMAIL }}
           STAGING_STRIPE_SECRET_KEY: ${{ secrets.STAGING_STRIPE_SECRET_KEY }}
           STAGING_STRIPE_WEBHOOK_SECRET: ${{ secrets.STAGING_STRIPE_WEBHOOK_SECRET }}
           STAGING_APP_URL: ${{ secrets.STAGING_APP_URL }}

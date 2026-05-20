@@ -88,12 +88,14 @@ jobs:
         run: |
           {
             printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY"
+            printf 'RESEND_FROM_EMAIL=%s\n' "$RESEND_FROM_EMAIL"
             printf 'STRIPE_SECRET_KEY=%s\n' "$STRIPE_SECRET_KEY"
             printf 'STRIPE_WEBHOOK_SECRET=%s\n' "$STRIPE_WEBHOOK_SECRET"
             printf 'APP_URL=%s\n' "$APP_URL"
           } > functions/.env
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           APP_URL: ${{ secrets.APP_URL }}
