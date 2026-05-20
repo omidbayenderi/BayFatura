@@ -146,6 +146,25 @@ html {
 .auth-toggle-btn:hover {
     color: #4f46e5;
 }
+
+.auth-landing-link {
+    margin-top: 24px;
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.auth-landing-link:hover {
+    color: #4f46e5;
+}
+
 .auth-header { text-align: center; margin-bottom: 2rem; }
 
 .gradient-text {

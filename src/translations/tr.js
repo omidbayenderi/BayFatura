@@ -87,6 +87,7 @@ export default {
     inviteToTeam: 'Ekibe Davet Et',
     inviteDesc: 'Yeni üyeye davetiye ve rol gönderin.',
     emailAddress: 'E-Posta Adresi',
+    backToLanding: 'Web App ana sayfasına dön',
     sending: 'Gönderiliyor...',
     sendInvite: 'Davet Gönder',
 

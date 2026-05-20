@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { Mail, Lock, User, Building, LogIn, AlertCircle, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, Building, LogIn, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const Auth = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -16,7 +16,7 @@ const Auth = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isRedirecting, setIsRedirecting] = useState(false);
     
-    const { login, register, signInWithGoogle, signInWithApple, signInAsDemo, isAuthenticated } = useAuth();
+    const { login, register, signInWithGoogle, signInWithApple, isAuthenticated } = useAuth();
     const { t } = useLanguage();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -236,37 +236,13 @@ const Auth = () => {
                     </p>
                 </div>
 
-                <div className="auth-divider">
-                    <div className="auth-divider-line"></div>
-                    <span>{t('or') || 'veya'}</span>
-                    <div className="auth-divider-line"></div>
-                </div>
-
-                <button
-                    onClick={async () => {
-                        setError('');
-                        setIsLoading(true);
-                        try {
-                            const res = await signInAsDemo();
-                            if (res.success) navigate('/dashboard');
-                            else setError(res.error || t('loginFailed'));
-                        } catch (err) {
-                            setError(err?.message || t('loginFailed'));
-                        } finally {
-                            setIsLoading(false);
-                        }
-                    }}
-                    className="secondary-btn auth-social-btn"
-                    style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-                    disabled={isLoading}
-                >
-                    <Sparkles size={18} />
-                    {t('demoLogin') || 'Demo ile Giriş Yap'}
-                </button>
+                <Link to="/" className="auth-landing-link">
+                    <ArrowLeft size={16} />
+                    {t('backToLanding')}
+                </Link>
             </div>
         </div>
     );
 };
 
 export default Auth;
-
