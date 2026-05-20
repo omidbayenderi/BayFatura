@@ -4,13 +4,12 @@ import { useLanguage } from '../../context/LanguageContext';
 import { motion } from 'framer-motion';
 import {
     Check, Star, Sparkles, TrendingUp, Users,
-    Zap, Shield, Clock, FileSpreadsheet, Ghost, Crown
+    Zap, Shield, Clock, FileSpreadsheet, Ghost
 } from 'lucide-react';
 
 const stripeLinks = {
     monthly: 'https://buy.stripe.com/aFa28q4fFfIS84P1HA2kw02',
-    yearly: 'https://buy.stripe.com/8x24gyeUj2W61GrgCu2kw01',
-    lifetime: 'https://buy.stripe.com/fZuaEWfYnfIS2Kv9a22kw00'
+    yearly: 'https://buy.stripe.com/8x24gyeUj2W61GrgCu2kw01'
 };
 
 const Billing = () => {
@@ -21,8 +20,6 @@ const Billing = () => {
     const hasEliteAccess = ['elite', 'premium', 'lifetime'].includes(currentUser?.plan) ||
         currentUser?.subscriptionType === 'lifetime' ||
         currentUser?.featureAccess === 'all';
-    const isLifetime = currentUser?.subscriptionType === 'lifetime' || currentUser?.plan === 'lifetime';
-    const isSubscriptionActive = hasEliteAccess && !isLifetime;
 
     const handleUpgrade = (planType) => {
         const paymentLink = stripeLinks[planType];
@@ -37,8 +34,8 @@ const Billing = () => {
         window.location.assign(checkoutUrl.toString());
     };
 
-    const eliteIconColor = isSubscriptionActive ? 'var(--primary)' : '#fcd34d';
-    const eliteTextColor = isSubscriptionActive ? '#1e293b' : 'white';
+    const eliteIconColor = hasEliteAccess ? 'var(--primary)' : '#fcd34d';
+    const eliteTextColor = hasEliteAccess ? '#1e293b' : 'white';
 
     return (
         <div className="page-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -137,10 +134,10 @@ const Billing = () => {
                     style={{
                         padding: '32px',
                         borderRadius: '24px',
-                        background: isSubscriptionActive ? 'var(--glass-white)' : 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                        background: hasEliteAccess ? 'var(--glass-white)' : 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
                         color: eliteTextColor,
                         border: '2px solid',
-                        borderColor: isSubscriptionActive ? 'var(--primary)' : '#334155',
+                        borderColor: hasEliteAccess ? 'var(--primary)' : '#334155',
                         boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
                         position: 'relative',
                         display: 'flex',
@@ -159,7 +156,7 @@ const Billing = () => {
                         fontSize: '0.75rem',
                         fontWeight: '700'
                     }}>
-                        {isSubscriptionActive ? t('active') : t('recommended')}
+                        {hasEliteAccess ? t('active') : t('recommended')}
                     </div>
 
                     <div style={{ marginBottom: '20px' }}>
@@ -168,7 +165,7 @@ const Billing = () => {
                         </div>
                         <div style={{ fontSize: '2.5rem', fontWeight: '800' }}>
                             €{billingCycle === 'monthly' ? '9' : '77'}
-                            <span style={{ fontSize: '1rem', color: isSubscriptionActive ? '#64748b' : '#94a3b8', fontWeight: '400' }}>
+                            <span style={{ fontSize: '1rem', color: hasEliteAccess ? '#64748b' : '#94a3b8', fontWeight: '400' }}>
                                 {' '}/ {billingCycle === 'monthly' ? t('month').toLowerCase() : t('yearly').toLowerCase()}
                             </span>
                         </div>
@@ -196,84 +193,7 @@ const Billing = () => {
                         onClick={() => handleUpgrade(billingCycle)}
                         style={{ width: '100%', padding: '14px', borderRadius: '12px' }}
                     >
-                        {isSubscriptionActive ? t('active') : t('upgradeToElite')}
-                    </button>
-                </motion.div>
-
-                <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    style={{
-                        padding: '32px',
-                        borderRadius: '24px',
-                        background: isLifetime ? 'var(--glass-white)' : 'linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%)',
-                        color: isLifetime ? '#1e293b' : '#451a03',
-                        border: '2px solid',
-                        borderColor: isLifetime ? 'var(--primary)' : '#b45309',
-                        boxShadow: isLifetime ? 'none' : '0 25px 50px -12px rgba(245,158,11,0.2)',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        height: '100%'
-                    }}
-                >
-                    <div style={{
-                        position: 'absolute',
-                        top: '16px',
-                        right: '16px',
-                        background: isLifetime ? 'var(--primary)' : '#b45309',
-                        color: 'white',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: '700'
-                    }}>
-                        {isLifetime ? t('active') : 'PREMIUM'}
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isLifetime ? 'var(--primary)' : '#b45309', fontWeight: '800', marginBottom: '8px' }}>
-                            <Crown size={18} fill={isLifetime ? 'var(--primary)' : '#b45309'} /> {t('eliteLifetime')}
-                        </div>
-                        <div style={{ fontSize: '2.5rem', fontWeight: '900' }}>
-                            €299
-                        </div>
-                        <p style={{ fontSize: '0.85rem', color: isLifetime ? '#64748b' : '#78350f', marginTop: '8px', fontWeight: '600' }}>
-                            {t('eliteLifetimeDesc')}
-                        </p>
-                    </div>
-
-                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-                        {[
-                            t('forecasting'),
-                            t('bankMatcher'),
-                            t('teamManagementElite'),
-                            `${t('products')} & ${t('customers')}`,
-                            t('quotes'),
-                            t('aiVatPrediction'),
-                            t('unlimitedAndAdFree')
-                        ].map(label => (
-                            <li key={label} style={{ display: 'flex', gap: '12px', fontWeight: '600' }}>
-                                <Check size={20} color={isLifetime ? '#10b981' : 'inherit'} />
-                                <span>{label}</span>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <button
-                        className="primary-btn"
-                        onClick={() => handleUpgrade('lifetime')}
-                        style={{
-                            width: '100%',
-                            padding: '16px',
-                            borderRadius: '12px',
-                            background: isLifetime ? 'transparent' : '#0f172a',
-                            color: isLifetime ? '#16a34a' : 'white',
-                            border: isLifetime ? '2px solid #16a34a' : 'none',
-                            fontWeight: '700',
-                            fontSize: '1rem'
-                        }}
-                    >
-                        {isLifetime ? t('active') : t('getLifetimeBtn')}
+                        {hasEliteAccess ? t('active') : t('upgradeToElite')}
                     </button>
                 </motion.div>
             </div>
