@@ -218,6 +218,7 @@ const Auth = () => {
 
                 <div className="auth-social-grid">
                     <button 
+                        type="button"
                         onClick={() => handleSocialLogin('google')}
                         className="secondary-btn auth-social-btn"
                     >
@@ -230,6 +231,7 @@ const Auth = () => {
                         Google
                     </button>
                     <button 
+                        type="button"
                         onClick={() => handleSocialLogin('apple')}
                         className="secondary-btn auth-social-btn"
                     >
