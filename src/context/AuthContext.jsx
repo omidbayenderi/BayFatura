@@ -4,7 +4,6 @@ import {
     onAuthStateChanged,
     signInWithEmailAndPassword,
     signOut,
-    signInWithPopup,
     signInWithRedirect,
     getRedirectResult,
     signInWithCredential,
@@ -24,21 +23,6 @@ import { nativeSignInWithGoogle, nativeSignInWithApple, isNativeAuthAvailable, N
 import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
 
 const AuthContext = createContext();
-
-const shouldFallbackToRedirect = (err) => {
-    const code = err?.code || '';
-    const message = (err?.message || '').toLowerCase();
-
-    return [
-        'auth/popup-closed-by-user',
-        'auth/popup-blocked',
-        'auth/cancelled-popup-request',
-        'auth/web-storage-unsupported'
-    ].includes(code) ||
-        message.includes('popup') ||
-        message.includes('cross-origin') ||
-        message.includes('storage access');
-};
 
 export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
@@ -188,16 +172,7 @@ export const AuthProvider = ({ children }) => {
                         return { success: false, error: 'Sign in was cancelled.' };
                     }
                     if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
-                        console.warn('[Auth] Native Google plugin unavailable, using web SDK directly');
-                        try {
-                            const result = await signInWithPopup(auth, googleProvider);
-                            return { success: true, user: result.user };
-                        } catch (popupErr) {
-                            if (!shouldFallbackToRedirect(popupErr)) throw popupErr;
-                            console.warn('[Auth] Google popup unavailable, falling back to redirect:', popupErr?.code || popupErr?.message);
-                            await signInWithRedirect(auth, googleProvider);
-                            return { success: true, redirecting: true };
-                        }
+                        console.warn('[Auth] Native Google plugin unavailable, using redirect flow');
                     }
                     if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
                         console.warn('[Auth] Native Google not configured, falling back to redirect:', nativeErr.message);
@@ -208,15 +183,9 @@ export const AuthProvider = ({ children }) => {
                 await signInWithRedirect(auth, googleProvider);
                 return { success: true, redirecting: true };
             }
-            try {
-                const result = await signInWithPopup(auth, googleProvider);
-                return { success: true, user: result.user };
-            } catch (popupErr) {
-                if (!shouldFallbackToRedirect(popupErr)) throw popupErr;
-                console.warn('[Auth] Google popup unavailable, falling back to redirect:', popupErr?.code || popupErr?.message);
-                await signInWithRedirect(auth, googleProvider);
-                return { success: true, redirecting: true };
-            }
+
+            await signInWithRedirect(auth, googleProvider);
+            return { success: true, redirecting: true };
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
@@ -249,16 +218,7 @@ export const AuthProvider = ({ children }) => {
                         return { success: false, error: 'Sign in was cancelled.' };
                     }
                     if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
-                        console.warn('[Auth] Native Apple plugin unavailable, using web SDK directly');
-                        try {
-                            const result = await signInWithPopup(auth, appleProvider);
-                            return { success: true, user: result.user };
-                        } catch (popupErr) {
-                            if (!shouldFallbackToRedirect(popupErr)) throw popupErr;
-                            console.warn('[Auth] Apple popup unavailable, falling back to redirect:', popupErr?.code || popupErr?.message);
-                            await signInWithRedirect(auth, appleProvider);
-                            return { success: true, redirecting: true };
-                        }
+                        console.warn('[Auth] Native Apple plugin unavailable, using redirect flow');
                     }
                     if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
                         console.warn('[Auth] Native Apple not configured, falling back to redirect:', nativeErr.message);
@@ -269,15 +229,9 @@ export const AuthProvider = ({ children }) => {
                 await signInWithRedirect(auth, appleProvider);
                 return { success: true, redirecting: true };
             }
-            try {
-                const result = await signInWithPopup(auth, appleProvider);
-                return { success: true, user: result.user };
-            } catch (popupErr) {
-                if (!shouldFallbackToRedirect(popupErr)) throw popupErr;
-                console.warn('[Auth] Apple popup unavailable, falling back to redirect:', popupErr?.code || popupErr?.message);
-                await signInWithRedirect(auth, appleProvider);
-                return { success: true, redirecting: true };
-            }
+
+            await signInWithRedirect(auth, appleProvider);
+            return { success: true, redirecting: true };
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
