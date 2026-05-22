@@ -21,6 +21,7 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { isNativePlatform } from '../lib/platform';
 import { nativeSignInWithGoogle, nativeSignInWithApple, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
 import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
+import { saveAuthRedirectError } from '../lib/authRedirect';
 
 const AuthContext = createContext();
 
@@ -52,6 +53,7 @@ export const AuthProvider = ({ children }) => {
             })
             .catch((error) => {
                 console.error("Redirect login callback error:", error);
+                saveAuthRedirectError(error);
             });
         
         const unsubscribe = onAuthStateChanged(auth, async (user) => {

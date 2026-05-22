@@ -3,6 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Mail, Lock, User, Building, LogIn, AlertCircle, ArrowLeft } from 'lucide-react';
+import {
+    consumeAuthRedirectError,
+    consumeAuthRedirectTarget,
+    normalizeAuthRedirectTarget,
+    saveAuthRedirectTarget,
+} from '../../lib/authRedirect';
 
 const Auth = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -20,12 +26,21 @@ const Auth = () => {
     const { t } = useLanguage();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const redirectTo = searchParams.get('redirect') || '/dashboard';
+    const redirectTo = normalizeAuthRedirectTarget(searchParams.get('redirect') || '/dashboard');
+
+    useEffect(() => {
+        const redirectError = consumeAuthRedirectError();
+        if (redirectError) {
+            setError(redirectError);
+            setIsLoading(false);
+            setIsRedirecting(false);
+        }
+    }, []);
 
     // iOS redirect sonrası: Google auth tamamlandı, authState değişti → navigate
     useEffect(() => {
         if (isAuthenticated) {
-            navigate(redirectTo);
+            navigate(consumeAuthRedirectTarget(redirectTo), { replace: true });
         }
     }, [isAuthenticated, navigate, redirectTo]);
 
@@ -78,6 +93,7 @@ const Auth = () => {
 
     const handleSocialLogin = async (provider) => {
         setError('');
+        saveAuthRedirectTarget(redirectTo);
         try {
             const loginPromise = provider === 'google' ? signInWithGoogle() : signInWithApple();
             setIsLoading(true);
