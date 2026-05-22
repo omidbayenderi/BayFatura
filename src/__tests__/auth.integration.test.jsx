@@ -64,6 +64,7 @@ describe('Auth page integration', () => {
     authMock.signInWithApple.mockReset();
     authMock.signInAsDemo.mockReset();
     authMock.isAuthenticated = false;
+    window.sessionStorage.clear();
   });
 
   test('logs in with email and password then follows redirect query', async () => {
@@ -129,6 +130,41 @@ describe('Auth page integration', () => {
         companyName: 'Ada GmbH',
       });
       expect(screen.getByText('Dashboard page')).toBeInTheDocument();
+    });
+  });
+
+  test('stores safe redirect target before starting Google redirect login', async () => {
+    authMock.signInWithGoogle.mockResolvedValue({ success: true, redirecting: true });
+
+    renderAuth('/login?redirect=/team');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Google' }));
+
+    await waitFor(() => {
+      expect(authMock.signInWithGoogle).toHaveBeenCalled();
+      expect(window.sessionStorage.getItem('bayfatura.auth.redirectTarget')).toBe('/team');
+      expect(screen.getByText('Processing')).toBeInTheDocument();
+    });
+  });
+
+  test('consumes stored redirect error after returning to login page', async () => {
+    window.sessionStorage.setItem('bayfatura.auth.redirectError', 'Google sign-in is not authorized for this domain.');
+
+    renderAuth();
+
+    expect(await screen.findByText('Google sign-in is not authorized for this domain.')).toBeInTheDocument();
+    expect(window.sessionStorage.getItem('bayfatura.auth.redirectError')).toBeNull();
+  });
+
+  test('authenticated redirect return follows stored target', async () => {
+    authMock.isAuthenticated = true;
+    window.sessionStorage.setItem('bayfatura.auth.redirectTarget', '/team');
+
+    renderAuth('/login');
+
+    await waitFor(() => {
+      expect(screen.getByText('Team page')).toBeInTheDocument();
+      expect(window.sessionStorage.getItem('bayfatura.auth.redirectTarget')).toBeNull();
     });
   });
 });
