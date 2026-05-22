@@ -14,9 +14,34 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import { logger } from './logger';
 
+export const resolveFirebaseAuthDomain = ({ authDomain, projectId, appEnv, hostname }) => {
+    if (!authDomain || !projectId || appEnv === 'production') {
+        return authDomain;
+    }
+
+    const currentHost = hostname || (typeof window !== 'undefined' ? window.location.hostname : '');
+    const isPreviewOrLocalHost = currentHost === 'localhost'
+        || currentHost === '127.0.0.1'
+        || currentHost.endsWith('.web.app')
+        || currentHost.endsWith('.firebaseapp.com');
+    const isCustomAuthDomain = !authDomain.endsWith('.firebaseapp.com')
+        && !authDomain.endsWith('.web.app')
+        && !authDomain.includes('localhost');
+
+    if (isPreviewOrLocalHost && isCustomAuthDomain) {
+        return `${projectId}.firebaseapp.com`;
+    }
+
+    return authDomain;
+};
+
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    authDomain: resolveFirebaseAuthDomain({
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        appEnv: import.meta.env.VITE_APP_ENV,
+    }),
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,

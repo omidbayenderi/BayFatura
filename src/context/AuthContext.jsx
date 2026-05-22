@@ -4,6 +4,7 @@ import {
     onAuthStateChanged,
     signInWithEmailAndPassword,
     signOut,
+    signInWithPopup,
     signInWithRedirect,
     getRedirectResult,
     signInWithCredential,
@@ -24,6 +25,34 @@ import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
 import { saveAuthRedirectError } from '../lib/authRedirect';
 
 const AuthContext = createContext();
+
+const shouldFallbackToRedirect = (err) => {
+    const code = err?.code || '';
+    return [
+        'auth/cancelled-popup-request',
+        'auth/operation-not-supported-in-this-environment',
+        'auth/popup-blocked',
+        'auth/popup-closed-by-user',
+        'auth/web-storage-unsupported',
+    ].includes(code);
+};
+
+const signInWithWebProvider = async (provider, label) => {
+    try {
+        await signInWithPopup(auth, provider);
+        return { success: true };
+    } catch (popupErr) {
+        const code = popupErr?.code || '';
+        console.warn(`[Auth] ${label} popup login failed:`, { code, message: popupErr?.message });
+
+        if (!shouldFallbackToRedirect(popupErr)) {
+            throw popupErr;
+        }
+
+        await signInWithRedirect(auth, provider);
+        return { success: true, redirecting: true };
+    }
+};
 
 export const AuthProvider = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
@@ -186,8 +215,7 @@ export const AuthProvider = ({ children }) => {
                 return { success: true, redirecting: true };
             }
 
-            await signInWithRedirect(auth, googleProvider);
-            return { success: true, redirecting: true };
+            return await signInWithWebProvider(googleProvider, 'Google');
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
@@ -232,8 +260,7 @@ export const AuthProvider = ({ children }) => {
                 return { success: true, redirecting: true };
             }
 
-            await signInWithRedirect(auth, appleProvider);
-            return { success: true, redirecting: true };
+            return await signInWithWebProvider(appleProvider, 'Apple');
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
