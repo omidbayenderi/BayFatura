@@ -61,6 +61,8 @@ Firebase Console → Authentication → Sign-in providers → Google:
 
 Aynı mekanizma (`signInWithRedirect`) Apple için de geçerli. Firebase Web SDK, OAuth 2.0 flow'u Safari'de açar.
 
+Detayli staging ve production kurulum adimlari icin: `docs/apple-sign-in-setup.md`.
+
 İhtiyaç duyulanlar:
 
 - [ ] **Apple Developer üyeliği** ($99/yıl) — gerekli
