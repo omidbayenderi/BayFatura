@@ -26,6 +26,7 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 
 - Google ile web girisi staging preview uzerinde basarili test edildi.
 - Apple/iCloud girisi `auth/operation-not-allowed` hatasi veriyor. Bu, Firebase Authentication tarafinda Apple provider'in henuz etkin olmadigini veya Apple provider ayarlarinin tamamlanmadigini gosterir.
+- Apple staging callback URL: `https://bayfatura-staging.firebaseapp.com/__/auth/handler`. Kurulum rehberi: `docs/apple-sign-in-setup.md`.
 - Chrome console'daki `Cross-Origin-Opener-Policy policy would block the window.closed/window.close call` uyarilari popup tabanli OAuth akislarinda gorulebilir; hosting header'i `same-origin-allow-popups` olacak sekilde duzenlenmelidir.
 - Resend domain dogrulamasi henuz yapilmadi. Ucretsiz/test modunda Resend sadece sinirli alicilara mail gonderir; genel ekip daveti icin dogrulanmis domain ve bu domaine ait `from` adresi gerekir.
 
