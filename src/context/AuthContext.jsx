@@ -23,6 +23,7 @@ import { isNativePlatform } from '../lib/platform';
 import { nativeSignInWithGoogle, nativeSignInWithApple, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
 import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
 import { saveAuthRedirectError } from '../lib/authRedirect';
+import { getSocialAuthErrorMessage } from '../lib/authErrors';
 
 const AuthContext = createContext();
 
@@ -222,9 +223,8 @@ export const AuthProvider = ({ children }) => {
             console.error("[Auth] Google login error:", { code: errCode, message: errMsg });
             if (errMsg.includes('redirect_uri_mismatch')) {
                 console.warn('[Auth] Redirect URI mismatch. Check Firebase Console > Authentication > Authorized domains');
-                return { success: false, error: 'OAuth configuration error. Please contact support.' };
             }
-            return { success: false, error: errMsg || 'Google sign-in failed.' };
+            return { success: false, error: getSocialAuthErrorMessage('Google', err) };
         }
     };
     
@@ -265,7 +265,7 @@ export const AuthProvider = ({ children }) => {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
             console.error("[Auth] Apple login error:", { code: errCode, message: errMsg });
-            return { success: false, error: errMsg || 'Apple sign-in failed.' };
+            return { success: false, error: getSocialAuthErrorMessage('Apple', err) };
         }
     };
     const signInAsDemo = async () => {
