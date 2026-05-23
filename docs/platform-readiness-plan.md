@@ -22,6 +22,13 @@ Bu plan BayFatura'nin Web App, Android ve iOS surumlerini staging'den production
 
 Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-tools` paketini indiremedi; ag izniyle tekrar calistirildi ve Firestore emulator testleri basarili tamamlandi.
 
+## Son Manuel Bulgular
+
+- Google ile web girisi staging preview uzerinde basarili test edildi.
+- Apple/iCloud girisi `auth/operation-not-allowed` hatasi veriyor. Bu, Firebase Authentication tarafinda Apple provider'in henuz etkin olmadigini veya Apple provider ayarlarinin tamamlanmadigini gosterir.
+- Chrome console'daki `Cross-Origin-Opener-Policy policy would block the window.closed/window.close call` uyarilari popup tabanli OAuth akislarinda gorulebilir; hosting header'i `same-origin-allow-popups` olacak sekilde duzenlenmelidir.
+- Resend domain dogrulamasi henuz yapilmadi. Ucretsiz/test modunda Resend sadece sinirli alicilara mail gonderir; genel ekip daveti icin dogrulanmis domain ve bu domaine ait `from` adresi gerekir.
+
 ## Faz 1: Web Staging Stabilizasyonu
 
 ### Codex tarafindan yapilacaklar
@@ -35,15 +42,17 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 
 ### Omid tarafindan yapilacaklar
 
-- [ ] En guncel PR preview linkinde Chrome ve Safari ile Google login test et.
+- [x] En guncel PR preview linkinde Chrome ve Safari ile Google login test et.
 - [ ] Resend'de domain dogrulamasini tamamla.
 - [ ] Firebase Console'da staging ve production authorized domains listesini kontrol et.
+- [ ] Firebase Console'da Apple provider'i etkinlestir ve Apple Developer ayarlarini tamamla.
 - [ ] Stripe/PayPal test hesaplariyla odeme akisini manuel test et.
 
 ### Cikis kriterleri
 
 - [ ] Email/password login calisiyor.
-- [ ] Google login Chrome ve Safari'de calisiyor veya net Firebase config hatasi gorunuyor.
+- [x] Google login Chrome ve Safari'de calisiyor veya net Firebase config hatasi gorunuyor.
+- [ ] Apple/iCloud login Firebase provider etkinlestirildikten sonra calisiyor.
 - [ ] Onboarding tamamlanabiliyor.
 - [ ] Musteri, urun, fatura ve PDF akislari calisiyor.
 - [ ] Team invite email'i dogrulanmis domain ile hedef adrese ulasiyor.
