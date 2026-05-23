@@ -1,3 +1,8 @@
+export const isExpectedSocialAuthSetupError = (err) => {
+    const code = err?.code || '';
+    return code === 'auth/operation-not-allowed';
+};
+
 export const getSocialAuthErrorMessage = (providerLabel, err) => {
     const code = err?.code || '';
     const message = err?.message || '';

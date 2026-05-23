@@ -23,7 +23,7 @@ import { isNativePlatform } from '../lib/platform';
 import { nativeSignInWithGoogle, nativeSignInWithApple, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
 import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
 import { saveAuthRedirectError } from '../lib/authRedirect';
-import { getSocialAuthErrorMessage } from '../lib/authErrors';
+import { getSocialAuthErrorMessage, isExpectedSocialAuthSetupError } from '../lib/authErrors';
 
 const AuthContext = createContext();
 
@@ -44,7 +44,9 @@ const signInWithWebProvider = async (provider, label) => {
         return { success: true };
     } catch (popupErr) {
         const code = popupErr?.code || '';
-        console.warn(`[Auth] ${label} popup login failed:`, { code, message: popupErr?.message });
+        if (!isExpectedSocialAuthSetupError(popupErr)) {
+            console.warn(`[Auth] ${label} popup login failed:`, { code, message: popupErr?.message });
+        }
 
         if (!shouldFallbackToRedirect(popupErr)) {
             throw popupErr;
@@ -220,7 +222,11 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
-            console.error("[Auth] Google login error:", { code: errCode, message: errMsg });
+            if (isExpectedSocialAuthSetupError(err)) {
+                console.info("[Auth] Google login provider is not enabled:", { code: errCode });
+            } else {
+                console.error("[Auth] Google login error:", { code: errCode, message: errMsg });
+            }
             if (errMsg.includes('redirect_uri_mismatch')) {
                 console.warn('[Auth] Redirect URI mismatch. Check Firebase Console > Authentication > Authorized domains');
             }
@@ -264,7 +270,11 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
-            console.error("[Auth] Apple login error:", { code: errCode, message: errMsg });
+            if (isExpectedSocialAuthSetupError(err)) {
+                console.info("[Auth] Apple login provider is not enabled:", { code: errCode });
+            } else {
+                console.error("[Auth] Apple login error:", { code: errCode, message: errMsg });
+            }
             return { success: false, error: getSocialAuthErrorMessage('Apple', err) };
         }
     };

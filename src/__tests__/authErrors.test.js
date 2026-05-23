@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { getSocialAuthErrorMessage } from '../lib/authErrors';
+import { getSocialAuthErrorMessage, isExpectedSocialAuthSetupError } from '../lib/authErrors';
 
 describe('getSocialAuthErrorMessage', () => {
   test('explains disabled Apple provider without leaking raw Firebase text', () => {
@@ -18,5 +18,10 @@ describe('getSocialAuthErrorMessage', () => {
     });
 
     expect(message).toBe('Google sign-in was cancelled.');
+  });
+
+  test('marks disabled providers as expected setup errors', () => {
+    expect(isExpectedSocialAuthSetupError({ code: 'auth/operation-not-allowed' })).toBe(true);
+    expect(isExpectedSocialAuthSetupError({ code: 'auth/network-request-failed' })).toBe(false);
   });
 });
