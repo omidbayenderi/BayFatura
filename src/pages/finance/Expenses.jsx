@@ -7,6 +7,8 @@ import { usePanel } from '../../context/PanelContext';
 import PremiumModal from '../../components/PremiumModal';
 import { scanReceipt } from '../../lib/geminiService';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { isNativePlatform } from '../../lib/platform';
+import { takePhoto } from '../../lib/nativeCamera';
 
 const Expenses = () => {
     const {
@@ -24,6 +26,7 @@ const Expenses = () => {
     const { t, appLanguage } = useLanguage();
     const { isPro } = useAuth();
     const { showToast } = usePanel();
+    const useNativeReceiptCapture = isNativePlatform();
     
     const [showForm, setShowForm] = useState(false);
     const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -65,15 +68,44 @@ const Expenses = () => {
         }
     };
 
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
+    const applyReceiptImage = (dataUrl) => {
+        setFormData(prev => ({ ...prev, receiptImage: dataUrl }));
+    };
+
+    const scanReceiptImage = async (base64) => {
+        setIsAiScanning(true);
+        try {
+            const result = await scanReceipt(base64);
+            setFormData(prev => ({
+                ...prev,
+                title: result.vendor || result.title || prev.title,
+                amount: result.totalAmount || result.amount || prev.amount,
+                currency: result.currency || prev.currency,
+                category: result.category || prev.category,
+                date: result.date || prev.date,
+                taxAmount: result.taxAmount || 0
+            }));
+            showToast(t('exportSuccessful'), 'success');
+        } catch (error) {
+            console.error("AI Scan Error:", error);
+            showToast(t('aiScanError') + ": " + error.message, 'error');
+        } finally {
+            setIsAiScanning(false);
+        }
+    };
+
+    const readReceiptFile = (file, onRead) => {
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, receiptImage: reader.result }));
+                onRead(reader.result);
             };
             reader.readAsDataURL(file);
         }
+    };
+
+    const handleImageChange = (e) => {
+        readReceiptFile(e.target.files?.[0], applyReceiptImage);
     };
 
     const handleAiScanChange = async (e) => {
@@ -83,35 +115,25 @@ const Expenses = () => {
             return;
         }
 
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64 = reader.result;
-                setFormData(prev => ({ ...prev, receiptImage: base64 }));
-                
-                // Real AI Extraction via Gemini
-                setIsAiScanning(true);
-                try {
-                    const result = await scanReceipt(base64);
-                    setFormData(prev => ({
-                        ...prev,
-                        title: result.vendor || result.title || prev.title,
-                        amount: result.totalAmount || result.amount || prev.amount,
-                        currency: result.currency || prev.currency,
-                        category: result.category || prev.category,
-                        date: result.date || prev.date,
-                        taxAmount: result.taxAmount || 0
-                    }));
-                    showToast(t('exportSuccessful'), 'success');
-                } catch (error) {
-                    console.error("AI Scan Error:", error);
-                    showToast(t('aiScanError') + ": " + error.message, 'error');
-                } finally {
-                    setIsAiScanning(false);
-                }
-            };
-            reader.readAsDataURL(file);
+        readReceiptFile(e.target.files?.[0], async (base64) => {
+            applyReceiptImage(base64);
+            await scanReceiptImage(base64);
+        });
+    };
+
+    const handleNativeReceiptCapture = async ({ scan = false } = {}) => {
+        if (scan && !isPro) {
+            setShowPremiumModal(true);
+            return;
+        }
+
+        const photo = await takePhoto({ source: 'CAMERA', quality: scan ? 90 : 85, width: 1400 });
+        if (!photo?.dataUrl) return;
+
+        applyReceiptImage(photo.dataUrl);
+
+        if (scan) {
+            await scanReceiptImage(photo.dataUrl);
         }
     };
 
@@ -255,51 +277,92 @@ const Expenses = () => {
                                 <label>{t('billScanner')}</label>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                     
-                                    <label 
-                                        className="primary-btn" 
-                                        style={{ 
-                                            cursor: !isPro ? 'pointer' : 'pointer', 
-                                            display: 'flex', alignItems: 'center', gap: '8px',
-                                            background: 'linear-gradient(135deg, #6366f1, #a855f7)',
-                                            border: 'none',
-                                            position: 'relative',
-                                            overflow: 'hidden'
-                                        }}
-                                        onClick={(e) => { if(!isPro) { e.preventDefault(); setShowPremiumModal(true); } }}
-                                    >
-                                        <Sparkles size={18} />
-                                        <span>{t('aiScanText')}</span>
-                                        {!isPro && <Lock size={14} style={{ marginLeft: '4px', opacity: 0.8 }} />}
-                                        {isPro && (
+                                    {useNativeReceiptCapture ? (
+                                        <button
+                                            type="button"
+                                            className="primary-btn"
+                                            onClick={() => handleNativeReceiptCapture({ scan: true })}
+                                            disabled={isAiScanning}
+                                            style={{
+                                                cursor: isAiScanning ? 'not-allowed' : 'pointer',
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                                                border: 'none',
+                                                position: 'relative',
+                                                overflow: 'hidden',
+                                                opacity: isAiScanning ? 0.8 : 1
+                                            }}
+                                        >
+                                            <Sparkles size={18} />
+                                            <span>{t('aiScanText')}</span>
+                                            {!isPro && <Lock size={14} style={{ marginLeft: '4px', opacity: 0.8 }} />}
+                                            {isAiScanning && (
+                                                <div style={{
+                                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                    background: 'rgba(255,255,255,0.2)',
+                                                    animation: 'scanBar 1.5s infinite linear'
+                                                }} />
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <label
+                                            className="primary-btn"
+                                            style={{
+                                                cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                                                border: 'none',
+                                                position: 'relative',
+                                                overflow: 'hidden'
+                                            }}
+                                            onClick={(e) => { if (!isPro) { e.preventDefault(); setShowPremiumModal(true); } }}
+                                        >
+                                            <Sparkles size={18} />
+                                            <span>{t('aiScanText')}</span>
+                                            {!isPro && <Lock size={14} style={{ marginLeft: '4px', opacity: 0.8 }} />}
+                                            {isPro && (
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    style={{ display: 'none' }}
+                                                    onChange={handleAiScanChange}
+                                                />
+                                            )}
+                                            {isAiScanning && (
+                                                <div style={{
+                                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                    background: 'rgba(255,255,255,0.2)',
+                                                    animation: 'scanBar 1.5s infinite linear'
+                                                }} />
+                                            )}
+                                        </label>
+                                    )}
+
+                                    {useNativeReceiptCapture ? (
+                                        <button
+                                            type="button"
+                                            className="secondary-btn"
+                                            onClick={() => handleNativeReceiptCapture()}
+                                            disabled={isAiScanning}
+                                            style={{ cursor: isAiScanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                        >
+                                            <Camera size={18} />
+                                            <span>{t('manual')}</span>
+                                        </button>
+                                    ) : (
+                                        <label className="secondary-btn" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Camera size={18} />
+                                            <span>{t('manual')}</span>
                                             <input
                                                 type="file"
                                                 accept="image/*"
                                                 capture="environment"
                                                 style={{ display: 'none' }}
-                                                onChange={handleAiScanChange}
+                                                onChange={handleImageChange}
                                             />
-                                        )}
-                                        {/* CSS Scanner Effect */}
-                                        {isAiScanning && (
-                                            <div style={{
-                                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                                                background: 'rgba(255,255,255,0.2)',
-                                                animation: 'scanBar 1.5s infinite linear'
-                                            }} />
-                                        )}
-                                    </label>
-
-                                    <label className="secondary-btn" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Camera size={18} />
-                                        <span>{t('manual')}</span>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            capture="environment" // Hints mobile browsers to use camera
-                                            style={{ display: 'none' }}
-                                            onChange={handleImageChange}
-                                        />
-                                    </label>
+                                        </label>
+                                    )}
                                     {formData.receiptImage && (
                                         <div style={{ position: 'relative', height: '40px', width: '40px' }}>
                                             <img

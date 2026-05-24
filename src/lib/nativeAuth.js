@@ -2,21 +2,28 @@ import { Capacitor } from '@capacitor/core';
 import { isNativePlatform } from './platform';
 
 let FirebaseAuthentication;
+const shouldLogNativeAuthDebug = import.meta.env.DEV || import.meta.env.VITE_DEBUG_NATIVE_AUTH === 'true';
+
+function debugNativeAuth(...args) {
+    if (shouldLogNativeAuthDebug) {
+        console.log(...args);
+    }
+}
 
 async function getPlugin() {
     if (!FirebaseAuthentication) {
         try {
-            console.log('[NativeAuth] isNativePlatform:', isNativePlatform());
-            console.log('[NativeAuth] Capacitor platform:', Capacitor.getPlatform());
-            console.log('[NativeAuth] isPluginAvailable:', Capacitor.isPluginAvailable('FirebaseAuthentication'));
+            debugNativeAuth('[NativeAuth] isNativePlatform:', isNativePlatform());
+            debugNativeAuth('[NativeAuth] Capacitor platform:', Capacitor.getPlatform());
+            debugNativeAuth('[NativeAuth] isPluginAvailable:', Capacitor.isPluginAvailable('FirebaseAuthentication'));
             const mod = await import('@capacitor-firebase/authentication');
             FirebaseAuthentication = mod.FirebaseAuthentication;
-            console.log('[NativeAuth] Plugin loaded, type:', typeof FirebaseAuthentication);
-            console.log('[NativeAuth] Plugin keys:', Object.keys(FirebaseAuthentication).join(', '));
+            debugNativeAuth('[NativeAuth] Plugin loaded, type:', typeof FirebaseAuthentication);
+            debugNativeAuth('[NativeAuth] Plugin keys:', Object.keys(FirebaseAuthentication).join(', '));
             if (FirebaseAuthentication && typeof FirebaseAuthentication.signInWithGoogle === 'function') {
-                console.log('[NativeAuth] signInWithGoogle IS a function');
+                debugNativeAuth('[NativeAuth] signInWithGoogle IS a function');
             } else {
-                console.log('[NativeAuth] signInWithGoogle is NOT a function, type:', typeof FirebaseAuthentication?.signInWithGoogle);
+                debugNativeAuth('[NativeAuth] signInWithGoogle is NOT a function, type:', typeof FirebaseAuthentication?.signInWithGoogle);
             }
         } catch (err) {
             console.error('[NativeAuth] Plugin load error:', err);

@@ -10,6 +10,7 @@ Bu dokuman BayFatura Android surumunun beta ve release oncesi durumunu takip ede
 - Capacitor native klasoru repo stratejisinde uretilen klasor olarak kabul ediliyor; `android/` git'e alinmiyor.
 - Kalici Android ozel ayarlari `scripts/patch-android-capacitor.mjs` ile `npx cap sync android` sonrasinda uygulanir.
 - CI workflow'u temiz checkout ortaminda `android/` yoksa `npx cap add android` calistirir, sonra sync ve patch adimlarini uygular.
+- Cihaz test akisi `docs/android-smoke-test.md` uzerinden takip edilir.
 
 ## Son Lokal Dogrulama
 
@@ -31,6 +32,7 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
 - R8/ProGuard icin Facebook auth `dontwarn` kurallari eklendi:
   - Capacitor Firebase Auth plugini Facebook siniflarina referans verebiliyor.
   - BayFatura su anda Google ve Apple provider kullandigi icin bu siniflar release build'i bloklamamali.
+- Gider/fiş ekraninda Android native shell algilandiginda Capacitor Camera kullanilir; web ortaminda mevcut dosya secici fallback olarak kalir.
 
 ## Codex Tarafinda Tamamlananlar
 
@@ -39,6 +41,8 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
 - Release build R8 hatasi giderildi.
 - Release signing placeholder degerlerinin build'i kirmamasi saglandi.
 - GitHub Actions Android workflow'u native klasor stratejisine uyumlu hale getirildi.
+- Android smoke test matrisi ayrica dokumante edildi: `docs/android-smoke-test.md`.
+- Android native kamera entegrasyonu gider/fiş tarama akisi icin baglandi.
 
 ## Omid Tarafindan Gerekli Dis Adimlar
 
@@ -68,4 +72,3 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
 - Push notification token'i kaydediliyor.
 - CI signed AAB uretiyor.
 - Internal testing build'i Firebase App Distribution veya Play Console'a yukleniyor.
-

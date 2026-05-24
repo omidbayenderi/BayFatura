@@ -94,8 +94,9 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 - [x] Release build icin R8/ProGuard ve signing placeholder problemlerini duzelt.
 - [x] Native klasorlerin git'e alinmadigi mimariye uygun post-sync Android patch scripti ekle.
 - [x] Play Store internal testing icin release checklist hazirla: `docs/android-readiness.md`.
-- [x] Android smoke test matrisi hazirla: login, camera, PDF, push, invoice, team invite.
-- [ ] Native feature flag davranisini kontrol et.
+- [x] Android smoke test matrisi hazirla: `docs/android-smoke-test.md`.
+- [x] Native kamera davranisini web fallback'i bozmadan Android shell'e bagla.
+- [ ] Native push notification davranisini kontrollu opt-in mimarisiyle bagla.
 
 ### Omid tarafindan yapilacaklar
 
