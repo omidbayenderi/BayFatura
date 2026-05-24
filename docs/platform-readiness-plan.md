@@ -7,18 +7,20 @@ Bu plan BayFatura'nin Web App, Android ve iOS surumlerini staging'den production
 | Platform | Durum | Ana Risk |
 |----------|-------|----------|
 | Web App | Staging stabilizasyonunda, CI/build/test geciyor | Sosyal login, Resend domain, observability ve production reconciliation |
-| Android | Native proje hazir, Firebase/Capacitor baglantilari mevcut | Gercek cihaz, signed release, Play Console ve push/auth testleri |
+| Android | Build/sync zinciri dogrulandi, CI icin post-sync patch mimarisi eklendi | Gercek cihaz, signed CI release, Play Console ve push/auth testleri |
 | iOS | Native proje hazir, SPM/Firebase baglantilari mevcut | Gercek cihaz, Apple Sign In entitlement, TestFlight ve App Store ayarlari |
 
 ## Son Otomatik Dogrulama
 
-23 Mayis 2026 tarihinde lokal ortamda su kontroller tamamlandi:
+23-24 Mayis 2026 tarihinde lokal ortamda su kontroller tamamlandi:
 
 - `npm run check:release` gecti.
 - `node --check functions/index.js` gecti.
 - `npm run test:rules` gecti.
 - `npx cap sync android` gecti.
 - `npx cap sync ios` gecti.
+- `./gradlew assembleDebug` Android icin gecti.
+- `./gradlew assembleRelease` Android icin unsigned artifact olarak gecti.
 
 Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-tools` paketini indiremedi; ag izniyle tekrar calistirildi ve Firestore emulator testleri basarili tamamlandi.
 
@@ -27,6 +29,7 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 - Google ile web girisi staging preview uzerinde basarili test edildi.
 - Apple/iCloud girisi `auth/operation-not-allowed` hatasi veriyor. Bu, Firebase Authentication tarafinda Apple provider'in henuz etkin olmadigini veya Apple provider ayarlarinin tamamlanmadigini gosterir.
 - Apple staging callback URL: `https://bayfatura-staging.firebaseapp.com/__/auth/handler`. Kurulum rehberi: `docs/apple-sign-in-setup.md`.
+- iCloud/Apple girisi lansman oncesi Apple Developer ve Firebase Console ayarlari tamamlandiktan sonra aktif hale getirilecek.
 - Chrome console'daki `Cross-Origin-Opener-Policy policy would block the window.closed/window.close call` uyarilari popup tabanli OAuth akislarinda gorulebilir; hosting header'i `same-origin-allow-popups` olacak sekilde duzenlenmelidir.
 - Resend domain dogrulamasi henuz yapilmadi. Ucretsiz/test modunda Resend sadece sinirli alicilara mail gonderir; genel ekip daveti icin dogrulanmis domain ve bu domaine ait `from` adresi gerekir.
 
@@ -87,9 +90,11 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 ### Codex tarafindan yapilacaklar
 
 - [x] `npm run build` ve `npx cap sync android` akisini dogrula.
-- [ ] Android manifest, permissions, Firebase config ve release signing mimarisini gozden gecir.
-- [ ] Play Store internal testing icin release checklist hazirla.
-- [ ] Android smoke test matrisi hazirla: login, camera, PDF, push, invoice, team invite.
+- [x] Android manifest, permissions, Firebase config ve release signing mimarisini gozden gecir.
+- [x] Release build icin R8/ProGuard ve signing placeholder problemlerini duzelt.
+- [x] Native klasorlerin git'e alinmadigi mimariye uygun post-sync Android patch scripti ekle.
+- [x] Play Store internal testing icin release checklist hazirla: `docs/android-readiness.md`.
+- [x] Android smoke test matrisi hazirla: login, camera, PDF, push, invoice, team invite.
 - [ ] Native feature flag davranisini kontrol et.
 
 ### Omid tarafindan yapilacaklar
@@ -103,11 +108,13 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 
 ### Cikis kriterleri
 
+- [x] Debug build lokal olarak uretiliyor.
 - [ ] Debug build gercek cihazda aciliyor.
 - [ ] Email/password ve Google native login calisiyor.
 - [ ] Kamera izinleri dogru isliyor.
 - [ ] PDF/download/share akisi kullanilabilir.
-- [ ] Internal testing icin signed APK/AAB uretilebiliyor.
+- [x] Lokal unsigned release artifact uretiliyor.
+- [ ] Internal testing icin CI signed APK/AAB uretilebiliyor.
 
 ## Faz 4: iOS Beta Hazirligi
 
