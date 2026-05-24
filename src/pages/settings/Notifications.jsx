@@ -2,15 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { db } from '../../lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, writeBatch, arrayUnion } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Check, Trash2, Info, AlertTriangle, CheckCircle, Search } from 'lucide-react';
+import { isNativePlatform } from '../../lib/platform';
+import { registerPushNotifications } from '../../lib/nativePush';
 
 const Notifications = () => {
     const { currentUser } = useAuth();
     const { t, appLanguage } = useLanguage();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [pushStatus, setPushStatus] = useState('idle');
+    const canEnableNativePush = isNativePlatform();
 
     useEffect(() => {
         if (!currentUser) return;
@@ -52,6 +56,21 @@ const Notifications = () => {
         const ref = doc(db, 'users', currentUser.uid, 'notifications', id);
         batch.delete(ref);
         await batch.commit();
+    };
+
+    const enableNativePush = async () => {
+        if (!currentUser || pushStatus === 'loading') return;
+
+        setPushStatus('loading');
+        const token = await registerPushNotifications(currentUser.uid, async (value) => {
+            await updateDoc(doc(db, 'users', currentUser.uid), {
+                fcmTokens: arrayUnion(value),
+                'notificationSettings.pushEnabled': true,
+                'notificationSettings.pushLastRegisteredAt': new Date().toISOString(),
+            });
+        });
+
+        setPushStatus(token ? 'enabled' : 'blocked');
     };
 
     const getIcon = (type) => {
@@ -113,11 +132,27 @@ const Notifications = () => {
                     </h1>
                     <p style={{ color: '#64748b' }}>{t('notificationsDesc') || 'Sistem ve hesap uyarılarınızı buradan takip edin.'}</p>
                 </div>
-                {notifications.some(n => !n.read) && (
-                    <button className="secondary-btn" onClick={markAllAsRead}>
-                        <Check size={16} /> {t('markAllRead') || 'Tümünü Okundu İşaretle'}
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {canEnableNativePush && (
+                        <button
+                            className="secondary-btn"
+                            onClick={enableNativePush}
+                            disabled={pushStatus === 'loading' || pushStatus === 'enabled'}
+                        >
+                            <Bell size={16} />
+                            {pushStatus === 'enabled'
+                                ? (appLanguage === 'tr' ? 'Push aktif' : 'Push enabled')
+                                : pushStatus === 'loading'
+                                    ? (appLanguage === 'tr' ? 'Etkinlestiriliyor...' : 'Enabling...')
+                                    : (appLanguage === 'tr' ? 'Push etkinlestir' : 'Enable push')}
+                        </button>
+                    )}
+                    {notifications.some(n => !n.read) && (
+                        <button className="secondary-btn" onClick={markAllAsRead}>
+                            <Check size={16} /> {t('markAllRead') || 'Tümünü Okundu İşaretle'}
+                        </button>
+                    )}
+                </div>
             </header>
 
             {notifications.length === 0 ? (

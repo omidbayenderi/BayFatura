@@ -34,6 +34,7 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
   - Capacitor Firebase Auth plugini Facebook siniflarina referans verebiliyor.
   - BayFatura su anda Google ve Apple provider kullandigi icin bu siniflar release build'i bloklamamali.
 - Gider/fiş ekraninda Android native shell algilandiginda Capacitor Camera kullanilir; web ortaminda mevcut dosya secici fallback olarak kalir.
+- Bildirimler ekraninda Android native shell algilandiginda push notification opt-in aksiyonu gosterilir; kullanici onayi olmadan izin istemez.
 
 ## Codex Tarafinda Tamamlananlar
 
@@ -45,6 +46,7 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
 - Android smoke test matrisi ayrica dokumante edildi: `docs/android-smoke-test.md`.
 - Android native kamera entegrasyonu gider/fiş tarama akisi icin baglandi.
 - Android cihaz/emulator runbook'u eklendi: `docs/android-device-runbook.md`.
+- Native push notification token kaydi Bildirimler ekraninda kullanici kontrollu opt-in olarak baglandi.
 
 ## Omid Tarafindan Gerekli Dis Adimlar
 

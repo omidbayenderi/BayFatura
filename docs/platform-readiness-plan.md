@@ -97,7 +97,7 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 - [x] Android smoke test matrisi hazirla: `docs/android-smoke-test.md`.
 - [x] Android Studio/adb cihaz runbook'u hazirla: `docs/android-device-runbook.md`.
 - [x] Native kamera davranisini web fallback'i bozmadan Android shell'e bagla.
-- [ ] Native push notification davranisini kontrollu opt-in mimarisiyle bagla.
+- [x] Native push notification davranisini kontrollu opt-in mimarisiyle bagla.
 
 ### Omid tarafindan yapilacaklar
 

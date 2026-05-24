@@ -59,6 +59,7 @@ Bu liste Android beta oncesi her build icin ayni sirayla uygulanir. Amac, WebVie
 - Bildirim izni isteniyor.
 - Izin verilirse FCM token alinip kullanici kaydina yaziliyor.
 - Izin reddedilirse uygulama normal kullanima devam ediyor.
+- Bildirimler ekranindaki push etkinlestirme aksiyonu kullanici tiklamadan izin istemiyor.
 - Firebase App Distribution/Play internal build ile token kaydi tekrar kontrol ediliyor.
 
 ## 8. Offline ve Oturum Dayanikliligi
@@ -81,4 +82,3 @@ Bu liste Android beta oncesi her build icin ayni sirayla uygulanir. Amac, WebVie
 ## Kabul Kriteri
 
 Android beta build'i dagitilabilir saymak icin 1-4. bolumler gecmeli, 5-7. bolumlerdeki native ozellikler ise en az bir gercek cihazda dogrulanmalidir.
-
