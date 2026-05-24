@@ -2,7 +2,7 @@
 
 BayFatura, KOBİ'ler ve büyüyen ekipler için tasarlanmış; fatura, müşteri, ürün, ödeme, ekip yönetimi ve finansal içgörü akışlarını tek yerde toplayan React/Firebase tabanlı bir SaaS uygulamasıdır. Uygulama; Gemini destekli AI modülleri, Almanya/Portekiz odaklı e-fatura ve vergi uyumluluğu, native mobil hazırlığı ve staging odaklı CI/CD altyapısıyla geliştirilmektedir.
 
-## 🚀 Mevcut Durum (19 Mayıs 2026)
+## 🚀 Mevcut Durum (24 Mayıs 2026)
 
 BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kodu, Firebase güvenlik kuralları ve Cloud Functions dağıtımı için GitHub Actions tabanlı profesyonel bir önizleme hattı kurulmuştur. Production'a geçiş kontrollü, manuel ve ayrı bir onay süreciyle yapılmalıdır.
 
@@ -12,7 +12,12 @@ BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kod
 - ✅ **Firestore rules testleri:** Emulator destekli `npm run test:rules`
 - ✅ **Staging rules deploy:** Manuel GitHub Actions workflow ile doğrulanmış
 - ✅ **Staging functions deploy:** Manuel GitHub Actions workflow ile doğrulanmış
+- ✅ **Android native build:** `npm run build` → `npx cap sync android` → post-sync patch → `./gradlew assembleDebug` zinciri doğrulanmış
+- ✅ **Android native kamera:** Gider/fiş ekranında Capacitor Camera entegrasyonu aktif, web dosya seçici fallback korunur
+- ✅ **Android native push opt-in:** Bildirimler ekranından kullanıcı kontrollü FCM token kaydı bağlanmış
 - ✅ **Deploy edilen staging functions:** `stripeWebhook`, `proxyImage`, `scanReceipt`, `sendInvoiceEmail`, `sendInvitationEmail`, `syncUserPlan`, `syncAllAuthUsers`, `analyzeFinancials`, `analyzeBankStatement`, `acceptTeamInvitation`, `checkOverdueInvoices`, `processRecurringTemplates`
+- ⚠️ **Apple/iCloud Sign-In:** Kod ve dokümantasyon hazır; lansman öncesi Apple Developer + Firebase Console provider ayarı tamamlanmalıdır
+- ⚠️ **Resend:** Test modunda sadece doğrulanmış/test alıcılara mail gider; genel ekip daveti için Resend domain doğrulaması ve domain tabanlı `from` adresi gerekir
 - ⚠️ **Production:** Henüz ana kaynak olarak ele alınmamalı; `main` dalı bilinçli şekilde reconcile edilmeden production deploy yapılmamalı
 
 ## ✨ Öne Çıkan Özellikler
@@ -71,6 +76,9 @@ BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kod
 ### 📱 Native Mobile (iOS & Android)
 - **Native Authentication:** Firebase Auth ve `@capacitor-firebase/authentication` ile tarayıcısız native FaceID/TouchID ve Google Play girişleri.
 - **Platform Persistence:** WKWebView cookie blokajlarını aşan IndexedDB Local Persistence.
+- **Android Receipt Capture:** Android native shell içinde gider/fiş ekranı Capacitor Camera ile çalışır; web ortamında mevcut dosya seçici korunur.
+- **Android Push Opt-In:** Bildirimler sayfasında kullanıcı aksiyonuyla push izni istenir ve FCM token kullanıcı belgesine kaydedilir.
+- **Generated Native Strategy:** `android/` ve `ios/` klasörleri üretilebilir native çıktılar olarak ele alınır; kalıcı Android patchleri `scripts/patch-android-capacitor.mjs` ile sync sonrası uygulanır.
 
 
 ## 🛠️ Teknik Altyapı
@@ -119,6 +127,7 @@ Staging deploy işlemleri GitHub Actions üzerinden manuel ve kontrollü yürüt
 | `preview-deploy.yml` | PR/preview hosting doğrulaması |
 | `deploy-staging-rules.yml` | Firestore rules emulator doğrulama + Firestore/Storage rules staging deploy |
 | `deploy-staging-functions.yml` | App doğrulama + Functions syntax check + staging functions deploy |
+| `android-build.yml` | Capacitor Android platform hazırlığı, post-sync patch, signed AAB üretimi ve internal distribution |
 
 Gerekli staging secret'ları `STAGING_*` isim alanında tutulur. Firebase servis hesabı JSON dosyaları repoya commit edilmemelidir.
 
@@ -148,6 +157,9 @@ src/lib/
 - **Firebase Storage CORS:** `proxyImage` Cloud Function ile sunucu tarafında çözüldü.
 - **Staging kaynak dalı:** `preview-test-staging`, aktif geliştirme ve test dalıdır.
 - **Firebase CLI kullanımı:** CI ve lokal komutlarda `npx -y firebase-tools@latest` tercih edilir.
+- **Android native klasör stratejisi:** `android/` klasörü repoda takip edilmez; temiz ortamda `npx cap add android`, `npx cap sync android` ve `node scripts/patch-android-capacitor.mjs` sırası kullanılmalıdır.
+- **Android cihaz testi:** Runbook `docs/android-device-runbook.md`, smoke test matrisi `docs/android-smoke-test.md`.
+- **Apple Sign-In:** Callback URL `https://bayfatura-staging.firebaseapp.com/__/auth/handler`; detaylar `docs/apple-sign-in-setup.md`.
 - **Alan İsimleri:** Şirket profili için `companyPhone` / `companyEmail` kullanılır.
 - **AT Sertifikasyonu:** ATCUD üretimi referans amaçlıdır. Portekiz'de yasal fatura için AT sertifikasyonu ve TOC (Técnico Oficial de Contas) danışmanlığı gereklidir.
 - **eSPap B2G:** Ocak 2026'dan itibaren tüm KOBİ'ler için kamu kurumlarına e-fatura zorunluluğu.
@@ -247,5 +259,27 @@ src/lib/
 - `main` dalı reconciliation sürecini küçük ve denetlenebilir PR'larla yürütmek.
 
 ---
+## 📱 34. Android Native Readiness (Completed — 24 Mayıs 2026)
+
+### 🤖 34.1 Generated Android Workflow
+- **Post-sync patch script:** `scripts/patch-android-capacitor.mjs` eklendi; release signing guard ve R8/ProGuard kuralları sync sonrası idempotent uygulanır.
+- **CI compatibility:** `android-build.yml`, temiz checkout ortamında Android platformu yoksa `npx cap add android` çalıştırır, ardından sync ve patch adımlarını uygular.
+- **Build doğrulaması:** `npm run build`, `npx cap sync android`, `node scripts/patch-android-capacitor.mjs`, `./gradlew assembleDebug` ve lokal unsigned `assembleRelease` akışları doğrulandı.
+
+### 📷 34.2 Native Receipt Capture
+- **Capacitor Camera:** Android native shell algılandığında gider/fiş ekranında gerçek native kamera kullanılır.
+- **Web fallback:** Web ortamındaki `<input type="file">` davranışı korunur.
+- **AI scan flow:** Native kamera ile alınan fiş görseli mevcut Gemini `scanReceipt` akışına aktarılır.
+
+### 🔔 34.3 Native Push Opt-In
+- **Kullanıcı kontrollü izin:** Push izni otomatik istenmez; Bildirimler ekranındaki aksiyonla başlatılır.
+- **FCM token kaydı:** Token `users/{uid}` belgesinde `fcmTokens` alanına eklenir, `notificationSettings.pushEnabled` işaretlenir.
+- **Runbook:** Cihaz/emulator test adımları `docs/android-device-runbook.md`, smoke test matrisi `docs/android-smoke-test.md`.
+
+### 📌 34.4 Kalan Mobil Eşik
+- Gerçek Android cihaz veya emulator üzerinde email/password, Google login, kamera, AI scan, PDF paylaşımı ve push opt-in manuel test edilmelidir.
+- CI signed AAB için GitHub secrets tarafında Android keystore ve `ANDROID_GOOGLE_SERVICES_JSON` değerleri doğrulanmalıdır.
+
+---
 © 2026 BayFatura Cloud — Innovation in Finance.
-*Last Updated: 19 Mayıs 2026 (Staging CI/CD Stabilization)*
+*Last Updated: 24 Mayıs 2026 (Android Native Readiness)*

@@ -2,22 +2,30 @@
 
 Bu dosya, **BayFatura** projesinin yapay zeka tarafından yönetilen gelişim sürecini, tamamlanan modülleri ve "Gerçek Dünya" üretim aşamasına geçiş için gereken tüm optimizasyonları belgeler.
 
-## 🚀 MEVCUT STRATEJİK DURUM (19 Mayıs 2026)
+## 🚀 MEVCUT STRATEJİK DURUM (24 Mayıs 2026)
 
-BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygulamasıdır; güncel odak artık **kontrollü staging doğrulaması, CI/CD sertleştirme ve production'a güvenli geçiş planı** üzerindedir.
+BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygulamasıdır; güncel odak artık **kontrollü staging doğrulaması, Android native beta hazırlığı, iOS/Apple dış panel ayarları ve production'a güvenli geçiş planı** üzerindedir.
 
 ### ✅ Staging Hazır Bileşenler
 - `preview-test-staging` aktif geliştirme ve staging doğrulama dalıdır.
 - GitHub Actions üzerinde app validation, Firestore/Storage rules deploy ve Cloud Functions deploy hatları çalışır durumdadır.
 - Firebase staging projesinde Cloud Functions deploy başarıyla tamamlanmıştır.
 - Firestore rules için emulator destekli test hattı kurulmuştur.
+- Android native build zinciri doğrulanmıştır: web build, Capacitor sync, Android post-sync patch, Gradle debug build.
+- Android native kamera ve push opt-in entegrasyonları kod tarafında bağlanmıştır.
+
+### ⚠️ Lansman Öncesi Dış Bağımlılıklar
+- Apple/iCloud Sign-In için Apple Developer ve Firebase Console provider ayarı tamamlanmalıdır.
+- Resend genel ekip daveti için domain doğrulaması ve domain tabanlı `from` adresi gerektirir.
+- Android gerçek cihaz/emulator smoke testleri tamamlanmadan native beta dağıtımı yapılmamalıdır.
+- CI signed AAB için Android keystore ve `ANDROID_GOOGLE_SERVICES_JSON` GitHub secrets değerleri doğrulanmalıdır.
 
 ### ⚠️ Production Guardrail
 - `main` dalı production kaynağı olarak kullanılmadan önce bilinçli şekilde reconcile edilmelidir.
 - Production deploy manuel ve ayrı onaylı tutulmalıdır.
 - Staging IAM/secrets modeli production'a birebir kopyalanmamalı; ayrı servis hesabı ve ayrı yetki setiyle kurulmalıdır.
 
-## 🚀 LANSMAN HAZIRLIĞI (Mayıs 2026) - STAGING STABILIZATION ✅
+## 🚀 LANSMAN HAZIRLIĞI (Mayıs 2026) - STAGING + ANDROID NATIVE READINESS ✅
 
 ### 🏛️ 25. EU Compliance Full Stack (Completed)
 - **Portekiz (AT):** ATCUD, QR-PT (Portaria 195/2020), NIF doğrulama ve eSPap (UBL 2.1) XML üretimi tam aktif.
@@ -341,5 +349,37 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - **Production reconciliation:** `main` dalı ve production deploy hattı küçük, denetlenebilir PR'larla güncel staging mimarisine yaklaştırılmalı.
 
 ---
-*Son Güncelleme: 19 Mayıs 2026 (Staging CI/CD Stabilization)*
+## 📱 34. Android Native Readiness & Device Test Prep (Completed — 24 Mayıs 2026)
+
+### 🧱 34.1 Generated Native Architecture
+- **Native klasör stratejisi:** `android/` ve `ios/` klasörleri repo içinde kalıcı kaynak olarak tutulmuyor; Capacitor ile yeniden üretilebilir native çıktılar olarak ele alınıyor.
+- **Android post-sync patch:** `scripts/patch-android-capacitor.mjs`, `android/app/build.gradle` ve `android/app/proguard-rules.pro` üzerinde BayFatura'ya özel release signing ve R8 kurallarını idempotent uygular.
+- **CI uyumu:** `android-build.yml`, temiz checkout ortamında Android platformu yoksa `npx cap add android` çalıştırır, sonra `npx cap sync android` ve patch adımını uygular.
+
+### 📷 34.2 Native Camera Receipt Capture
+- **Gider/fiş ekranı:** Android native shell algılandığında `@capacitor/camera` ile gerçek cihaz kamerası kullanılır.
+- **Web fallback:** Web uygulamadaki dosya seçici davranışı korunur; mevcut web kullanıcı akışı bozulmaz.
+- **AI tarama:** Native kameradan gelen görsel mevcut Gemini/Functions `scanReceipt` akışına bağlanır.
+
+### 🔔 34.3 Native Push Opt-In
+- **İzin mimarisi:** Push notification izni otomatik istenmez; Bildirimler ekranında kullanıcı aksiyonuyla başlatılır.
+- **Token kaydı:** FCM token `users/{uid}.fcmTokens` listesine eklenir ve `notificationSettings.pushEnabled` işaretlenir.
+- **Test disiplini:** Push opt-in cihaz testinde doğrulanmalı; izin reddi uygulamayı kilitlememelidir.
+
+### 🧪 34.4 Verification
+- `npm run build` başarılı.
+- `npm test -- --run src/__tests__/platform.test.js src/__tests__/authErrors.test.js` başarılı.
+- `npm test -- --run src/__tests__/platform.test.js src/__tests__/featureFlags.test.js` başarılı.
+- `npx cap sync android` başarılı.
+- `node scripts/patch-android-capacitor.mjs` idempotent çalışıyor.
+- `./gradlew assembleDebug` başarılı.
+- Lokal `./gradlew assembleRelease` unsigned artifact olarak başarılı; CI signed AAB için gerçek keystore secrets gerekir.
+
+### 📌 34.5 Next Required Manual Step
+- Android Studio ile `BayFatura/android` açılmalı.
+- Emulator veya gerçek Android cihazda `docs/android-smoke-test.md` uygulanmalı.
+- `docs/android-device-runbook.md` cihaz kurulumu ve APK çalıştırma için ana rehberdir.
+
+---
+*Son Güncelleme: 24 Mayıs 2026 (Android Native Readiness)*
 *Codex AI Agent*
