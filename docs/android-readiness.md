@@ -11,6 +11,7 @@ Bu dokuman BayFatura Android surumunun beta ve release oncesi durumunu takip ede
 - Kalici Android ozel ayarlari `scripts/patch-android-capacitor.mjs` ile `npx cap sync android` sonrasinda uygulanir.
 - CI workflow'u temiz checkout ortaminda `android/` yoksa `npx cap add android` calistirir, sonra sync ve patch adimlarini uygular.
 - Cihaz test akisi `docs/android-smoke-test.md` uzerinden takip edilir.
+- Android Studio/adb ile cihazda calistirma adimlari `docs/android-device-runbook.md` uzerinden takip edilir.
 
 ## Son Lokal Dogrulama
 
@@ -43,6 +44,7 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
 - GitHub Actions Android workflow'u native klasor stratejisine uyumlu hale getirildi.
 - Android smoke test matrisi ayrica dokumante edildi: `docs/android-smoke-test.md`.
 - Android native kamera entegrasyonu gider/fiş tarama akisi icin baglandi.
+- Android cihaz/emulator runbook'u eklendi: `docs/android-device-runbook.md`.
 
 ## Omid Tarafindan Gerekli Dis Adimlar
 

@@ -95,6 +95,7 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 - [x] Native klasorlerin git'e alinmadigi mimariye uygun post-sync Android patch scripti ekle.
 - [x] Play Store internal testing icin release checklist hazirla: `docs/android-readiness.md`.
 - [x] Android smoke test matrisi hazirla: `docs/android-smoke-test.md`.
+- [x] Android Studio/adb cihaz runbook'u hazirla: `docs/android-device-runbook.md`.
 - [x] Native kamera davranisini web fallback'i bozmadan Android shell'e bagla.
 - [ ] Native push notification davranisini kontrollu opt-in mimarisiyle bagla.
 
