@@ -10,7 +10,7 @@ function debugNativeAuth(...args) {
     }
 }
 
-async function getPlugin() {
+async function ensurePluginLoaded() {
     if (!FirebaseAuthentication) {
         try {
             debugNativeAuth('[NativeAuth] isNativePlatform:', isNativePlatform());
@@ -30,7 +30,14 @@ async function getPlugin() {
             throw err;
         }
     }
-    return FirebaseAuthentication;
+}
+
+async function getPlugin() {
+    await ensurePluginLoaded();
+    // Capacitor plugin proxies can expose native methods for arbitrary property names.
+    // Returning the proxy directly from an async function makes Promise resolution probe
+    // `then`, which calls a non-existent native FirebaseAuthentication.then() method.
+    return { plugin: FirebaseAuthentication };
 }
 
 export function isNativeAuthAvailable() {
@@ -67,9 +74,9 @@ function categorizeError(err) {
 }
 
 export async function nativeSignInWithGoogle() {
-    const plugin = await getPlugin();
+    const { plugin } = await getPlugin();
     try {
-        const result = await plugin.signInWithGoogle();
+        const result = await plugin.signInWithGoogle({ skipNativeAuth: true });
         return result;
     } catch (err) {
         const categorized = categorizeError(err);
@@ -79,9 +86,9 @@ export async function nativeSignInWithGoogle() {
 }
 
 export async function nativeSignInWithApple() {
-    const plugin = await getPlugin();
+    const { plugin } = await getPlugin();
     try {
-        const result = await plugin.signInWithApple();
+        const result = await plugin.signInWithApple({ skipNativeAuth: true });
         return result;
     } catch (err) {
         const categorized = categorizeError(err);
@@ -91,7 +98,7 @@ export async function nativeSignInWithApple() {
 }
 
 export async function nativeSignOut() {
-    const plugin = await getPlugin();
+    const { plugin } = await getPlugin();
     try {
         await plugin.signOut();
     } catch (err) {
@@ -101,7 +108,7 @@ export async function nativeSignOut() {
 }
 
 export async function getNativeIdToken(forceRefresh = false) {
-    const plugin = await getPlugin();
+    const { plugin } = await getPlugin();
     try {
         const result = await plugin.getIdToken({ forceRefresh });
         return result.token;

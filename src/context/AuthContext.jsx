@@ -205,17 +205,19 @@ export const AuthProvider = ({ children }) => {
                     if (nativeErr?.type === NativeAuthError.USER_CANCELLED) {
                         return { success: false, error: 'Sign in was cancelled.' };
                     }
-                    if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
-                        console.warn('[Auth] Native Google plugin unavailable, using redirect flow');
-                    }
                     if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
-                        console.warn('[Auth] Native Google not configured, falling back to redirect:', nativeErr.message);
+                        console.warn('[Auth] Native Google not configured:', nativeErr.message);
+                        return { success: false, error: 'Google sign-in is not configured for this Android build yet. Please check Firebase SHA-1/SHA-256 and google-services.json.' };
+                    }
+                    if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
+                        console.warn('[Auth] Native Google plugin unavailable:', nativeErr.message);
+                        return { success: false, error: 'Google sign-in is not available in this Android build yet.' };
                     } else {
-                        console.warn('[Auth] Native Google login failed, falling back to redirect:', nativeErr);
+                        console.warn('[Auth] Native Google login failed:', nativeErr);
+                        return { success: false, error: nativeErr?.message || 'Google sign-in failed on Android.' };
                     }
                 }
-                await signInWithRedirect(auth, googleProvider);
-                return { success: true, redirecting: true };
+                return { success: false, error: 'Google sign-in did not return a valid credential.' };
             }
 
             return await signInWithWebProvider(googleProvider, 'Google');
@@ -253,17 +255,19 @@ export const AuthProvider = ({ children }) => {
                     if (nativeErr?.type === NativeAuthError.USER_CANCELLED) {
                         return { success: false, error: 'Sign in was cancelled.' };
                     }
-                    if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
-                        console.warn('[Auth] Native Apple plugin unavailable, using redirect flow');
-                    }
                     if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
-                        console.warn('[Auth] Native Apple not configured, falling back to redirect:', nativeErr.message);
+                        console.warn('[Auth] Native Apple not configured:', nativeErr.message);
+                        return { success: false, error: 'Apple sign-in is not enabled yet. Please use Google or email/password for now.' };
+                    }
+                    if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
+                        console.warn('[Auth] Native Apple plugin unavailable:', nativeErr.message);
+                        return { success: false, error: 'Apple sign-in is not available in this build yet.' };
                     } else {
-                        console.warn('[Auth] Native Apple login failed, falling back to redirect:', nativeErr);
+                        console.warn('[Auth] Native Apple login failed:', nativeErr);
+                        return { success: false, error: nativeErr?.message || 'Apple sign-in failed on this device.' };
                     }
                 }
-                await signInWithRedirect(auth, appleProvider);
-                return { success: true, redirecting: true };
+                return { success: false, error: 'Apple sign-in did not return a valid credential.' };
             }
 
             return await signInWithWebProvider(appleProvider, 'Apple');

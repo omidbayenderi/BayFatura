@@ -110,6 +110,9 @@ const Auth = () => {
             } else if (res?.error) {
                 setError(res.error);
                 setIsLoading(false);
+            } else {
+                setError(t('loginError') || 'Sign in failed. Please try again.');
+                setIsLoading(false);
             }
         } catch (err) {
             setError(err.message);
