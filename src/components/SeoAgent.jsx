@@ -136,13 +136,13 @@ const SeoAgent = ({ websiteData, profile }) => {
                     "itemListElement": websiteData.sections
                         .filter(s => s.type === 'features')
                         .flatMap(s => s.data.items || [])
-                            return {
+                        .map(item => ({
                             "@type": "Offer",
                             "itemOffered": {
                                 "@type": "Service",
                                 "name": item.title,
                                 "description": item.desc
-                            };
+                            }
                         }))
                 }
             })
@@ -162,7 +162,13 @@ const SeoAgent = ({ websiteData, profile }) => {
 
         // 4. ANALYTICS INJECTION (Google Analytics)
         // ------------------------------------------------
-        const analyticsId = websiteData.config?.analyticsId || profile?.analyticsId;
+        const rawAnalyticsId = websiteData.config?.analyticsId || profile?.analyticsId;
+
+        // Sanitize: only allow valid GA4 (G-XXXXXXXXXX) or UA (UA-XXXXXXX-X) format
+        const GA_ID_PATTERN = /^(G-[A-Z0-9]{4,15}|UA-\d{4,10}-\d{1,4})$/;
+        const analyticsId = (typeof rawAnalyticsId === 'string' && GA_ID_PATTERN.test(rawAnalyticsId))
+            ? rawAnalyticsId
+            : null;
 
         // Clean up previous script if ID changes or is removed
         const existingScript = document.getElementById('ga-script');
@@ -172,18 +178,18 @@ const SeoAgent = ({ websiteData, profile }) => {
             const script = document.createElement('script');
             script.id = 'ga-script';
             script.async = true;
-            script.src = `https://www.googletagmanager.com/gtag/js?id=${analyticsId}`;
+            script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(analyticsId)}`;
             document.head.appendChild(script);
 
-            // Inject config
+            // Inject config — use JSON.stringify to safely embed the value
             const configScript = document.createElement('script');
             configScript.id = 'ga-config';
-            configScript.innerHTML = `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${analyticsId}');
-             `;
+            configScript.textContent = [
+                'window.dataLayer = window.dataLayer || [];',
+                'function gtag(){dataLayer.push(arguments);}',
+                "gtag('js', new Date());",
+                `gtag('config', ${JSON.stringify(analyticsId)});`,
+            ].join('\n');
             document.head.appendChild(configScript);
             console.log(`📊 SEO Agent: Google Analytics (${analyticsId}) injected.`);
         }

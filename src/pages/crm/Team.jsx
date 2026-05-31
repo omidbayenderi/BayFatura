@@ -32,7 +32,9 @@ import {
     Search,
     ChevronRight,
     Filter,
-    Lock
+    Lock,
+    Copy,
+    Link as LinkIcon
 } from 'lucide-react';
 
 const TeamSkeleton = () => (
@@ -76,8 +78,41 @@ const Team = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isInviting, setIsInviting] = useState(false);
     const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'member' });
+    const [manualInvite, setManualInvite] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [teamMembers, setTeamMembers] = useState([]);
+
+    const buildInviteLink = (invitationId, email) => {
+        if (!currentUser || !invitationId) return '';
+        const baseUrl = window.location.origin;
+        const params = new URLSearchParams({
+            token: invitationId,
+            tenant: currentUser.uid,
+            email: email || ''
+        });
+        return `${baseUrl}/accept-invite?${params.toString()}`;
+    };
+
+    const copyInviteLink = async (link) => {
+        if (!link) return false;
+        try {
+            await navigator.clipboard.writeText(link);
+            showToast(t('inviteLinkCopied'), 'success');
+            return true;
+        } catch (error) {
+            const textarea = document.createElement('textarea');
+            textarea.value = link;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast(copied ? t('inviteLinkCopied') : t('inviteLinkCopyFailed'), copied ? 'success' : 'error');
+            return copied;
+        }
+    };
 
     useEffect(() => {
         if (!currentUser) return;
@@ -125,6 +160,7 @@ const Team = () => {
         const teamRef = collection(db, 'users', currentUser.uid, 'team');
         const inviteeEmail = inviteData.email.trim();
         const inviteeName = inviteData.name.trim() || inviteeEmail.split('@')[0];
+        setManualInvite(null);
 
         try {
             const docRef = await addDoc(teamRef, {
@@ -152,9 +188,16 @@ const Team = () => {
                 await updateDoc(docRef, {
                     status: 'email_failed',
                     emailError: emailError?.message || 'Email send failed',
-                    emailFailedAt: new Date().toISOString()
+                    emailFailedAt: new Date().toISOString(),
+                    manualInviteLinkAvailable: true
                 });
-                showToast(emailError?.message || t('inviteFailed'), 'error');
+                const link = buildInviteLink(docRef.id, inviteeEmail);
+                setManualInvite({
+                    link,
+                    email: inviteeEmail,
+                    message: emailError?.message || t('inviteFailed')
+                });
+                showToast(t('inviteEmailFailedCopyLink'), 'info');
                 return;
             }
 
@@ -229,6 +272,7 @@ const Team = () => {
                             showToast(t('unlockFeatureMsg'), "info");
                             return;
                         }
+                        setManualInvite(null);
                         setShowInviteModal(true);
                     }}
                 >
@@ -304,6 +348,15 @@ const Team = () => {
                                         {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : '-'}
                                     </td>
                                     <td className="td-right">
+                                        {(member.status === 'pending' || member.status === 'email_failed') && (
+                                            <button
+                                                className="icon-btn"
+                                                title={t('copyInviteLink')}
+                                                onClick={() => copyInviteLink(buildInviteLink(member.id, member.email))}
+                                            >
+                                                <Copy size={18} />
+                                            </button>
+                                        )}
                                         {member.role !== 'owner' && (
                                             <button
                                                 className="icon-btn delete delete-btn-red"
@@ -420,6 +473,34 @@ const Team = () => {
                                         </>
                                     )}
                                 </button>
+
+                                {manualInvite && (
+                                    <div className="manual-invite-panel">
+                                        <div className="manual-invite-header">
+                                            <LinkIcon size={18} />
+                                            <div>
+                                                <strong>{t('manualInviteTitle')}</strong>
+                                                <p>{t('manualInviteDesc')}</p>
+                                            </div>
+                                        </div>
+                                        <div className="manual-invite-link-row">
+                                            <input
+                                                className="form-input manual-invite-input"
+                                                value={manualInvite.link}
+                                                readOnly
+                                                onFocus={(e) => e.target.select()}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="secondary-btn manual-invite-copy-btn"
+                                                onClick={() => copyInviteLink(manualInvite.link)}
+                                            >
+                                                <Copy size={16} />
+                                                {t('copyInviteLink')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </form>
                         </motion.div>
                     </div>

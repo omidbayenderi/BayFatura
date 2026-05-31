@@ -53,6 +53,7 @@ jobs:
             printf 'STRIPE_SECRET_KEY=%s\n' "$STAGING_STRIPE_SECRET_KEY"
             printf 'STRIPE_WEBHOOK_SECRET=%s\n' "$STAGING_STRIPE_WEBHOOK_SECRET"
             printf 'APP_URL=%s\n' "$STAGING_APP_URL"
+            printf 'GOOGLE_GENAI_API_KEY=%s\n' "$STAGING_GOOGLE_GENAI_API_KEY"
           } > functions/.env
         env:
           STAGING_RESEND_API_KEY: ${{ secrets.STAGING_RESEND_API_KEY }}
@@ -60,6 +61,7 @@ jobs:
           STAGING_STRIPE_SECRET_KEY: ${{ secrets.STAGING_STRIPE_SECRET_KEY }}
           STAGING_STRIPE_WEBHOOK_SECRET: ${{ secrets.STAGING_STRIPE_WEBHOOK_SECRET }}
           STAGING_APP_URL: ${{ secrets.STAGING_APP_URL }}
+          STAGING_GOOGLE_GENAI_API_KEY: ${{ secrets.STAGING_GOOGLE_GENAI_API_KEY }}
 
       - name: Deploy functions to staging
         run: npx -y firebase-tools@latest deploy --only functions --project "$STAGING_FIREBASE_PROJECT_ID"

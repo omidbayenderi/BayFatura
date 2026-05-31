@@ -2,9 +2,9 @@
 
 BayFatura, KOBİ'ler ve büyüyen ekipler için tasarlanmış; fatura, müşteri, ürün, ödeme, ekip yönetimi ve finansal içgörü akışlarını tek yerde toplayan React/Firebase tabanlı bir SaaS uygulamasıdır. Uygulama; Gemini destekli AI modülleri, Almanya/Portekiz odaklı e-fatura ve vergi uyumluluğu, native mobil hazırlığı ve staging odaklı CI/CD altyapısıyla geliştirilmektedir.
 
-## 🚀 Mevcut Durum (24 Mayıs 2026)
+## 🚀 Mevcut Durum (26 Mayıs 2026)
 
-BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kodu, Firebase güvenlik kuralları ve Cloud Functions dağıtımı için GitHub Actions tabanlı profesyonel bir önizleme hattı kurulmuştur. Production'a geçiş kontrollü, manuel ve ayrı bir onay süreciyle yapılmalıdır.
+BayFatura aktif olarak **Web staging smoke test tamamlandıktan sonra Android gerçek cihaz beta hazırlığı** aşamasındadır. Web App kritik kullanıcı akışları staging üzerinde Safari/Chrome manuel smoke testinden geçmiştir; Android debug build emülatörde çalışır, Google native giriş doğrulanmıştır ve mobil shell UX'i native uygulama hissine yaklaştırılmıştır. Production'a geçiş hâlâ kontrollü, manuel ve ayrı bir onay süreciyle yapılmalıdır.
 
 ### 🎯 Operasyonel Durum
 - ✅ **Aktif geliştirme dalı:** `preview-test-staging`
@@ -12,12 +12,22 @@ BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kod
 - ✅ **Firestore rules testleri:** Emulator destekli `npm run test:rules`
 - ✅ **Staging rules deploy:** Manuel GitHub Actions workflow ile doğrulanmış
 - ✅ **Staging functions deploy:** Manuel GitHub Actions workflow ile doğrulanmış
+- ✅ **Web final smoke test:** Safari'de Google giriş, email/password akışı, onboarding, müşteri/ürün/fatura CRUD, PDF indirme ve Team invite manuel fallback doğrulandı
+- ✅ **Staging Hosting deploy:** Güncel web build `https://bayfatura-staging.web.app` üzerinde yayında
+- ✅ **Email/password reset UX:** Email/password hesabı olan kullanıcılar için Firebase reset akışı aktif; sadece Google/Microsoft ile kayıtlı hesaplarda kullanıcı doğru sosyal giriş yöntemine yönlendirilir
+- ✅ **Microsoft Sign-In:** Web login ekranında iCloud yerine Microsoft provider akışı kullanılacak şekilde bağlandı
+- ✅ **Team invite fallback:** Resend test/domain kısıtı nedeniyle e-posta gitmezse Firestore daveti korunur ve manuel davet linki kopyalanabilir
 - ✅ **Android native build:** `npm run build` → `npx cap sync android` → post-sync patch → `./gradlew assembleDebug` zinciri doğrulanmış
+- ✅ **Android native Google login:** `com.bayfatura.app.debug` için SHA-1/OAuth client içeren lokal `google-services.json` ile emülatörde doğrulanmış
 - ✅ **Android native kamera:** Gider/fiş ekranında Capacitor Camera entegrasyonu aktif, web dosya seçici fallback korunur
 - ✅ **Android native push opt-in:** Bildirimler ekranından kullanıcı kontrollü FCM token kaydı bağlanmış
+- ✅ **Android mobile shell UX:** Alt navigasyon ve açılır menü yuvarlatılmış, güvenli alanlara uyumlu ve native app hissine uygun hale getirilmiş
+- ✅ **Firestore WebView uyumu:** Realtime listen bağlantıları için `experimentalAutoDetectLongPolling` aktif edilerek Android/iOS WebView ve Safari varyantlarına karşı daha dayanıklı yapı kurulmuş
 - ✅ **Deploy edilen staging functions:** `stripeWebhook`, `proxyImage`, `scanReceipt`, `sendInvoiceEmail`, `sendInvitationEmail`, `syncUserPlan`, `syncAllAuthUsers`, `analyzeFinancials`, `analyzeBankStatement`, `acceptTeamInvitation`, `checkOverdueInvoices`, `processRecurringTemplates`
-- ⚠️ **Apple/iCloud Sign-In:** Kod ve dokümantasyon hazır; lansman öncesi Apple Developer + Firebase Console provider ayarı tamamlanmalıdır
-- ⚠️ **Resend:** Test modunda sadece doğrulanmış/test alıcılara mail gider; genel ekip daveti için Resend domain doğrulaması ve domain tabanlı `from` adresi gerekir
+- ⚠️ **Microsoft Sign-In config:** Azure/Entra App Registration ve Firebase Microsoft provider ayarları tamamlandıktan sonra staging üzerinde canlı test edilmelidir
+- ⚠️ **Resend:** Test modunda sadece doğrulanmış/test alıcılara mail gider; genel ekip daveti için Resend domain doğrulaması ve domain tabanlı `from` adresi gerekir. Domain doğrulanana kadar manuel davet linki fallback'i kullanılabilir
+- ⚠️ **Android release:** Debug emülatör testi başarılı; Play Console internal testing için signed AAB/keystore ve gerçek cihaz smoke testleri tamamlanmalıdır
+- ⚠️ **iOS beta:** Capacitor/iOS hazırlığı mevcut; Apple Developer, signing, Apple Sign-In capability, APNs ve gerçek cihaz/TestFlight testleri bekliyor
 - ⚠️ **Production:** Henüz ana kaynak olarak ele alınmamalı; `main` dalı bilinçli şekilde reconcile edilmeden production deploy yapılmamalı
 
 ## ✨ Öne Çıkan Özellikler
@@ -67,7 +77,8 @@ BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kod
 ### 💳 Ödeme & SaaS
 - **Müşteri Self-Servis Portalı:** Public fatura izleme + Stripe ve PayPal entegrasyonu.
 - **Subscription Pricing:** Free (0€), Elite Monthly (9€/Ay), Elite Yearly (77€/Yıl). Lifetime paket yeni satıştan kaldırıldı; mevcut lifetime/test hakları korunur.
-- **One-Click Social Login:** Google ve Apple (iCloud) için tek tıkla giriş.
+- **One-Click Social Login:** Google ve Microsoft için tek tıkla giriş.
+- **Password Recovery UX:** Email/password hesapları için Firebase şifre sıfırlama maili; Google/Microsoft-only hesaplarda sıfırlanacak şifre olmadığı net mesajla belirtilir.
 
 ### 🌍 Lokalizasyon
 - **6 Dil:** DE, TR, EN, FR, ES, PT — tüm fatura ve arayüz metinleri.
@@ -76,8 +87,10 @@ BayFatura aktif olarak **staging stabilizasyonu** aşamasındadır. Uygulama kod
 ### 📱 Native Mobile (iOS & Android)
 - **Native Authentication:** Firebase Auth ve `@capacitor-firebase/authentication` ile tarayıcısız native FaceID/TouchID ve Google Play girişleri.
 - **Platform Persistence:** WKWebView cookie blokajlarını aşan IndexedDB Local Persistence.
+- **Android Google Sign-In:** Debug package (`com.bayfatura.app.debug`) için Firebase OAuth/SHA-1 konfigürasyonu doğrulandı; Credential Manager kaynaklı "No credentials available" davranışı klasik Google flow ile stabilize edildi.
 - **Android Receipt Capture:** Android native shell içinde gider/fiş ekranı Capacitor Camera ile çalışır; web ortamında mevcut dosya seçici korunur.
 - **Android Push Opt-In:** Bildirimler sayfasında kullanıcı aksiyonuyla push izni istenir ve FCM token kullanıcı belgesine kaydedilir.
+- **Mobile Shell Polish:** Alt navigasyon ve mobil drawer, güvenli alanlara uyumlu yuvarlatılmış app bar/drawer düzenine taşındı.
 - **Generated Native Strategy:** `android/` ve `ios/` klasörleri üretilebilir native çıktılar olarak ele alınır; kalıcı Android patchleri `scripts/patch-android-capacitor.mjs` ile sync sonrası uygulanır.
 
 
@@ -159,7 +172,12 @@ src/lib/
 - **Firebase CLI kullanımı:** CI ve lokal komutlarda `npx -y firebase-tools@latest` tercih edilir.
 - **Android native klasör stratejisi:** `android/` klasörü repoda takip edilmez; temiz ortamda `npx cap add android`, `npx cap sync android` ve `node scripts/patch-android-capacitor.mjs` sırası kullanılmalıdır.
 - **Android cihaz testi:** Runbook `docs/android-device-runbook.md`, smoke test matrisi `docs/android-smoke-test.md`.
-- **Apple Sign-In:** Callback URL `https://bayfatura-staging.firebaseapp.com/__/auth/handler`; detaylar `docs/apple-sign-in-setup.md`.
+- **Android Firebase config:** Lokal `android/app/google-services.json` repoya commit edilmez; debug ve release package client'larını içeren dosya Firebase Console'dan indirilir.
+- **Firestore WebView transport:** `initializeFirestore` içinde `experimentalAutoDetectLongPolling: true` aktiftir; WebView/Safari realtime listen kanalında görülen access-control retry gürültüsünü azaltmak içindir.
+- **Microsoft Sign-In:** Azure/Entra redirect URI staging için `https://bayfatura-staging.firebaseapp.com/__/auth/handler`; production için production Firebase auth handler kullanılmalıdır.
+- **Resend domain:** Genel ekip daveti ve fatura e-postaları için doğrulanmış domain gerekir; detaylar `docs/resend-domain-setup.md`.
+- **Team invite manual fallback:** Resend e-postası test/domain kısıtı nedeniyle başarısız olursa `/accept-invite` linki uygulama origin'i üzerinden oluşturulur. Staging'de `bayfatura-staging.web.app`, production'da `bayfatura.com` üretir.
+- **Functions dependency hardening:** Audit riskleri `docs/functions-dependency-hardening.md` altında takip edilir; `npm audit fix --force` kullanılmamalıdır.
 - **Alan İsimleri:** Şirket profili için `companyPhone` / `companyEmail` kullanılır.
 - **AT Sertifikasyonu:** ATCUD üretimi referans amaçlıdır. Portekiz'de yasal fatura için AT sertifikasyonu ve TOC (Técnico Oficial de Contas) danışmanlığı gereklidir.
 - **eSPap B2G:** Ocak 2026'dan itibaren tüm KOBİ'ler için kamu kurumlarına e-fatura zorunluluğu.
@@ -281,5 +299,28 @@ src/lib/
 - CI signed AAB için GitHub secrets tarafında Android keystore ve `ANDROID_GOOGLE_SERVICES_JSON` değerleri doğrulanmalıdır.
 
 ---
+## ✅ 35. Web Final Smoke Test (Completed — 26 Mayıs 2026)
+
+### 🌐 35.1 Staging Web Validation
+- **Test URL:** `https://bayfatura-staging.web.app/login`
+- **Google Login:** Safari ve Chrome tarafında giriş başarılı.
+- **Email/Password:** Login formu aktif; şifre sıfırlama butonu eklendi.
+- **Password Reset Logic:** Email/password hesabı varsa Firebase reset maili gönderilir; sadece Google/Microsoft sağlayıcısı olan hesapta kullanıcıya sosyal girişle devam etmesi gerektiği gösterilir.
+- **Onboarding:** Kurulum sihirbazı tamamlanabiliyor; şirket telefon/adres alanları opsiyonel iyileştirme olarak takip edilebilir.
+- **Core CRUD:** Müşteri, ürün ve fatura oluşturma akışları çalışıyor.
+- **PDF Download:** Fatura PDF indirme akışı çalışıyor.
+- **Team Invite:** Ekip daveti oluşturuluyor; Resend e-postası gitmezse manuel davet linki kopyalama çalışıyor.
+
+### 📌 35.2 Production Domain Davranışı
+- Manuel davet linkleri `window.location.origin` üzerinden üretildiği için staging'de Firebase Hosting domain'i görünür.
+- Production kullanıcıları uygulamaya `https://bayfatura.com` üzerinden girdiğinde aynı linkler otomatik olarak `https://bayfatura.com/accept-invite?...` formatında üretilecektir.
+- Cloud Functions tarafındaki invite e-posta fallback değeri de `https://bayfatura.com` olarak korunur; production öncesi `APP_URL=https://bayfatura.com` environment değeri ayrıca set edilmelidir.
+
+### 📌 35.3 Sıradaki Eşik
+- Android gerçek cihaz smoke test: Google login, email/password, kamera/fiş tarama, PDF/download/share, mobil menü ve push opt-in.
+- iOS/TestFlight hazırlığı: Apple Developer, signing, Microsoft/Google auth davranışı ve gerçek cihaz testleri.
+- Production reconciliation: `preview-test-staging` değişiklikleri `main` ile kontrollü PR'lar üzerinden birleştirilmelidir.
+
+---
 © 2026 BayFatura Cloud — Innovation in Finance.
-*Last Updated: 24 Mayıs 2026 (Android Native Readiness)*
+*Last Updated: 26 Mayıs 2026 (Web Final Smoke Test Completed)*

@@ -6,13 +6,13 @@ Bu plan BayFatura'nin Web App, Android ve iOS surumlerini staging'den production
 
 | Platform | Durum | Ana Risk |
 |----------|-------|----------|
-| Web App | Staging stabilizasyonunda, CI/build/test geciyor | Sosyal login, Resend domain, observability ve production reconciliation |
-| Android | Build/sync zinciri dogrulandi, CI icin post-sync patch mimarisi eklendi | Gercek cihaz, signed CI release, Play Console ve push/auth testleri |
+| Web App | Staging stabilizasyonunda, temel akislari calisiyor | Resend domain, Microsoft provider canli test, observability ve production reconciliation |
+| Android | Debug emulator, native Google login, kamera/push kod baglantilari ve mobile shell polish dogrulandi | Gercek cihaz, signed CI release, Play Console ve push/auth smoke testleri |
 | iOS | Native proje hazir, SPM/Firebase baglantilari mevcut | Gercek cihaz, Apple Sign In entitlement, TestFlight ve App Store ayarlari |
 
 ## Son Otomatik Dogrulama
 
-23-24 Mayis 2026 tarihinde lokal ortamda su kontroller tamamlandi:
+23-25 Mayis 2026 tarihinde lokal ortamda su kontroller tamamlandi:
 
 - `npm run check:release` gecti.
 - `node --check functions/index.js` gecti.
@@ -21,44 +21,49 @@ Bu plan BayFatura'nin Web App, Android ve iOS surumlerini staging'den production
 - `npx cap sync ios` gecti.
 - `./gradlew assembleDebug` Android icin gecti.
 - `./gradlew assembleRelease` Android icin unsigned artifact olarak gecti.
+- Android emulator uzerinde Google native login calisti.
+- Android alt navigasyon ve acilir menu native app hissi icin yuvarlatildi.
+- Firestore WebView realtime listen uyumu icin `experimentalAutoDetectLongPolling` aktif edildi.
 
 Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-tools` paketini indiremedi; ag izniyle tekrar calistirildi ve Firestore emulator testleri basarili tamamlandi.
 
 ## Son Manuel Bulgular
 
 - Google ile web girisi staging preview uzerinde basarili test edildi.
-- Apple/iCloud girisi `auth/operation-not-allowed` hatasi veriyor. Bu, Firebase Authentication tarafinda Apple provider'in henuz etkin olmadigini veya Apple provider ayarlarinin tamamlanmadigini gosterir.
-- Apple staging callback URL: `https://bayfatura-staging.firebaseapp.com/__/auth/handler`. Kurulum rehberi: `docs/apple-sign-in-setup.md`.
-- iCloud/Apple girisi lansman oncesi Apple Developer ve Firebase Console ayarlari tamamlandiktan sonra aktif hale getirilecek.
+- Android emulator uzerinde Google login basarili test edildi.
+- iCloud/Apple girisi lansman blokajindan cikarildi; web login ekraninda Apple yerine Microsoft provider kullanilacak.
+- Microsoft staging callback URL: `https://bayfatura-staging.firebaseapp.com/__/auth/handler`.
+- Microsoft/Entra App Registration ve Firebase Microsoft provider ayarlari tamamlandiktan sonra staging uzerinde Microsoft login smoke test edilecek.
 - Chrome console'daki `Cross-Origin-Opener-Policy policy would block the window.closed/window.close call` uyarilari popup tabanli OAuth akislarinda gorulebilir; hosting header'i `same-origin-allow-popups` olacak sekilde duzenlenmelidir.
 - Resend domain dogrulamasi henuz yapilmadi. Ucretsiz/test modunda Resend sadece sinirli alicilara mail gonderir; genel ekip daveti icin dogrulanmis domain ve bu domaine ait `from` adresi gerekir.
+- Firestore `Listen/channel` access-control hatasi tek basina kritik kabul edilmedi; veri akisi calistigi surece gürültü seviyesindedir. WebView uyumlulugu icin long-polling auto-detect etkinlestirildi.
 
 ## Faz 1: Web Staging Stabilizasyonu
 
 ### Codex tarafindan yapilacaklar
 
 - [x] `preview-test-staging` uzerinde kucuk PR akisini koru.
-- [ ] Web kritik akislari icin test kapsamindaki bosluklari tespit et.
+- [x] Web kritik akislari icin test kapsamindaki bosluklari tespit et.
 - [ ] Sosyal login, onboarding, billing, team invite ve PDF akislari icin regresyon testleri ekle.
 - [ ] Firebase Auth redirect/popup davranisini staging ve production domain ayrimina gore dokumante et.
-- [ ] Sentry/observability entegrasyonu icin environment ve hata yakalama planini hazirla.
-- [ ] Resend domain dogrulamasi sonrasi `from` adresi mimarisini kesinlestir.
+- [x] Sentry/observability entegrasyonu icin environment ve hata yakalama planini hazirla.
+- [x] Resend domain dogrulamasi sonrasi `from` adresi mimarisini kesinlestir.
 
 ### Omid tarafindan yapilacaklar
 
 - [x] En guncel PR preview linkinde Chrome ve Safari ile Google login test et.
 - [ ] Resend'de domain dogrulamasini tamamla.
 - [ ] Firebase Console'da staging ve production authorized domains listesini kontrol et.
-- [ ] Firebase Console'da Apple provider'i etkinlestir ve Apple Developer ayarlarini tamamla.
+- [ ] Firebase Console'da Microsoft provider'i etkinlestir ve Azure/Entra Client ID + Client Secret degerlerini ekle.
 - [ ] Stripe/PayPal test hesaplariyla odeme akisini manuel test et.
 
 ### Cikis kriterleri
 
 - [ ] Email/password login calisiyor.
 - [x] Google login Chrome ve Safari'de calisiyor veya net Firebase config hatasi gorunuyor.
-- [ ] Apple/iCloud login Firebase provider etkinlestirildikten sonra calisiyor.
-- [ ] Onboarding tamamlanabiliyor.
-- [ ] Musteri, urun, fatura ve PDF akislari calisiyor.
+- [ ] Microsoft login Firebase provider etkinlestirildikten sonra calisiyor.
+- [x] Onboarding tamamlanabiliyor.
+- [x] Musteri, urun, fatura ve PDF akislari calisiyor.
 - [ ] Team invite email'i dogrulanmis domain ile hedef adrese ulasiyor.
 - [ ] Console'da yeni kritik hata yok.
 
@@ -68,9 +73,9 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 
 - [x] `npm run test:rules` ile Firestore rules emulator suite'i dogrula.
 - [x] Functions syntax ve callable akislari icin `node --check functions/index.js` calistir.
-- [ ] Functions dependency audit risklerini ayri bir hardening listesine ayir.
+- [x] Functions dependency audit risklerini ayri bir hardening listesine ayir: `docs/functions-dependency-hardening.md`.
 - [ ] `sendInvitationEmail`, `sendInvoiceEmail`, `syncUserPlan`, `scanReceipt`, `analyzeFinancials` icin loglama ve hata mesajlarini gozden gecir.
-- [ ] Production secrets ve staging secrets ayrimini dokumanda guncelle.
+- [x] Production secrets ve staging secrets ayrimini dokumanda guncelle.
 
 ### Omid tarafindan yapilacaklar
 
@@ -80,8 +85,8 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 
 ### Cikis kriterleri
 
-- [ ] Rules testleri geciyor.
-- [ ] Functions syntax check geciyor.
+- [x] Rules testleri geciyor.
+- [x] Functions syntax check geciyor.
 - [ ] Staging deploy workflow'lari production secret kullanmadan calisiyor.
 - [ ] Backend kaynakli hatalar kullaniciya anlasilir mesajlarla donuyor.
 
@@ -98,10 +103,13 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 - [x] Android Studio/adb cihaz runbook'u hazirla: `docs/android-device-runbook.md`.
 - [x] Native kamera davranisini web fallback'i bozmadan Android shell'e bagla.
 - [x] Native push notification davranisini kontrollu opt-in mimarisiyle bagla.
+- [x] Android emulator Google login sorununu cozumle ve klasik Google hesap secici akisina stabilize et.
+- [x] Android mobile shell alt nav/drawer UI polish uygula.
 
 ### Omid tarafindan yapilacaklar
 
-- [ ] Android Studio'da gercek cihaz veya emulator ile app'i ac.
+- [x] Android Studio'da emulator ile app'i ac.
+- [ ] Android Studio'da gercek cihaz ile app'i ac.
 - [ ] Google login'i gercek cihazda test et.
 - [ ] Kamera ile fis tarama iznini ve AI scan akisini test et.
 - [ ] Push notification permission ve token kaydini test et.
@@ -111,8 +119,10 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 ### Cikis kriterleri
 
 - [x] Debug build lokal olarak uretiliyor.
+- [x] Debug build emulator uzerinde aciliyor.
+- [x] Google native login emulator uzerinde calisiyor.
 - [ ] Debug build gercek cihazda aciliyor.
-- [ ] Email/password ve Google native login calisiyor.
+- [ ] Email/password ve Google native login gercek cihazda calisiyor.
 - [ ] Kamera izinleri dogru isliyor.
 - [ ] PDF/download/share akisi kullanilabilir.
 - [x] Lokal unsigned release artifact uretiliyor.
@@ -123,17 +133,17 @@ Not: `npm run test:rules` ilk denemede sandbox ag kisiti nedeniyle `firebase-too
 ### Codex tarafindan yapilacaklar
 
 - [x] `npm run build` ve `npx cap sync ios` akisini dogrula.
-- [ ] iOS Info.plist, URL schemes, SPM paketleri ve Firebase config mimarisini gozden gecir.
-- [ ] TestFlight checklist hazirla.
-- [ ] iOS smoke test matrisi hazirla: login, Apple Sign In, camera, PDF/share, push.
-- [ ] Apple Sign In entitlement ve Firebase Apple provider gereksinimlerini dokumante et.
+- [x] iOS Info.plist, URL schemes, SPM paketleri ve Firebase config mimarisini gozden gecir.
+- [x] TestFlight checklist hazirla.
+- [x] iOS smoke test matrisi hazirla: `docs/ios-smoke-test.md`.
+- [x] Apple Sign In entitlement ve Firebase Apple provider gereksinimlerini dokumante et.
 
 ### Omid tarafindan yapilacaklar
 
 - [ ] Apple Developer Program uyeligini aktif et.
 - [ ] Xcode'da Team, Bundle ID ve Signing ayarlarini kontrol et.
 - [ ] Sign in with Apple capability ekle.
-- [ ] Gercek iPhone'da Google ve Apple login test et.
+- [ ] Gercek iPhone'da Google ve Microsoft login test et.
 - [ ] Push Notifications capability ve APNs ayarlarini kontrol et.
 - [ ] App Store Connect'te app kaydini ve TestFlight internal testing'i hazirla.
 

@@ -9,8 +9,9 @@ import Auth from '../pages/auth/Auth';
 const authMock = vi.hoisted(() => ({
   login: vi.fn(),
   register: vi.fn(),
+  resetPassword: vi.fn(),
   signInWithGoogle: vi.fn(),
-  signInWithApple: vi.fn(),
+  signInWithMicrosoft: vi.fn(),
   signInAsDemo: vi.fn(),
   isAuthenticated: false,
 }));
@@ -42,6 +43,11 @@ vi.mock('../context/LanguageContext', () => ({
       or: 'or',
       demoLogin: 'Demo login',
       loginFailed: 'Login failed',
+      forgotPassword: 'Forgot password?',
+      resetPasswordEmailRequired: 'Enter your email address first, then request the reset link.',
+      resetPasswordEmailSent: 'Password reset link sent. Please check your inbox.',
+      resetPasswordSocialOnly: 'This email is registered with Google or Microsoft. Please sign in with that method; there is no password to reset yet.',
+      resetPasswordFailed: 'Password reset could not be started. Please try again.',
     }[key] || key),
   }),
 }));
@@ -60,8 +66,9 @@ describe('Auth page integration', () => {
   beforeEach(() => {
     authMock.login.mockReset();
     authMock.register.mockReset();
+    authMock.resetPassword.mockReset();
     authMock.signInWithGoogle.mockReset();
-    authMock.signInWithApple.mockReset();
+    authMock.signInWithMicrosoft.mockReset();
     authMock.signInAsDemo.mockReset();
     authMock.isAuthenticated = false;
     window.sessionStorage.clear();
@@ -100,6 +107,58 @@ describe('Auth page integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Login' }));
 
     expect(await screen.findByText('Invalid credentials')).toBeInTheDocument();
+  });
+
+  test('requires an email before requesting a password reset link', async () => {
+    renderAuth();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+
+    expect(await screen.findByText('Enter your email address first, then request the reset link.')).toBeInTheDocument();
+    expect(authMock.resetPassword).not.toHaveBeenCalled();
+  });
+
+  test('sends a password reset link for the entered email', async () => {
+    authMock.resetPassword.mockResolvedValue({ success: true });
+
+    renderAuth();
+
+    fireEvent.change(screen.getByPlaceholderText('mail@fatura.com'), {
+      target: { value: 'user@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+
+    await waitFor(() => {
+      expect(authMock.resetPassword).toHaveBeenCalledWith('user@example.com');
+      expect(screen.getByText('Password reset link sent. Please check your inbox.')).toBeInTheDocument();
+    });
+  });
+
+  test('shows a provider-specific message when reset is not available for social-only accounts', async () => {
+    authMock.resetPassword.mockResolvedValue({ success: false, messageKey: 'resetPasswordSocialOnly' });
+
+    renderAuth();
+
+    fireEvent.change(screen.getByPlaceholderText('mail@fatura.com'), {
+      target: { value: 'google-user@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+
+    expect(await screen.findByText('This email is registered with Google or Microsoft. Please sign in with that method; there is no password to reset yet.')).toBeInTheDocument();
+  });
+
+  test('starts Microsoft social login from the login page', async () => {
+    authMock.signInWithMicrosoft.mockResolvedValue({ success: true, redirecting: true });
+
+    renderAuth('/login?redirect=/team');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Microsoft' }));
+
+    await waitFor(() => {
+      expect(authMock.signInWithMicrosoft).toHaveBeenCalled();
+      expect(window.sessionStorage.getItem('bayfatura.auth.redirectTarget')).toBe('/team');
+      expect(screen.getByText('Processing')).toBeInTheDocument();
+    });
   });
 
   test('registers a new account after toggling to signup mode', async () => {
@@ -145,6 +204,21 @@ describe('Auth page integration', () => {
       expect(window.sessionStorage.getItem('bayfatura.auth.redirectTarget')).toBe('/team');
       expect(screen.getByText('Processing')).toBeInTheDocument();
     });
+  });
+
+  test('waits for auth state after Google popup success before navigating', async () => {
+    authMock.signInWithGoogle.mockResolvedValue({ success: true });
+
+    renderAuth('/login?redirect=/team');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Google' }));
+
+    await waitFor(() => {
+      expect(authMock.signInWithGoogle).toHaveBeenCalled();
+      expect(screen.getByText('Processing')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Team page')).not.toBeInTheDocument();
   });
 
   test('consumes stored redirect error after returning to login page', async () => {

@@ -1,9 +1,12 @@
 import { initializeApp } from 'firebase/app';
 import {
-    getAuth,
     GoogleAuthProvider,
     OAuthProvider,
     indexedDBLocalPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence,
+    initializeAuth,
+    browserPopupRedirectResolver,
 } from 'firebase/auth';
 import {
     initializeFirestore,
@@ -13,6 +16,7 @@ import {
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import { logger } from './logger';
+import { Capacitor } from '@capacitor/core';
 
 export const resolveFirebaseAuthDomain = ({ authDomain, projectId, appEnv, hostname }) => {
     if (!authDomain || !projectId || appEnv === 'production') {
@@ -49,32 +53,23 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-import { Capacitor } from '@capacitor/core';
-import {
-    initializeAuth,
-    browserPopupRedirectResolver
-} from 'firebase/auth';
-
-// Initialize Auth platform-specifically to prevent WKWebView ITP sync hangs
+// Initialize Auth explicitly so Safari redirect flows have deterministic persistence.
 export const auth = (() => {
-    if (Capacitor.isNativePlatform()) {
-        // iOS & Android: iframe-based sync breaks/hangs. Use direct indexedDB initialization.
-        // We MUST pass browserPopupRedirectResolver so signInWithRedirect doesn't throw argument-error!
-        return initializeAuth(app, {
-            persistence: indexedDBLocalPersistence,
-            popupRedirectResolver: browserPopupRedirectResolver
-        });
-    } else {
-        // Web: Standard browser flow
-        return getAuth(app);
-    }
+    const persistence = Capacitor.isNativePlatform()
+        ? indexedDBLocalPersistence
+        : [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence];
+
+    return initializeAuth(app, {
+        persistence,
+        popupRedirectResolver: browserPopupRedirectResolver
+    });
 })();
 
 // Firestore - offline persistence aktif (mobil için kritik)
 export const db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
     localCache: persistentLocalCache({
         tabManager: persistentSingleTabManager()
     })
@@ -117,11 +112,11 @@ googleProvider.setCustomParameters({
     // Ensure redirect URI is properly handled
     access_type: 'online'
 });
-export const appleProvider = new OAuthProvider('apple.com');
-appleProvider.addScope('email');
-appleProvider.addScope('name');
-appleProvider.setCustomParameters({
-    locale: 'en'
+export const microsoftProvider = new OAuthProvider('microsoft.com');
+microsoftProvider.addScope('email');
+microsoftProvider.addScope('profile');
+microsoftProvider.setCustomParameters({
+    prompt: 'select_account'
 });
 
 export const isFirebaseConfigured = () => {

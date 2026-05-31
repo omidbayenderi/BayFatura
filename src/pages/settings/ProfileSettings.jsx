@@ -34,7 +34,6 @@ const ProfileSettings = () => {
         newPassword: '',
         confirmPassword: '',
         stripePublicKey: currentUser?.stripePublicKey || '',
-        stripeSecretKey: currentUser?.stripeSecretKey || '',
         paypalClientId: currentUser?.paypalClientId || ''
     });
 
@@ -48,7 +47,6 @@ const ProfileSettings = () => {
                 newPassword: '',
                 confirmPassword: '',
                 stripePublicKey: currentUser.stripePublicKey || '',
-                stripeSecretKey: currentUser.stripeSecretKey || '',
                 paypalClientId: currentUser.paypalClientId || ''
             });
             setIsInitialized(true);
@@ -114,9 +112,7 @@ const ProfileSettings = () => {
                 ...currentUser,
                 name: formData.name,
                 email: formData.email,
-                role: formData.role,
                 stripePublicKey: formData.stripePublicKey,
-                stripeSecretKey: formData.stripeSecretKey,
                 paypalClientId: formData.paypalClientId
             });
             setIsLoading(false);
@@ -311,18 +307,12 @@ const ProfileSettings = () => {
                         <label>{t('role')}</label>
                         <div style={{ position: 'relative' }}>
                             <Shield size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                            <select
+                            <input
                                 className="form-input"
-                                name="role"
-                                value={formData.role}
-                                onChange={handleChange}
-                                style={{ paddingLeft: '40px' }}
-                            >
-                                <option value="Administrator">{translateRole('Administrator')}</option>
-                                <option value="Manager">{translateRole('Manager')}</option>
-                                <option value="Accountant">{translateRole('Accountant')}</option>
-                                <option value="Employee">{translateRole('Employee')}</option>
-                            </select>
+                                value={translateRole(currentUser?.role || 'Administrator')}
+                                readOnly
+                                style={{ paddingLeft: '40px', background: '#f8fafc', cursor: 'not-allowed' }}
+                            />
                         </div>
                     </div>
                 </div>

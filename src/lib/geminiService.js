@@ -7,6 +7,13 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from './firebase';
 
 // Gemini calls are now securely handled by Firebase Cloud Functions.
+const getAiErrorMessage = (error, fallback) => {
+  const message = error?.message || '';
+  if (message.toLowerCase().includes('deadline') || message.toLowerCase().includes('timeout')) {
+    return 'The AI request took too long. Please try again with a smaller file or image.';
+  }
+  return message || fallback;
+};
 
 export const scanReceipt = async (base64Image) => {
   try {
@@ -23,7 +30,7 @@ export const scanReceipt = async (base64Image) => {
     return result.data.receiptData;
   } catch (error) {
     console.error("Cloud Function Scan Error:", error);
-    throw error;
+    throw new Error(getAiErrorMessage(error, 'Receipt scan failed. Please try another image or enter the expense manually.'));
   }
 };
 
@@ -34,6 +41,6 @@ export const analyzeFinancials = async (historyData) => {
         return result.data.analysis;
     } catch (error) {
         console.error("Cloud Function Analysis Error:", error);
-        throw error;
+        throw new Error(getAiErrorMessage(error, 'Financial analysis failed. Please try again later.'));
     }
 };

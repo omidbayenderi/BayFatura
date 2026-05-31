@@ -2,9 +2,9 @@
 
 Bu dosya, **BayFatura** projesinin yapay zeka tarafından yönetilen gelişim sürecini, tamamlanan modülleri ve "Gerçek Dünya" üretim aşamasına geçiş için gereken tüm optimizasyonları belgeler.
 
-## 🚀 MEVCUT STRATEJİK DURUM (24 Mayıs 2026)
+## 🚀 MEVCUT STRATEJİK DURUM (25 Mayıs 2026)
 
-BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygulamasıdır; güncel odak artık **kontrollü staging doğrulaması, Android native beta hazırlığı, iOS/Apple dış panel ayarları ve production'a güvenli geçiş planı** üzerindedir.
+BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygulamasıdır; güncel odak artık **kontrollü staging doğrulaması, Android native beta smoke testleri, iOS/Apple dış panel ayarları ve production'a güvenli geçiş planı** üzerindedir. 25 Mayıs itibarıyla Android debug build emülatörde açılmış, native Google login doğrulanmış, mobil alt navigasyon/drawer UI iyileştirilmiş ve Firestore WebView bağlantı dayanıklılığı artırılmıştır.
 
 ### ✅ Staging Hazır Bileşenler
 - `preview-test-staging` aktif geliştirme ve staging doğrulama dalıdır.
@@ -12,18 +12,55 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - Firebase staging projesinde Cloud Functions deploy başarıyla tamamlanmıştır.
 - Firestore rules için emulator destekli test hattı kurulmuştur.
 - Android native build zinciri doğrulanmıştır: web build, Capacitor sync, Android post-sync patch, Gradle debug build.
+- Android native Google login emülatörde başarıyla test edilmiştir.
 - Android native kamera ve push opt-in entegrasyonları kod tarafında bağlanmıştır.
+- Android mobil shell UI alt menü ve açılır menü düzeyinde native app görünümüne yaklaştırılmıştır.
+- Firestore `initializeFirestore` ayarında `experimentalAutoDetectLongPolling` aktiftir; WebView/Safari realtime listen kanalındaki access-control retry sorunlarına karşı daha toleranslıdır.
 
 ### ⚠️ Lansman Öncesi Dış Bağımlılıklar
 - Apple/iCloud Sign-In için Apple Developer ve Firebase Console provider ayarı tamamlanmalıdır.
 - Resend genel ekip daveti için domain doğrulaması ve domain tabanlı `from` adresi gerektirir.
-- Android gerçek cihaz/emulator smoke testleri tamamlanmadan native beta dağıtımı yapılmamalıdır.
+- Android emülatör smoke testleri başladı; gerçek cihaz smoke testleri tamamlanmadan native beta dağıtımı yapılmamalıdır.
 - CI signed AAB için Android keystore ve `ANDROID_GOOGLE_SERVICES_JSON` GitHub secrets değerleri doğrulanmalıdır.
 
 ### ⚠️ Production Guardrail
 - `main` dalı production kaynağı olarak kullanılmadan önce bilinçli şekilde reconcile edilmelidir.
 - Production deploy manuel ve ayrı onaylı tutulmalıdır.
 - Staging IAM/secrets modeli production'a birebir kopyalanmamalı; ayrı servis hesabı ve ayrı yetki setiyle kurulmalıdır.
+
+## 📌 25 Mayıs 2026 Son Teknik Notlar
+
+### Android Native Durumu
+- Google Sign-In problemi çözüldü: `@capacitor-firebase/authentication` dönüşü güvenli şekilde unwrap ediliyor ve Android'de `useCredentialManager: false` ile klasik Google hesap seçici kullanılıyor.
+- Firebase Android config dosyası lokal olarak doğru yapıya getirildi: `com.bayfatura.app` ve `com.bayfatura.app.debug` için Android OAuth client kayıtları mevcut.
+- `google-services.json` repoya commit edilmez; lokal native build ve CI secret mimarisiyle yönetilmelidir.
+- Mobil alt navigasyon ve açılır menü tasarımı yuvarlatılmış, safe-area uyumlu ve daha native hissedilecek şekilde güncellendi.
+
+### Web App Durumu
+- Email/password ve Google giriş akışları test edildi.
+- Onboarding, müşteri/ürün ekleme, fatura oluşturma ve PDF indirme temel akışları kullanıcı tarafından doğrulandı.
+- Team invitation email akışı Resend test hesabı kısıtına takılıyor; kendi mail adresine gönderim çalışıyor, farklı alıcılar için domain doğrulaması zorunlu.
+- Apple/iCloud web login kod tarafında kontrollü hata mesajı veriyor; provider/capability dış panel ayarları tamamlanmadan aktif kabul edilmemelidir.
+
+### Firestore / WebView Durumu
+- Firestore CSP izinleri `https://*.googleapis.com` üzerinden uygundur.
+- WebView/Safari ortamında görülebilen `Listen/channel ... due to access control checks` hatası için auto-detect long polling etkinleştirildi.
+- Hata veri okuyup yazmayı engellemiyorsa kritik kabul edilmez; tekrar eden realtime gecikmeler görülürse logcat + Firestore rules + network transport birlikte incelenmelidir.
+
+### Öncelik Sırası
+1. Android gerçek cihaz smoke testleri: login, onboarding, fatura, PDF/share, kamera, push opt-in.
+2. Resend domain doğrulaması ve `from` adresinin domain tabanlı hale getirilmesi.
+3. Apple Developer + Firebase Apple provider + iOS signing/capability kurulumu.
+4. Android signed AAB/keystore ve GitHub Actions secret doğrulaması.
+5. Production reconciliation: `preview-test-staging` değişikliklerinin küçük PR'larla `main` tarafına taşınması.
+
+### Güncel Operasyon Dokümanları
+- Resend domain kurulumu: `docs/resend-domain-setup.md`
+- Android beta/release hazırlığı: `docs/android-readiness.md`
+- iOS/TestFlight hazırlığı: `docs/ios-readiness.md`
+- iOS smoke test matrisi: `docs/ios-smoke-test.md`
+- Functions dependency hardening: `docs/functions-dependency-hardening.md`
+- Platform readiness planı: `docs/platform-readiness-plan.md`
 
 ## 🚀 LANSMAN HAZIRLIĞI (Mayıs 2026) - STAGING + ANDROID NATIVE READINESS ✅
 

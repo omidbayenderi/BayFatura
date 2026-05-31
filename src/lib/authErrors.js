@@ -1,6 +1,6 @@
 export const isExpectedSocialAuthSetupError = (err) => {
     const code = err?.code || '';
-    return code === 'auth/operation-not-allowed';
+    return code === 'auth/operation-not-allowed' || code === 'auth/unauthorized-domain';
 };
 
 export const getSocialAuthErrorMessage = (providerLabel, err) => {
@@ -10,6 +10,10 @@ export const getSocialAuthErrorMessage = (providerLabel, err) => {
 
     if (code === 'auth/operation-not-allowed') {
         return `${label} sign-in is not enabled yet. Please use Google or email/password for now.`;
+    }
+
+    if (code === 'auth/unauthorized-domain') {
+        return `${label} sign-in is not allowed from this address yet. Use localhost for local testing or add this domain in Firebase Authentication authorized domains.`;
     }
 
     if (code === 'auth/popup-blocked') {

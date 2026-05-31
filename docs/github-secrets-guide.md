@@ -1,5 +1,6 @@
 # 🔐 BayFatura — GitHub Secrets Kurulum Rehberi
 > **Oluşturma Tarihi:** 11 Mayıs 2026  
+> **Son Güncelleme:** 25 Mayıs 2026
 > GitHub → Settings → Secrets and variables → Actions → New repository secret
 
 ---
@@ -30,14 +31,14 @@ base64 -i android/bayfatura-release.keystore | pbcopy
 ```
 
 ### ANDROID_KEYSTORE_PASSWORD
-Değer: `BayFatura2026!Secure`
-> ⚠️ Bu şifreyi güvenli bir yerde de saklayın (1Password, Bitwarden).
+Release keystore oluştururken belirlediğiniz güçlü şifre.
+> ⚠️ Bu şifreyi güvenli bir yerde saklayın (1Password, Bitwarden). Dokümana gerçek şifre yazmayın.
 
 ### ANDROID_KEY_ALIAS
 Değer: `bayfatura`
 
 ### ANDROID_KEY_PASSWORD
-Değer: `BayFatura2026!Secure`
+Release key oluştururken belirlediğiniz güçlü şifre. Store password ile aynı olabilir, fakat zorunlu değildir.
 
 ### FIREBASE_ANDROID_APP_ID
 Firebase Console → Project Settings → Your Apps → Android app → App ID  
@@ -45,6 +46,29 @@ Format: `1:123456789:android:abc123def456`
 
 ### ANDROID_GOOGLE_SERVICES_JSON
 Firebase Console → Project Settings → Your Apps → Android (com.bayfatura.app) → google-services.json → tüm içeriği kopyala
+> Debug ve release testlerinde aynı dosyanın `com.bayfatura.app` ve gerekirse `com.bayfatura.app.debug` client kayıtlarını içerdiğini doğrulayın.
+
+---
+
+## 📧 Resend / Email Secrets
+
+### Staging
+
+| Secret Adı | Açıklama |
+|---|---|
+| `STAGING_RESEND_API_KEY` | Staging Cloud Functions için Resend API key |
+| `STAGING_RESEND_FROM_EMAIL` | Doğrulanmış sender, örn. `BayFatura Staging <noreply@bayfatura.com>` |
+
+### Production
+
+| Secret Adı | Açıklama |
+|---|---|
+| `RESEND_API_KEY` | Production Cloud Functions için Resend API key |
+| `RESEND_FROM_EMAIL` | Doğrulanmış sender, örn. `BayFatura <noreply@bayfatura.com>` |
+
+Notlar:
+- `RESEND_API_KEY` hiçbir zaman `VITE_*` değişkeni olarak frontend'e verilmemelidir.
+- Resend test modunda farklı alıcılara mail gitmez; domain doğrulama adımları için `docs/resend-domain-setup.md` kullanılır.
 
 ---
 
@@ -93,6 +117,8 @@ JSON key dosyasının tüm içeriği
    - [ ] `ANDROID_KEY_PASSWORD`
    - [ ] `FIREBASE_ANDROID_APP_ID`
    - [ ] `ANDROID_GOOGLE_SERVICES_JSON`
+   - [ ] `STAGING_RESEND_API_KEY`
+   - [ ] `STAGING_RESEND_FROM_EMAIL`
 
 2. **FAZ 4 Sonrası (iOS Build için):**
    - [ ] `IOS_DISTRIBUTION_CERT_BASE64`
@@ -111,16 +137,16 @@ JSON key dosyasının tüm içeriği
 
 ```bash
 # Keystore'u Base64'e çevir (macOS)
-base64 -i "/Users/omidbayanadarimoghaddam/iki proje/BayFatura/android/bayfatura-release.keystore" | pbcopy
+base64 -i android/bayfatura-release.keystore | pbcopy
 echo "✅ Panoya kopyalandı — GitHub Secret'a yapıştır"
 
 # Keystore bilgilerini doğrula
 keytool -list -v \
-  -keystore "/Users/omidbayanadarimoghaddam/iki proje/BayFatura/android/bayfatura-release.keystore" \
+  -keystore android/bayfatura-release.keystore \
   -alias bayfatura \
-  -storepass "BayFatura2026!Secure"
+  -storepass "<ANDROID_KEYSTORE_PASSWORD>"
 ```
 
 ---
 
-*Son Güncelleme: 11 Mayıs 2026 — FAZ 5 CI/CD kurulumu*
+*Son Güncelleme: 25 Mayıs 2026 — Android, iOS ve Resend secret ayrımı*

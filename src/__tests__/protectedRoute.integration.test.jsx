@@ -11,9 +11,16 @@ const authState = vi.hoisted(() => ({
   loading: false,
 }));
 
+const firebaseMock = vi.hoisted(() => ({
+  auth: { currentUser: null },
+  isFirebaseConfigured: vi.fn(() => true),
+}));
+
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => authState,
 }));
+
+vi.mock('../lib/firebase', () => firebaseMock);
 
 const renderProtectedRoute = (initialPath = '/dashboard') => render(
   <MemoryRouter initialEntries={[initialPath]}>
@@ -30,6 +37,7 @@ describe('ProtectedRoute integration', () => {
   test('renders protected content for authenticated users', () => {
     authState.currentUser = { uid: 'user-a', email: 'user@example.com' };
     authState.loading = false;
+    firebaseMock.auth.currentUser = null;
 
     renderProtectedRoute();
 
@@ -39,6 +47,7 @@ describe('ProtectedRoute integration', () => {
   test('redirects unauthenticated users to login', () => {
     authState.currentUser = null;
     authState.loading = false;
+    firebaseMock.auth.currentUser = null;
 
     renderProtectedRoute();
 
@@ -48,6 +57,17 @@ describe('ProtectedRoute integration', () => {
   test('shows loading page while auth is resolving', () => {
     authState.currentUser = null;
     authState.loading = true;
+    firebaseMock.auth.currentUser = null;
+
+    renderProtectedRoute();
+
+    expect(screen.getByText('Lädt...')).toBeInTheDocument();
+  });
+
+  test('waits when Firebase has a session but app user is still syncing', () => {
+    authState.currentUser = null;
+    authState.loading = false;
+    firebaseMock.auth.currentUser = { uid: 'pending-user' };
 
     renderProtectedRoute();
 

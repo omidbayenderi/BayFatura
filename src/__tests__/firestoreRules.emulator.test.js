@@ -72,6 +72,52 @@ describeWithEmulator('Firestore rules emulator', () => {
     }));
   });
 
+  test('users cannot escalate their own plan or role', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'users', 'user-a'), {
+        name: 'User A',
+        email: 'user-a@example.com',
+        plan: 'standard',
+        role: 'admin',
+        tenantId: 'user-a',
+      });
+    });
+
+    const db = authedDb('user-a', 'user-a@example.com');
+
+    await assertSucceeds(updateDoc(doc(db, 'users', 'user-a'), {
+      name: 'Updated User A',
+    }));
+    await assertFails(updateDoc(doc(db, 'users', 'user-a'), {
+      plan: 'elite',
+    }));
+    await assertFails(updateDoc(doc(db, 'users', 'user-a'), {
+      role: 'owner',
+    }));
+    await assertFails(updateDoc(doc(db, 'users', 'user-a'), {
+      tenantId: 'user-b',
+    }));
+  });
+
+  test('users cannot transfer business documents by changing userId', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'invoices', 'invoice-a'), {
+        userId: 'user-a',
+        invoiceNumber: 'A-1',
+        status: 'draft',
+      });
+    });
+
+    const db = authedDb('user-a');
+
+    await assertSucceeds(updateDoc(doc(db, 'invoices', 'invoice-a'), {
+      status: 'sent',
+    }));
+    await assertFails(updateDoc(doc(db, 'invoices', 'invoice-a'), {
+      userId: 'user-b',
+    }));
+  });
+
   test('super admin can read protected business documents', async () => {
     await seed(async (db) => {
       await setDoc(doc(db, 'expenses', 'expense-a'), { userId: 'user-a', amount: 42 });

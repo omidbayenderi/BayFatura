@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db, isFirebaseConfigured, googleProvider, appleProvider } from '../lib/firebase';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { auth, db, isFirebaseConfigured, googleProvider, microsoftProvider } from '../lib/firebase';
 import {
     onAuthStateChanged,
     signInWithEmailAndPassword,
@@ -10,20 +10,22 @@ import {
     signInWithCredential,
     createUserWithEmailAndPassword,
     GoogleAuthProvider,
-    OAuthProvider,
     signInAnonymously,
     updateProfile as firebaseUpdateProfile,
     updatePassword,
+    sendPasswordResetEmail,
+    fetchSignInMethodsForEmail,
     EmailAuthProvider,
     reauthenticateWithCredential,
     deleteUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { isNativePlatform } from '../lib/platform';
-import { nativeSignInWithGoogle, nativeSignInWithApple, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
+import { nativeSignInWithGoogle, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
 import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
 import { saveAuthRedirectError } from '../lib/authRedirect';
 import { getSocialAuthErrorMessage, isExpectedSocialAuthSetupError } from '../lib/authErrors';
+import { shouldUseRedirectForWebAuth } from '../lib/webAuthFlow';
 
 const AuthContext = createContext();
 
@@ -40,8 +42,14 @@ const shouldFallbackToRedirect = (err) => {
 
 const signInWithWebProvider = async (provider, label) => {
     try {
-        await signInWithPopup(auth, provider);
-        return { success: true };
+        if (shouldUseRedirectForWebAuth()) {
+            console.info(`[Auth] ${label} using redirect login for Safari/WebKit compatibility.`);
+            await signInWithRedirect(auth, provider);
+            return { success: true, redirecting: true };
+        }
+
+        const result = await signInWithPopup(auth, provider);
+        return { success: true, user: result.user };
     } catch (popupErr) {
         const code = popupErr?.code || '';
         if (!isExpectedSocialAuthSetupError(popupErr)) {
@@ -62,6 +70,59 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const useFirebase = isFirebaseConfigured();
 
+    const syncFirebaseUser = useCallback(async (user) => {
+        if (!user) {
+            setCurrentUser(null);
+            return null;
+        }
+
+        try {
+            const userRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userRef);
+
+            if (userDoc.exists()) {
+                const data = userDoc.data();
+                let updates = {};
+                if (!data.email && user.email) {
+                    updates = { ...updates, email: user.email };
+                }
+
+                const appUser = { uid: user.uid, email: user.email, ...data, ...updates };
+                if (Object.keys(updates).length > 0) {
+                    await updateDoc(userRef, updates);
+                }
+                setCurrentUser(appUser);
+                return appUser;
+            }
+
+            const initialData = {
+                name: user.isAnonymous ? 'Demo User' : (user.displayName || 'User'),
+                email: user.email || 'guest@bayfatura.com',
+                plan: 'standard',
+                role: 'admin',
+                tenantId: user.uid,
+                createdAt: new Date().toISOString()
+            };
+            await setDoc(userRef, initialData);
+            const appUser = { uid: user.uid, ...initialData };
+            setCurrentUser(appUser);
+            return appUser;
+        } catch (err) {
+            console.error("Auth sync error:", err);
+            const fallbackUser = {
+                uid: user.uid,
+                email: user.email || 'guest@bayfatura.com',
+                role: 'admin',
+                tenantId: user.uid,
+                plan: 'standard'
+            };
+            setCurrentUser(fallbackUser);
+            return fallbackUser;
+        } finally {
+            setCrashlyticsUserId(user.uid);
+        }
+    }, []);
+
     useEffect(() => {
         if (!useFirebase) {
             setCurrentUser({ uid: 'demo-1', email: 'demo@bayfatura.com', role: 'admin', tenantId: 'demo-1', plan: 'elite' });
@@ -71,16 +132,10 @@ export const AuthProvider = ({ children }) => {
 
         // Handle redirect result (crucial for Safari & redirect flows)
         getRedirectResult(auth)
-            .then((result) => {
+            .then(async (result) => {
                 if (result?.user) {
                     console.log("Redirect login successful:", result.user.email);
-                    // Force re-load user data after redirect
-                    const userRef = doc(db, 'users', result.user.uid);
-                    getDoc(userRef).then(userDoc => {
-                        if (userDoc.exists()) {
-                            setCurrentUser({ uid: result.user.uid, email: result.user.email, ...userDoc.data() });
-                        }
-                    });
+                    await syncFirebaseUser(result.user);
                 }
             })
             .catch((error) => {
@@ -90,44 +145,7 @@ export const AuthProvider = ({ children }) => {
         
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
-                try {
-                    const userRef = doc(db, 'users', user.uid);
-                    const userDoc = await getDoc(userRef);
-                    
-                    if (userDoc.exists()) {
-                        const data = userDoc.data();
-                        let updates = {};
-                        if (!data.role || !data.tenantId) {
-                            updates = { ...updates, role: data.role || 'admin', tenantId: data.tenantId || user.uid };
-                        }
-                        if (!data.email && user.email) {
-                            updates = { ...updates, email: user.email };
-                        }
-                        
-                        if (Object.keys(updates).length > 0) {
-                            await updateDoc(userRef, updates);
-                            setCurrentUser({ uid: user.uid, ...data, ...updates });
-                        } else {
-                            setCurrentUser({ uid: user.uid, email: user.email, ...data });
-                        }
-                    } else {
-                        const initialData = {
-                            name: user.isAnonymous ? 'Demo User' : (user.displayName || 'User'),
-                            email: user.email || 'guest@bayfatura.com',
-                            plan: user.isAnonymous ? 'elite' : 'standard',
-                            role: 'admin',
-                            tenantId: user.uid,
-                            createdAt: new Date().toISOString()
-                        };
-                        await setDoc(userRef, initialData);
-                        setCurrentUser({ uid: user.uid, ...initialData });
-                    }
-                } catch (err) {
-                    console.error("Auth sync error:", err);
-                    // Minimal fail-safe user
-                    setCurrentUser({ uid: user.uid, email: user.email || 'guest@bayfatura.com', role: 'admin', tenantId: user.uid, plan: user.isAnonymous ? 'elite' : 'standard' });
-                }
-                setCrashlyticsUserId(user.uid);
+                await syncFirebaseUser(user);
             } else {
                 setCurrentUser(null);
             }
@@ -135,7 +153,7 @@ export const AuthProvider = ({ children }) => {
         });
 
         return unsubscribe;
-    }, [useFirebase]);
+    }, [syncFirebaseUser, useFirebase]);
 
     const login = async (e, p) => {
         try {
@@ -162,6 +180,44 @@ export const AuthProvider = ({ children }) => {
                 throw new Error('Network error. Check your connection.');
             }
             throw new Error(errMsg);
+        }
+    };
+
+    const resetPassword = async (email) => {
+        const cleanEmail = String(email || '').trim();
+        if (!cleanEmail) {
+            return { success: false, error: 'Email address is required.' };
+        }
+
+        try {
+            const signInMethods = await fetchSignInMethodsForEmail(auth, cleanEmail);
+            if (signInMethods.length > 0 && !signInMethods.includes('password')) {
+                return { success: false, messageKey: 'resetPasswordSocialOnly' };
+            }
+            if (signInMethods.length === 0) {
+                return { success: false, messageKey: 'resetPasswordNoPasswordAccount' };
+            }
+
+            await sendPasswordResetEmail(auth, cleanEmail);
+            return { success: true };
+        } catch (err) {
+            const errCode = err?.code || '';
+            const errMsg = err?.message || 'Password reset failed.';
+            console.error("[Auth] Password reset error:", { code: errCode, message: errMsg });
+
+            if (errCode === 'auth/user-not-found') {
+                return { success: false, messageKey: 'resetPasswordNoPasswordAccount' };
+            }
+            if (errCode === 'auth/invalid-email') {
+                return { success: false, error: 'Invalid email address.' };
+            }
+            if (errCode === 'auth/too-many-requests') {
+                return { success: false, error: 'Too many attempts. Please try again later.' };
+            }
+            if (errCode === 'auth/network-request-failed') {
+                return { success: false, error: 'Network error. Check your connection.' };
+            }
+            return { success: false, error: errMsg };
         }
     };
     
@@ -205,9 +261,20 @@ export const AuthProvider = ({ children }) => {
                     if (nativeErr?.type === NativeAuthError.USER_CANCELLED) {
                         return { success: false, error: 'Sign in was cancelled.' };
                     }
+                    if (nativeErr?.type === NativeAuthError.NO_CREDENTIALS) {
+                        return { success: false, error: 'No Google account is available on this Android device. Please add a Google account in the emulator/device settings and try again.' };
+                    }
                     if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
                         console.warn('[Auth] Native Google not configured:', nativeErr.message);
                         return { success: false, error: 'Google sign-in is not configured for this Android build yet. Please check Firebase SHA-1/SHA-256 and google-services.json.' };
+                    }
+                    if (
+                        nativeErr?.code === 'auth/invalid-credential'
+                        || nativeErr?.message?.includes('audience')
+                        || nativeErr?.message?.includes('different project')
+                    ) {
+                        console.warn('[Auth] Native Google project mismatch:', nativeErr.message);
+                        return { success: false, error: 'Google sign-in is not configured for this Android build yet. Please rebuild Android with the matching Firebase environment.' };
                     }
                     if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
                         console.warn('[Auth] Native Google plugin unavailable:', nativeErr.message);
@@ -220,7 +287,12 @@ export const AuthProvider = ({ children }) => {
                 return { success: false, error: 'Google sign-in did not return a valid credential.' };
             }
 
-            return await signInWithWebProvider(googleProvider, 'Google');
+            const result = await signInWithWebProvider(googleProvider, 'Google');
+            if (result?.user) {
+                const appUser = await syncFirebaseUser(result.user);
+                return { ...result, appUser };
+            }
+            return result;
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
@@ -236,104 +308,45 @@ export const AuthProvider = ({ children }) => {
         }
     };
     
-    const signInWithApple = async () => {
+    const signInWithMicrosoft = async () => {
         try {
             const isNative = isNativeAuthAvailable();
             if (isNative) {
-                try {
-                    const result = await nativeSignInWithApple();
-                    if (result?.credential?.idToken) {
-                        const credential = OAuthProvider.credential({
-                            providerId: 'apple.com',
-                            idToken: result.credential.idToken,
-                            rawNonce: result.credential.secret,
-                        });
-                        await signInWithCredential(auth, credential);
-                        return { success: true };
-                    }
-                } catch (nativeErr) {
-                    if (nativeErr?.type === NativeAuthError.USER_CANCELLED) {
-                        return { success: false, error: 'Sign in was cancelled.' };
-                    }
-                    if (nativeErr?.type === NativeAuthError.CONFIG_ERROR || nativeErr?.type === NativeAuthError.PROVIDER_NOT_ENABLED) {
-                        console.warn('[Auth] Native Apple not configured:', nativeErr.message);
-                        return { success: false, error: 'Apple sign-in is not enabled yet. Please use Google or email/password for now.' };
-                    }
-                    if (nativeErr?.type === NativeAuthError.UNIMPLEMENTED) {
-                        console.warn('[Auth] Native Apple plugin unavailable:', nativeErr.message);
-                        return { success: false, error: 'Apple sign-in is not available in this build yet.' };
-                    } else {
-                        console.warn('[Auth] Native Apple login failed:', nativeErr);
-                        return { success: false, error: nativeErr?.message || 'Apple sign-in failed on this device.' };
-                    }
-                }
-                return { success: false, error: 'Apple sign-in did not return a valid credential.' };
+                return { success: false, error: 'Microsoft sign-in is available on the web build first. Please use Google or email/password on Android for now.' };
             }
 
-            return await signInWithWebProvider(appleProvider, 'Apple');
+            const result = await signInWithWebProvider(microsoftProvider, 'Microsoft');
+            if (result?.user) {
+                const appUser = await syncFirebaseUser(result.user);
+                return { ...result, appUser };
+            }
+            return result;
         } catch (err) {
             const errMsg = err?.message || '';
             const errCode = err?.code || '';
             if (isExpectedSocialAuthSetupError(err)) {
-                console.info("[Auth] Apple login provider is not enabled:", { code: errCode });
+                console.info("[Auth] Microsoft login provider is not enabled:", { code: errCode });
             } else {
-                console.error("[Auth] Apple login error:", { code: errCode, message: errMsg });
+                console.error("[Auth] Microsoft login error:", { code: errCode, message: errMsg });
             }
-            return { success: false, error: getSocialAuthErrorMessage('Apple', err) };
+            return { success: false, error: getSocialAuthErrorMessage('Microsoft', err) };
         }
     };
     const signInAsDemo = async () => {
-        const demoEmail = import.meta.env.VITE_DEMO_EMAIL || 'demo@bayfatura.com';
-        const demoPassword = import.meta.env.VITE_DEMO_PASSWORD || 'DemoPassword123!';
         try {
-            await signInWithEmailAndPassword(auth, demoEmail, demoPassword);
+            const { user } = await signInAnonymously(auth);
+            await setDoc(doc(db, 'users', user.uid), {
+                name: 'Demo User',
+                email: 'demo@bayfatura.com',
+                plan: 'standard',
+                role: 'admin',
+                tenantId: user.uid,
+                createdAt: new Date().toISOString()
+            });
             return { success: true };
         } catch (err) {
-            if (err.code === 'auth/user-not-found') {
-                try {
-                    const { user } = await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
-                    await setDoc(doc(db, 'users', user.uid), {
-                        name: 'Demo Kullanıcı',
-                        email: demoEmail,
-                        plan: 'elite',
-                        role: 'admin',
-                        tenantId: user.uid,
-                        createdAt: new Date().toISOString()
-                    });
-                    return { success: true };
-                } catch (createErr) {
-                    console.error("Demo account creation failed:", createErr);
-                    return { success: false, error: "Demo hesabı oluşturulamadı: " + createErr.message };
-                }
-            }
-            if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-                console.error("Demo wrong password, attempting to re-create account");
-                try {
-                    const currentUser = auth.currentUser;
-                    if (currentUser) {
-                        await currentUser.delete();
-                    }
-                } catch (deleteErr) {
-                    console.warn("Demo account cleanup skipped:", deleteErr?.message || deleteErr);
-                }
-                try {
-                    const { user } = await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
-                    await setDoc(doc(db, 'users', user.uid), {
-                        name: 'Demo Kullanıcı',
-                        email: demoEmail,
-                        plan: 'elite',
-                        role: 'admin',
-                        tenantId: user.uid,
-                        createdAt: new Date().toISOString()
-                    });
-                    return { success: true };
-                } catch (recreateErr) {
-                    console.error("Demo account re-creation failed:", recreateErr);
-                    return { success: false, error: "Demo hesabı şifresi değişmiş. Firebase Console'dan manuel olarak silin veya farklı bir email ile kaydolun." };
-                }
-            }
             console.error("Demo login failed:", err.code, err.message);
-            return { success: false, error: "Demo giriş hatası: " + err.message };
+            return { success: false, error: "Demo login failed. Please try again." };
         }
     };
 
@@ -341,14 +354,27 @@ export const AuthProvider = ({ children }) => {
         if (!currentUser) return { success: false, error: 'No user' };
         try {
             const userRef = doc(db, 'users', currentUser.uid);
-            // We only update Firestore, Auth profile (displayName) can be synced too if needed
-            await updateDoc(userRef, newData);
+            const allowedData = {
+                name: newData.name || '',
+                companyName: newData.companyName || currentUser.companyName || '',
+                email: auth.currentUser?.email || currentUser.email || '',
+                avatar: newData.avatar || currentUser.avatar || '',
+                phone: newData.phone || currentUser.phone || '',
+                address: newData.address || currentUser.address || '',
+                city: newData.city || currentUser.city || '',
+                country: newData.country || currentUser.country || '',
+                language: newData.language || currentUser.language || '',
+                stripePublicKey: newData.stripePublicKey || '',
+                paypalClientId: newData.paypalClientId || ''
+            };
+
+            await updateDoc(userRef, allowedData);
             
-            if (newData.name) {
-                await firebaseUpdateProfile(auth.currentUser, { displayName: newData.name });
+            if (allowedData.name) {
+                await firebaseUpdateProfile(auth.currentUser, { displayName: allowedData.name });
             }
             
-            setCurrentUser(prev => ({ ...prev, ...newData }));
+            setCurrentUser(prev => ({ ...prev, ...allowedData }));
             return { success: true };
         } catch (err) {
             console.error("Update user error:", err);
@@ -390,8 +416,8 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={{
-            currentUser, loading, login, register, logout, signInWithGoogle, signInWithApple, signInAsDemo,
-            updateUser, changePassword, deleteAccount,
+            currentUser, loading, login, register, logout, signInWithGoogle, signInWithMicrosoft, signInAsDemo,
+            resetPassword, updateUser, changePassword, deleteAccount,
             isAuthenticated: !!currentUser,
             isPro: ['premium', 'elite', 'lifetime'].includes(currentUser?.plan)
         }}>

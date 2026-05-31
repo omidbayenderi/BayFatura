@@ -15,12 +15,16 @@ Bu dokuman BayFatura Android surumunun beta ve release oncesi durumunu takip ede
 
 ## Son Lokal Dogrulama
 
-24 Mayis 2026 tarihinde su kontroller tamamlandi:
+24-25 Mayis 2026 tarihinde su kontroller tamamlandi:
 
 - `npm run build` basarili.
 - `npx cap sync android` basarili.
 - `./gradlew assembleDebug` basarili.
 - `./gradlew assembleRelease` unsigned release artifact olarak basarili.
+- Android emulator uzerinde uygulama acildi.
+- Android emulator uzerinde Google native login basarili test edildi.
+- Mobil alt navigasyon ve acilir menu safe-area uyumlu, yuvarlatilmis native shell UI'a tasindi.
+- Firestore WebView realtime transport uyumu icin `experimentalAutoDetectLongPolling` aktif edildi.
 
 Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned uretilir. CI ortaminda GitHub secrets ile keystore ve signing bilgileri verilince AAB signed uretilmelidir.
 
@@ -35,6 +39,7 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
   - BayFatura su anda Google ve Apple provider kullandigi icin bu siniflar release build'i bloklamamali.
 - Gider/fiş ekraninda Android native shell algilandiginda Capacitor Camera kullanilir; web ortaminda mevcut dosya secici fallback olarak kalir.
 - Bildirimler ekraninda Android native shell algilandiginda push notification opt-in aksiyonu gosterilir; kullanici onayi olmadan izin istemez.
+- Native Google Sign-In icin `@capacitor-firebase/authentication` sonuc nesnesi guvenli unwrap edilir ve Android'de `useCredentialManager: false` ile klasik Google hesap secici kullanilir.
 
 ## Codex Tarafinda Tamamlananlar
 
@@ -47,11 +52,13 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
 - Android native kamera entegrasyonu gider/fiş tarama akisi icin baglandi.
 - Android cihaz/emulator runbook'u eklendi: `docs/android-device-runbook.md`.
 - Native push notification token kaydi Bildirimler ekraninda kullanici kontrollu opt-in olarak baglandi.
+- Emulator uzerinde Google native login dogrulandi.
+- Mobil alt nav ve drawer gorsel polish tamamlandi.
 
 ## Omid Tarafindan Gerekli Dis Adimlar
 
-- Firebase Console'da Android app icin SHA-1 ve SHA-256 fingerprint kayitlarini kontrol et.
-- `google-services.json` dosyasinin Firebase Android app ile ayni package name'e sahip oldugunu dogrula.
+- Firebase Console'da Android app icin SHA-1 ve SHA-256 fingerprint kayitlarini release keystore icin de kontrol et.
+- `google-services.json` dosyasinin hem `com.bayfatura.app` hem de debug testlerinde `com.bayfatura.app.debug` client kayitlarini icerdigini dogrula.
 - GitHub secrets tarafinda su degerlerin dolu oldugunu kontrol et:
   - `ANDROID_KEYSTORE_BASE64`
   - `ANDROID_KEYSTORE_PASSWORD`
@@ -60,7 +67,7 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
   - `ANDROID_GOOGLE_SERVICES_JSON`
   - `FIREBASE_ANDROID_APP_ID`
   - `FIREBASE_SERVICE_ACCOUNT`
-- Android Studio'da emulator veya gercek cihaz ile uygulamayi ac.
+- Android Studio'da gercek cihaz ile uygulamayi ac.
 - Gercek cihazda email/password ve Google login test et.
 - Kamera izni ve fis tarama akislarini test et.
 - PDF indirme/paylasma akisini test et.
@@ -69,8 +76,10 @@ Not: Lokal release signing icin gercek keystore sifreleri yoksa build unsigned u
 
 ## Beta Cikis Kriterleri
 
+- Debug build emulator uzerinde aciliyor.
+- Google native login emulator uzerinde calisiyor.
 - Debug build gercek cihazda aciliyor.
-- Google native login app'e geri donebiliyor.
+- Google native login gercek cihazda app'e geri donebiliyor.
 - Onboarding, musteri, urun, fatura ve PDF akislari Android'de calisiyor.
 - Kamera izni ve AI fis tarama akisi calisiyor.
 - Push notification token'i kaydediliyor.

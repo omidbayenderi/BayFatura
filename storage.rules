@@ -3,6 +3,14 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    function isSafeRasterImage() {
+      return request.resource.contentType in [
+        'image/png',
+        'image/jpeg',
+        'image/webp'
+      ];
+    }
+
     // ═══════════════════════════════════════
     // 🛡️ User Assets (Logos, Signatures, Stamps)
     // ═══════════════════════════════════════
@@ -14,7 +22,7 @@ service firebase.storage {
       // Write & Delete: Only the file owner
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && isSafeRasterImage();
 
       // Delete: Only the file owner
       allow delete: if request.auth != null && request.auth.uid == userId;
@@ -32,7 +40,7 @@ service firebase.storage {
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.size < 10 * 1024 * 1024
         && (request.resource.contentType.matches('application/pdf') || 
-            request.resource.contentType.matches('image/.*'));
+            isSafeRasterImage());
 
       // Delete: Owner only
       allow delete: if request.auth != null && request.auth.uid == userId;
@@ -47,7 +55,7 @@ service firebase.storage {
 
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.size < 10 * 1024 * 1024
-        && (request.resource.contentType.matches('image/.*') ||
+        && (isSafeRasterImage() ||
             request.resource.contentType.matches('application/pdf'));
 
       allow delete: if request.auth != null && request.auth.uid == userId;
@@ -65,7 +73,7 @@ service firebase.storage {
       allow write: if request.auth != null
         && request.auth.uid == orgId
         && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && isSafeRasterImage();
 
       // Delete: ONLY the owner of this orgId folder
       allow delete: if request.auth != null && request.auth.uid == orgId;

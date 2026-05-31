@@ -15,14 +15,59 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
+    function userEditableKeys() {
+      return [
+        'name',
+        'companyName',
+        'email',
+        'avatar',
+        'phone',
+        'address',
+        'city',
+        'country',
+        'language',
+        'stripePublicKey',
+        'paypalClientId'
+      ];
+    }
+
+    function isSafeUserCreate(userId) {
+      return request.resource.data.keys().hasOnly([
+          'name',
+          'companyName',
+          'email',
+          'plan',
+          'role',
+          'tenantId',
+          'createdAt'
+        ])
+        && request.resource.data.tenantId == userId
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.plan == 'standard'
+        && request.resource.data.role == 'admin';
+    }
+
+    function isSafeUserUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(userEditableKeys())
+        && (!('email' in request.resource.data) || request.resource.data.email == request.auth.token.email);
+    }
+
+    function keepsOwner() {
+      return request.resource.data.userId == resource.data.userId;
+    }
+
     // =============================
     // Users
     // =============================
 
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() || (request.auth.uid == userId && isSafeUserCreate(userId))
+      );
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() || (request.auth.uid == userId && isSafeUserUpdate())
+      );
       allow delete: if isAuthenticated() && isSuperAdmin();
     }
 
@@ -36,7 +81,7 @@ service cloud.firestore {
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isSuperAdmin()
+        (resource.data.userId == request.auth.uid && keepsOwner()) || isSuperAdmin()
       );
       allow delete: if isAuthenticated() && (
         get(/databases/$(database)/documents/customers/$(docId)).data.userId == request.auth.uid || 
@@ -53,7 +98,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && keepsOwner()) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }
@@ -67,7 +115,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && keepsOwner()) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }
@@ -81,7 +132,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && keepsOwner()) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }
@@ -95,7 +149,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && keepsOwner()) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }
@@ -109,7 +166,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && keepsOwner()) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }
@@ -123,7 +183,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && keepsOwner()) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isSuperAdmin()
       );
     }
@@ -196,6 +259,23 @@ service cloud.firestore {
 
     match /users/{userId}/myTeams/{teamId} {
       allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create, update, delete: if false;
+    }
+
+    // =============================
+    // Rate Limits (server-managed, no client access)
+    // =============================
+
+    match /rate_limits/{docId} {
+      allow read, write: if false;
+    }
+
+    // =============================
+    // Email Logs (server-managed, SuperAdmin read)
+    // =============================
+
+    match /email_logs/{docId} {
+      allow read: if isSuperAdmin();
       allow create, update, delete: if false;
     }
 

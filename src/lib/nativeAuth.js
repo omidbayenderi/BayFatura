@@ -48,6 +48,7 @@ export const NativeAuthError = {
     UNIMPLEMENTED: 'UNIMPLEMENTED',
     PROVIDER_NOT_ENABLED: 'PROVIDER_NOT_ENABLED',
     USER_CANCELLED: 'USER_CANCELLED',
+    NO_CREDENTIALS: 'NO_CREDENTIALS',
     CONFIG_ERROR: 'CONFIG_ERROR',
     UNKNOWN: 'UNKNOWN',
 };
@@ -67,6 +68,9 @@ function categorizeError(err) {
     if (msg.includes('cancel') || msg.includes('user cancelled') || code === 'CANCELED') {
         return { type: NativeAuthError.USER_CANCELLED, message: 'Sign in was cancelled.' };
     }
+    if (msg.includes('no credentials available') || msg.includes('no credential')) {
+        return { type: NativeAuthError.NO_CREDENTIALS, message: 'No Google credentials are available on this Android device.' };
+    }
     if (msg.includes('configuration') || msg.includes('invalid') || msg.includes('missing')) {
         return { type: NativeAuthError.CONFIG_ERROR, message: err.message };
     }
@@ -76,7 +80,10 @@ function categorizeError(err) {
 export async function nativeSignInWithGoogle() {
     const { plugin } = await getPlugin();
     try {
-        const result = await plugin.signInWithGoogle({ skipNativeAuth: true });
+        const result = await plugin.signInWithGoogle({
+            skipNativeAuth: true,
+            useCredentialManager: false,
+        });
         return result;
     } catch (err) {
         const categorized = categorizeError(err);

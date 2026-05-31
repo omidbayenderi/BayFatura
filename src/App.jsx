@@ -9,6 +9,7 @@ import Archive from './pages/invoices/Archive';
 import { PanelProvider } from './context/PanelContext';
 import LoadingPage from './components/LoadingPage';
 import CookieConsent from './components/CookieConsent';
+import { isNativePlatform } from './lib/platform';
 
 // Lazy-loaded pages (non-critical routes)
 const Settings = React.lazy(() => import('./pages/settings/Settings'));
@@ -44,6 +45,20 @@ const LazyRoute = ({ children }) => (
     </Suspense>
 );
 
+const NativeHomeRedirect = () => {
+  const { currentUser, loading } = useAuth();
+
+  if (!isNativePlatform()) {
+    return <LazyRoute><Landing /></LazyRoute>;
+  }
+
+  if (loading) {
+    return <LoadingPage />;
+  }
+
+  return <Navigate to={currentUser ? '/dashboard' : '/login'} replace />;
+};
+
 function App() {
   const { currentUser } = useAuth();
   return (
@@ -52,7 +67,7 @@ function App() {
       <CookieConsent />
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<LazyRoute><Landing /></LazyRoute>} />
+        <Route path="/" element={<NativeHomeRedirect />} />
         <Route path="/login" element={<LazyRoute><Auth /></LazyRoute>} />
         <Route path="/success" element={<LazyRoute><Success /></LazyRoute>} />
         <Route path="/p/invoice/:id" element={<LazyRoute><PublicView type="invoice" /></LazyRoute>} />

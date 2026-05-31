@@ -8,6 +8,21 @@ import { functions } from './firebase';
 
 const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'fatura@bayfatura.com';
 
+const getEmailErrorMessage = (error, fallback) => {
+    const message = error?.message || '';
+    const details = error?.details || {};
+
+    if (details?.reason === 'domain_not_verified' || message.toLowerCase().includes('verify a resend domain')) {
+        return 'Email sending is still in test mode. Please verify a Resend domain and use a sender address from that domain.';
+    }
+
+    if (details?.reason === 'credentials' || message.toLowerCase().includes('credentials')) {
+        return 'Email provider credentials are not configured correctly.';
+    }
+
+    return message || fallback;
+};
+
 /**
  * Fatura/teklif için HTML e-posta şablonu üretir
  */
@@ -230,20 +245,22 @@ export const sendInvoiceEmail = async ({ toEmail, toName, invoice, senderName, s
     };
 
     const subject = subjects[language] || subjects['de'];
-    const html = buildEmailHtml({ invoice, senderName, senderEmail, type, language, publicUrl });
+    buildEmailHtml({ invoice, senderName, senderEmail, type, language, publicUrl });
 
     try {
         const sendEmailFn = httpsCallable(functions, 'sendInvoiceEmail');
         const result = await sendEmailFn({
-            to: `${toName} <${toEmail}>`,
+            toEmail,
+            toName,
             subject,
-            html,
-            invoiceId: invoice.id
+            invoiceId: invoice.id,
+            type,
+            language
         });
         return result.data;
     } catch (error) {
         console.error("Cloud Email Error:", error);
-        throw new Error(error.message || "Email send failed via Cloud Function");
+        throw new Error(getEmailErrorMessage(error, "Email send failed via Cloud Function"));
     }
 };
 
@@ -266,7 +283,7 @@ export const sendInvitationEmail = async ({ inviteeEmail, inviteeName, role, inv
         return result.data;
     } catch (error) {
         console.error("Invitation Email Error:", error);
-        throw new Error(error.message || "Failed to send invitation email");
+        throw new Error(getEmailErrorMessage(error, "Failed to send invitation email"));
     }
 };
 
