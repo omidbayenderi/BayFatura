@@ -43,14 +43,14 @@ html {
 .auth-icon-wrapper {
     width: 64px;
     height: 64px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
     border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 16px auto;
     color: white;
-    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.2);
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
 }
 
 .auth-title {
