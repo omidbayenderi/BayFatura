@@ -9,6 +9,7 @@ import Archive from './pages/invoices/Archive';
 import { PanelProvider } from './context/PanelContext';
 import LoadingPage from './components/LoadingPage';
 import CookieConsent from './components/CookieConsent';
+import AppInstallPrompt from './components/AppInstallPrompt';
 import { isNativePlatform } from './lib/platform';
 
 // Lazy-loaded pages (non-critical routes)
@@ -66,6 +67,7 @@ function App() {
     <PanelProvider>
       {/* Global Cookie Consent Banner — shown on all pages */}
       <CookieConsent />
+      <AppInstallPrompt currentUser={currentUser} />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<NativeHomeRedirect />} />

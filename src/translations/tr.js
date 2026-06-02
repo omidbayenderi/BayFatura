@@ -456,7 +456,7 @@ export default {
     limitFeature2: 'AI Fiş Tarayıcı & Banka Eşleştirme',
     limitFeature3: 'Finansal Tahmin & Raporlar',
     limitFeature4: 'Reklamsız Deneyim',
-    adSupported: 'Reklamlı Deneyim',
+    adSupported: 'Limitli ücretsiz plan',
     currentPlan: 'Aktueller Plan',
     recommended: 'EMPFOHLEN',
     launchOffer: 'Lansman Özel: İlk 100 kişiye 7€',

@@ -440,7 +440,7 @@ export default {
     limitFeature2: "Scanner de reçus IA & rapprochement bancaire",
     limitFeature3: "Prévisions financières & rapports",
     limitFeature4: "Expérience sans publicité",
-    adSupported: "Expérience avec publicité",
+    adSupported: "Plan gratuit limité",
     currentPlan: "Plan actuel",
     recommended: "RECOMMANDÉ",
     launchOffer: "Offre de lancement : 7€ pour les 100 premiers",

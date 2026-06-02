@@ -387,7 +387,7 @@ export default {
     limitFeature2: 'Scanner de recibos IA & conciliação bancária',
     limitFeature3: 'Previsão financeira & relatórios',
     limitFeature4: 'Experiência sem anúncios',
-    adSupported: 'Experiência com anúncios',
+    adSupported: 'Plano gratuito limitado',
     currentPlan: 'Plano atual',
     recommended: 'RECOMENDADO',
     launchOffer: 'Oferta de lançamento: 7€ para os primeiros 100',

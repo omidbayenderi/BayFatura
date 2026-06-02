@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { auth, db, isFirebaseConfigured, googleProvider, microsoftProvider } from '../lib/firebase';
+import { auth, db, getDb, getDbIdForCountry, isFirebaseConfigured, googleProvider, microsoftProvider } from '../lib/firebase';
 import {
     onAuthStateChanged,
     signInWithEmailAndPassword,
@@ -77,8 +77,15 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const userRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userRef);
+            // First read from global DB to discover which DB this user belongs to
+            const globalUserRef = doc(db, 'users', user.uid);
+            const globalUserDoc = await getDoc(globalUserRef);
+            const assignedDbId = globalUserDoc.exists()
+                ? globalUserDoc.data()?._db || null
+                : null;
+            const userDb = getDb(assignedDbId);
+            const userRef = assignedDbId ? doc(userDb, 'users', user.uid) : globalUserRef;
+            const userDoc = assignedDbId ? await getDoc(userRef) : globalUserDoc;
 
             if (userDoc.exists()) {
                 const data = userDoc.data();
@@ -240,17 +247,29 @@ export const AuthProvider = ({ children }) => {
         try {
             const { user } = await import('firebase/auth').then(m => m.createUserWithEmailAndPassword(auth, userData.email, userData.password));
             
+            const userCountry = userData.country || '';
+            const assignedDbId = getDbIdForCountry(userCountry);
+            const userDb = getDb(assignedDbId);
+
             const initialData = {
                 name: userData.name || 'User',
                 companyName: userData.companyName || '',
                 email: user.email,
+                country: userCountry,
                 plan: 'standard',
                 role: 'admin',
                 tenantId: user.uid,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                // DB assignment — never changes after registration
+                _db: assignedDbId,
             };
-            
-            await setDoc(doc(db, 'users', user.uid), initialData);
+
+            // Write to assigned DB (eu or global)
+            await setDoc(doc(userDb, 'users', user.uid), initialData);
+            // Also write a routing pointer in global DB if user is EU
+            if (assignedDbId !== '(default)') {
+                await setDoc(doc(db, 'users', user.uid), { _db: assignedDbId, _routingOnly: true });
+            }
             await firebaseUpdateProfile(user, { displayName: userData.name });
             
             return { success: true };

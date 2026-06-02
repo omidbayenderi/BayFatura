@@ -78,34 +78,47 @@ Rechtsgrundlagen:
 • Art. 6 Abs. 1 lit. a DSGVO: optionale Analyse- und Marketingdienste nach Einwilligung`
                     },
                     {
-                        title: '3. Drittanbieter / Third-Party Services',
+                        title: '3. Datenspeicherung & Serverstandorte / Data Storage & Server Locations',
+                        content: `BayFatura betreibt eine multi-regionale Infrastruktur:
+
+EU-Nutzer (DE, AT, CH, FR, ES, PT, NL, BE, IT und weitere EWR-Länder):
+— Nutzerdaten werden in Firestore "bayfatura-eu" (Google Cloud Region eur3 — Frankfurt/Belgien) gespeichert.
+— Cloud Functions: europe-west3 (Frankfurt)
+— DSGVO-konformer Serverstandort innerhalb der EU.
+
+Nutzer außerhalb der EU (global):
+— Nutzerdaten werden in Firestore "(default)" (Google Cloud Region nam5 — USA) gespeichert.
+— Cloud Functions: europe-west3 (Frankfurt)
+— Internationale Datenübermittlungen erfolgen auf Grundlage von EU-Standardvertragsklauseln (SCC) gemäß Art. 46 DSGVO.
+
+Die Serverzuweisung erfolgt automatisch bei der Registrierung anhand des Landes des Nutzers und ist dauerhaft festgelegt.`
+                    },
+                    {
+                        title: '4. Drittanbieter / Third-Party Services',
                         content: `Wir nutzen folgende Drittanbieter:
 
 Google Firebase / Google Cloud
 — Hosting, Authentifizierung, Firestore, Storage, Cloud Functions, App Check
-— Cloud Functions Region: europe-west3 (Frankfurt)
-— Firebase Hosting nutzt ein globales CDN; einzelne Abrufe können über Edge-Standorte außerhalb Deutschlands ausgeliefert werden.
 — Datenschutz: https://firebase.google.com/support/privacy
-— Auftragsverarbeitung und internationale Datenübermittlungen erfolgen auf Grundlage der Google Cloud Datenschutzbedingungen.
+— Firebase Hosting nutzt ein globales CDN; statische Assets können über globale Edge-Standorte ausgeliefert werden.
 
 Stripe
 — Zahlungsabwicklung und Abonnementverwaltung
 — Datenschutz: https://stripe.com/de/privacy
-— Zahlungsdaten können in Drittländer, insbesondere die USA, übermittelt werden.
+— Zahlungsdaten werden direkt von Stripe verarbeitet; wir speichern keine Kartendaten.
 
 Resend
-— E-Mail-Versand (Rechnungsbenachrichtigungen)
+— Transaktionaler E-Mail-Versand (Rechnungen, Einladungen)
 — Datenschutz: https://resend.com/privacy
-— E-Mail-Daten können in Drittländer, insbesondere die USA, übermittelt werden.
 
 Firebase Analytics / Google Analytics (nur mit Einwilligung)
 — Anonymisierte Nutzungsstatistiken
 — Verarbeitung erst nach Einwilligung über den Cookie-Banner
 
-Internationale Übermittlungen erfolgen, soweit erforderlich, auf Grundlage geeigneter Garantien wie EU-Standardvertragsklauseln oder Angemessenheitsbeschlüssen.`
+Alle internationalen Übermittlungen erfolgen auf Grundlage von EU-Standardvertragsklauseln (SCC) oder Angemessenheitsbeschlüssen der EU-Kommission.`
                     },
                     {
-                        title: '4. Cookies',
+                        title: '5. Cookies',
                         content: `Wir verwenden Cookies und ähnliche Technologien:
 
 Notwendige Cookies (immer aktiv):
@@ -119,7 +132,7 @@ Optionale Cookies und ähnliche Technologien (nur mit Einwilligung):
 Sie können Ihre Cookie-Einstellungen jederzeit über den Cookie-Banner anpassen. Rechtsgrundlage für den Zugriff auf Endeinrichtungen ist §25 TDDDG; für die anschließende Verarbeitung gilt die DSGVO.`
                     },
                     {
-                        title: '5. Ihre Rechte / Your Rights (GDPR Art. 15-22)',
+                        title: '6. Ihre Rechte / Your Rights (GDPR Art. 15-22)',
                         content: `Sie haben folgende Rechte bezüglich Ihrer Daten:
 
 • Auskunftsrecht (Art. 15 DSGVO): Auskunft über gespeicherte Daten
@@ -137,14 +150,33 @@ Zuständige Aufsichtsbehörde am Sitz des Anbieters: CNPD (Comissão Nacional de
 In Deutschland können Sie sich außerdem an die Datenschutzaufsichtsbehörde Ihres Bundeslandes wenden.`
                     },
                     {
-                        title: '6. Datenlöschung / Data Retention',
+                        title: '7. Regionale Zusätze / Regional Supplements',
+                        content: `Ergänzende Bestimmungen je nach Herkunftsland des Nutzers:
+
+── Brasilien (LGPD — Lei 13.709/2018) ──
+Brasilianische Nutzer haben Rechte gemäß LGPD, einschließlich Auskunft, Berichtigung, Löschung, Widerspruch und Datenportabilität. Anfragen: privacy@bayfatura.com. Grundlage für internationale Übermittlungen: Standardklauseln (Art. 33 LGPD).
+
+── Türkei (KVKK — Kişisel Verilerin Korunması Kanunu) ──
+Türkische Nutzer können ihre Rechte gemäß KVKK Art. 11 ausüben. Ausdrückliche Einwilligung (açık rıza) wird für nicht obligatorische Verarbeitungen eingeholt. Kontakt: privacy@bayfatura.com.
+
+── Vereinigte Staaten — Kalifornien (CCPA/CPRA) ──
+Kalifornische Nutzer haben das Recht zu erfahren, welche Daten erhoben werden, diese zu löschen und der Weitergabe ihrer Daten zu widersprechen. BayFatura verkauft keine personenbezogenen Daten. Für Anfragen: privacy@bayfatura.com.
+
+── Vereinigtes Königreich (UK GDPR) ──
+UK-Nutzer unterliegen dem UK GDPR. Angemessenheitsentscheidung der UK ICO für die EU gilt. Beschwerden: Information Commissioner's Office (ico.org.uk).
+
+── Australien (Privacy Act 1988) ──
+Australische Nutzer können Beschwerden beim Office of the Australian Information Commissioner (oaic.gov.au) einreichen.`
+                    },
+                    {
+                        title: '8. Datenlöschung / Data Retention',
                         content: `• Kontodaten: werden grundsätzlich innerhalb von 30 Tagen nach Kontoschließung gelöscht, sofern keine gesetzlichen Pflichten entgegenstehen
 • Rechnungs- und Buchhaltungsdaten: Aufbewahrung gemäß gesetzlichen Pflichten, regelmäßig bis zu 10 Jahre
 • Analytics-Daten: maximal 14 Monate, sofern Einwilligung erteilt wurde
 • Sicherheits- und Log-Daten: grundsätzlich bis zu 30 Tage, längere Speicherung nur bei Sicherheitsvorfällen oder Rechtsdurchsetzung`
                     },
                     {
-                        title: '7. Datensicherheit / Data Security',
+                        title: '9. Datensicherheit / Data Security',
                         content: `• Alle Daten werden verschlüsselt übertragen (TLS 1.3)
 • Cloud Functions werden in europe-west3 (Frankfurt) betrieben
 • Firestore Security Rules schützen Mandantentrennung
@@ -152,7 +184,7 @@ In Deutschland können Sie sich außerdem an die Datenschutzaufsichtsbehörde Ih
 • Regelmäßige Sicherheitsüberprüfungen`
                     },
                     {
-                        title: '8. Änderungen / Updates',
+                        title: '10. Änderungen / Updates',
                         content: `Wir behalten uns vor, diese Datenschutzerklärung anzupassen. Bei wesentlichen Änderungen werden registrierte Nutzer per E-Mail informiert. Stand dieser Version: ${lastUpdated}`
                     }
                 ].map(section => (

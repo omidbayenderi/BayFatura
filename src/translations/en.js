@@ -438,7 +438,7 @@ export default {
     limitFeature2: "AI Receipt Scanner & Bank Matcher",
     limitFeature3: "Financial Forecasting & Reports",
     limitFeature4: "Ad-free Experience",
-    adSupported: "Ad-supported experience",
+    adSupported: "Limited free plan",
     currentPlan: "Current Plan",
     recommended: "RECOMMENDED",
     launchOffer: "Launch Special: 7€ for first 100 users",

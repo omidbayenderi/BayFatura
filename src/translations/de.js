@@ -456,7 +456,7 @@ export default {
     limitFeature2: 'KI-Belegscanner & Bankabgleich',
     limitFeature3: 'Finanzprognose & Berichte',
     limitFeature4: 'Werbefreies Erlebnis',
-    adSupported: 'Werbeunterstütztes Erlebnis',
+    adSupported: 'Limitierter Free-Plan',
     currentPlan: 'Aktueller Plan',
     recommended: 'EMPFOHLEN',
     launchOffer: 'Launch-Special: 7€ für die ersten 100 User',

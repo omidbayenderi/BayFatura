@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, storage, functions } from '../lib/firebase';
+import { getDb, storage, functions } from '../lib/firebase';
 import {
     collection, addDoc, deleteDoc, doc, onSnapshot, query, where,
     or, orderBy, updateDoc, setDoc, getDocs, writeBatch
@@ -46,6 +46,8 @@ const INITIAL_COMPANY_PROFILE = {
 
 export const InvoiceProvider = ({ children }) => {
     const { currentUser } = useAuth();
+    // Route all Firestore reads/writes to the user's assigned DB
+    const db = getDb(currentUser?._db);
     const [invoices, setInvoices] = useState([]);
     const [quotes, setQuotes] = useState([]);
     const [expenses, setExpenses] = useState([]);
