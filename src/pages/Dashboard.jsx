@@ -3,7 +3,6 @@ import { useInvoice } from '../context/InvoiceContext';
 import { motion } from 'framer-motion';
 import { FileText, TrendingUp, TrendingDown, Users, Clock, PlusCircle, Receipt, Sparkles, Lock, ArrowRightLeft, Database, Zap } from 'lucide-react';
 import InvoiceLimitModal from '../components/InvoiceLimitModal';
-import AdsComponent from '../components/AdsComponent';
 import { Link, useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -263,6 +262,32 @@ const Dashboard = () => {
                 </div>
             ) : (
                 <>
+            {/* Portugal AT certification warning — shown once per session */}
+            {companyProfile?.country === 'PT' && !sessionStorage.getItem('bayfatura_at_warning_dismissed') && (
+                <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '12px',
+                    background: '#fffbeb', border: '1px solid #fcd34d',
+                    borderRadius: '12px', padding: '14px 16px', marginBottom: '20px',
+                    fontSize: '0.875rem', color: '#92400e', lineHeight: '1.5'
+                }}>
+                    <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>⚠️</span>
+                    <div style={{ flex: 1 }}>
+                        <strong>Aviso — Software não certificado AT:</strong>{' '}
+                        O BayFatura não é software certificado pela Autoridade Tributária (AT).
+                        Para emissão de faturas legalmente válidas em Portugal, utilize software certificado.{' '}
+                        <a href="https://info.portaldasfinancas.gov.pt/pt/apoio_contribuinte/Paginas/software-faturacao-certificado.aspx"
+                           target="_blank" rel="noopener noreferrer"
+                           style={{ color: '#92400e', fontWeight: '600' }}>
+                            Lista AT →
+                        </a>
+                    </div>
+                    <button
+                        onClick={() => { sessionStorage.setItem('bayfatura_at_warning_dismissed', '1'); window.location.reload(); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', padding: '0 4px', flexShrink: 0 }}
+                        aria-label="Aviso ignorar"
+                    >✕</button>
+                </div>
+            )}
             <header className="page-header">
                 <div>
                     <h1>{getGreeting()}, {userName}</h1>
@@ -426,12 +451,6 @@ const Dashboard = () => {
                     )}
                 </div>
             </div>
-
-            {!isPro && (
-                <div style={{ marginTop: '8px' }}>
-                    <AdsComponent slot="3201234567" format="auto" />
-                </div>
-            )}
 
             {(invoices.length > 0 || expenses.length > 0) && (
                 <div className="dev-clear-data-wrapper">
