@@ -173,7 +173,13 @@ const SeoAgent = ({ websiteData, profile }) => {
         // Clean up previous script if ID changes or is removed
         const existingScript = document.getElementById('ga-script');
 
-        if (analyticsId && !existingScript) {
+        // Only inject analytics if user has consented (GDPR Art. 6 lit. a)
+        const consent = (() => {
+            try { return JSON.parse(localStorage.getItem('bayfatura_cookie_consent') || 'null'); } catch { return null; }
+        })();
+        const analyticsConsented = consent?.analytics === true;
+
+        if (analyticsId && !existingScript && analyticsConsented) {
             // Inject gtag.js
             const script = document.createElement('script');
             script.id = 'ga-script';
@@ -192,6 +198,8 @@ const SeoAgent = ({ websiteData, profile }) => {
             ].join('\n');
             document.head.appendChild(configScript);
             console.log(`📊 SEO Agent: Google Analytics (${analyticsId}) injected.`);
+        } else if (analyticsId && !analyticsConsented) {
+            console.log('📊 SEO Agent: Analytics skipped — no cookie consent.');
         }
 
 
