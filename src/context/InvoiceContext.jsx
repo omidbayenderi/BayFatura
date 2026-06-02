@@ -1,12 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, storage } from '../lib/firebase';
-import { 
-    collection, addDoc, deleteDoc, doc, onSnapshot, query, where, 
-    or, orderBy, updateDoc, setDoc, getDocs, writeBatch 
+import { db, storage, functions } from '../lib/firebase';
+import {
+    collection, addDoc, deleteDoc, doc, onSnapshot, query, where,
+    or, orderBy, updateDoc, setDoc, getDocs, writeBatch
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { httpsCallable } from 'firebase/functions';
 import { useAuth } from './AuthContext';
 import { logger } from '../lib/logger';
+
+const checkInvoiceLimitFn = httpsCallable(functions, 'checkInvoiceLimit');
 
 /**
  * Uploads a File object to Firebase Storage and returns the public download URL.
@@ -140,6 +143,7 @@ export const InvoiceProvider = ({ children }) => {
 
     // Data Actions
     const saveInvoice = async (d) => {
+        await checkInvoiceLimitFn();
         const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString() });
         const ref = await addDoc(collection(db, 'invoices'), payload);
         return { id: ref.id, ...payload };
@@ -151,8 +155,9 @@ export const InvoiceProvider = ({ children }) => {
 
     const updateInvoice = async (id, d) => await updateDoc(doc(db, 'invoices', id), cleanData(d));
     const updateInvoiceStatus = async (id, s) => await updateDoc(doc(db, 'invoices', id), { status: s });
-    
+
     const saveQuote = async (d) => {
+        await checkInvoiceLimitFn();
         const payload = cleanData({ ...d, userId: currentUser.uid, createdAt: new Date().toISOString() });
         const ref = await addDoc(collection(db, 'quotes'), payload);
         return { id: ref.id, ...payload };

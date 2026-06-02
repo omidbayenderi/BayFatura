@@ -87,6 +87,21 @@ export const AuthProvider = ({ children }) => {
                     updates = { ...updates, email: user.email };
                 }
 
+                // Süreli verilen Elite plan dolmuşsa otomatik düşür
+                if (
+                    data.subscriptionType === 'granted' &&
+                    data.planExpiresAt &&
+                    new Date(data.planExpiresAt) < new Date()
+                ) {
+                    updates = {
+                        ...updates,
+                        plan: 'standard',
+                        subscriptionType: null,
+                        planExpiresAt: null,
+                        planDowngradedAt: new Date().toISOString(),
+                    };
+                }
+
                 const appUser = { uid: user.uid, email: user.email, ...data, ...updates };
                 if (Object.keys(updates).length > 0) {
                     await updateDoc(userRef, updates);
@@ -419,7 +434,7 @@ export const AuthProvider = ({ children }) => {
             currentUser, loading, login, register, logout, signInWithGoogle, signInWithMicrosoft, signInAsDemo,
             resetPassword, updateUser, changePassword, deleteAccount,
             isAuthenticated: !!currentUser,
-            isPro: ['premium', 'elite', 'lifetime'].includes(currentUser?.plan)
+            isPro: ['premium', 'elite'].includes(currentUser?.plan)
         }}>
             {children}
         </AuthContext.Provider>

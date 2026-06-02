@@ -1,4 +1,4 @@
-// BayFatura Service Worker v2
+// BayFatura Service Worker v3
 // ⚠️ CRITICAL: Development mode detection
 // In dev mode, this SW must be a no-op to avoid intercepting Vite HMR requests
 
@@ -18,13 +18,11 @@ if (IS_DEV) {
     // No fetch handler in dev mode — let all requests pass through normally
 } else {
     // ─── PRODUCTION MODE ONLY ─────────────────────────────────────────────────
-    const CACHE_VERSION = 'v2';
+    const CACHE_VERSION = 'v3';
     const STATIC_CACHE = `bayfatura-static-${CACHE_VERSION}`;
     const DYNAMIC_CACHE = `bayfatura-dynamic-${CACHE_VERSION}`;
 
     const STATIC_ASSETS = [
-        '/',
-        '/index.html',
         '/manifest.json',
         '/logo.svg'
     ];
@@ -87,26 +85,23 @@ if (IS_DEV) {
                         caches.open(DYNAMIC_CACHE).then((cache) => cache.put(request, cloned));
                         return response;
                     })
-                    .catch(() => caches.match(request).then(r => r || caches.match('/')))
+                    .catch(() => caches.match(request))
             );
             return;
         }
 
-        // CSS/JS/Font: Cache first, network fallback
+        // CSS/JS/Font: Network first, cache fallback. This avoids stale auth/CSP bundles.
         if (
             request.destination === 'style' ||
             request.destination === 'script' ||
             request.destination === 'font'
         ) {
             event.respondWith(
-                caches.match(request).then((cached) => {
-                    if (cached) return cached;
-                    return fetch(request).then((response) => {
-                        const cloned = response.clone();
-                        caches.open(DYNAMIC_CACHE).then((cache) => cache.put(request, cloned));
-                        return response;
-                    });
-                })
+                fetch(request).then((response) => {
+                    const cloned = response.clone();
+                    caches.open(DYNAMIC_CACHE).then((cache) => cache.put(request, cloned));
+                    return response;
+                }).catch(() => caches.match(request))
             );
             return;
         }

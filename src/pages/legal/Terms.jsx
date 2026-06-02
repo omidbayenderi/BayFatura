@@ -6,76 +6,91 @@ import { Link } from 'react-router-dom';
  * Required for commercial SaaS platforms in EU
  */
 const Terms = () => {
-    const lastUpdated = '21. Mai 2026';
+    const lastUpdated = '02. Juni 2026';
 
     const sections = [
         {
             title: '§1 Geltungsbereich / Scope',
-            content: `Diese Allgemeinen Geschäftsbedingungen (AGB) gelten für alle Verträge zwischen BayFatura (nachfolgend "Anbieter") und den Nutzern der Plattform bayfatura.com (nachfolgend "Nutzer").
+            content: `Diese Allgemeinen Geschäftsbedingungen (AGB) gelten für die Nutzung der Plattform bayfatura.com durch Unternehmer im Sinne von §14 BGB sowie, soweit ausdrücklich angeboten, durch Verbraucher im Sinne von §13 BGB.
 
-Die Nutzung der Plattform setzt die Akzeptanz dieser AGB voraus. Abweichende Bedingungen des Nutzers werden nicht anerkannt.`
+Anbieter ist BayFatura, vertreten durch Omid Bayandarimoghaddam. Die vollständigen Anbieterinformationen sind im Impressum abrufbar. Abweichende Bedingungen des Nutzers gelten nur, wenn wir ihnen ausdrücklich schriftlich zustimmen.`
         },
         {
             title: '§2 Leistungsbeschreibung / Services',
-            content: `BayFatura bietet eine cloudbasierte Software-as-a-Service (SaaS) Plattform für:
+            content: `BayFatura bietet eine cloudbasierte Software-as-a-Service-Plattform für:
 • Rechnungserstellung und -verwaltung
 • Angebots- und Kundenverwaltung
 • Ausgabenverfolgung und Finanzreporting
 • KI-gestützte Funktionen (Bankauszugsanalyse, Belegscanner)
 • E-Mail-Versand von Rechnungen
 
-Der Anbieter übernimmt keine Haftung für steuerliche oder rechtliche Korrektheit der erstellten Dokumente.`
+BayFatura stellt technische Werkzeuge bereit und ersetzt keine Steuer-, Rechts- oder Buchhaltungsberatung. Nutzer bleiben für Inhalt, Pflichtangaben, steuerliche Behandlung und rechtliche Korrektheit ihrer Dokumente verantwortlich.`
         },
         {
             title: '§3 Vertragsschluss / Contract Formation',
-            content: `Der Vertrag kommt durch die Registrierung und Bestätigung der E-Mail-Adresse zustande. Für kostenpflichtige Pakete (Elite) kommt der Vertrag mit der Zahlungsbestätigung zustande.
+            content: `Der kostenfreie Nutzungsvertrag kommt durch Registrierung und Annahme dieser AGB zustande.
 
-Nutzer müssen mindestens 18 Jahre alt sein und dürfen die Plattform nur für geschäftliche Zwecke nutzen.`
+Für kostenpflichtige Pakete kommt der Vertrag erst zustande, wenn der Nutzer im Checkout eine zahlungspflichtige Bestellung ausdrücklich bestätigt und der Zahlungsvorgang erfolgreich abgeschlossen wurde. Vor Abgabe der Bestellung werden die wesentlichen Leistungsmerkmale, Laufzeit, Preis, Steuerhinweise und Zahlungsmittel angezeigt.
+
+Nutzer müssen mindestens 18 Jahre alt sein. Geschäftliche Nutzer sichern zu, vertretungsberechtigt zu sein.`
         },
         {
             title: '§4 Preise & Zahlungsbedingungen / Pricing',
-            content: `Free-Paket: Kostenlos, eingeschränkte Funktionen.
-Elite-Paket: €9/Monat oder €77/Jahr, automatische Abrechnung über Stripe.
+            content: `Free-Paket: kostenlos, eingeschränkte Funktionen.
+Elite-Paket: 9 EUR/Monat oder 77 EUR/Jahr, automatische Abrechnung über Stripe.
 
-Alle Preise verstehen sich zzgl. der gesetzlichen Mehrwertsteuer (falls anwendbar).
-Zahlungen werden über Stripe Inc. verarbeitet. Rechnungen werden automatisch per E-Mail zugesandt.`
+Bei Angeboten an Verbraucher werden Gesamtpreise einschließlich gesetzlicher Umsatzsteuer angezeigt, soweit Umsatzsteuer anfällt. Bei Angeboten ausschließlich an Unternehmer können Nettopreise zuzüglich gesetzlicher Umsatzsteuer ausgewiesen werden.
+
+Zahlungen werden über Stripe verarbeitet. Wir speichern keine vollständigen Kartendaten. Rechnungen und Zahlungsbestätigungen werden elektronisch bereitgestellt oder per E-Mail zugesandt.`
         },
         {
             title: '§5 Kündigung / Cancellation',
-            content: `Das Free-Paket kann jederzeit ohne Kündigung eingestellt werden.
-Das Elite-Paket kann monatlich zum Ende des Abrechnungszeitraums über das Nutzerprofil oder per E-Mail gekündigt werden.
+            content: `Das Free-Paket kann jederzeit durch Löschung des Kontos beendet werden.
+Das Elite-Paket kann zum Ende des laufenden Abrechnungszeitraums über das Nutzerprofil, Stripe Customer Portal oder per E-Mail gekündigt werden.
 
-Bei Kündigung bleibt der Zugang bis zum Ende des bezahlten Zeitraums bestehen. Bereits geleistete Zahlungen werden nicht erstattet.`
+Bei Kündigung bleibt der Zugang bis zum Ende des bezahlten Zeitraums bestehen. Erstattungen erfolgen nur, wenn gesetzlich vorgeschrieben oder ausdrücklich zugesagt. Gesetzliche Verbraucherrechte bleiben unberührt.`
         },
         {
-            title: '§6 Datenschutz / Data Protection',
+            title: '§6 Widerrufsrecht für Verbraucher / Right of Withdrawal',
+            content: `Verbrauchern steht bei Fernabsatzverträgen grundsätzlich ein gesetzliches Widerrufsrecht zu. Die vollständige Widerrufsbelehrung ist unter /widerruf abrufbar.
+
+Bei digitalen Dienstleistungen kann das Widerrufsrecht vor Ablauf von 14 Tagen erlöschen, wenn der Verbraucher ausdrücklich zustimmt, dass wir vor Ablauf der Widerrufsfrist mit der Leistung beginnen, und bestätigt, dass er bei vollständiger Vertragserfüllung sein Widerrufsrecht verliert.`
+        },
+        {
+            title: '§7 Datenschutz / Data Protection',
             content: `Die Verarbeitung personenbezogener Daten erfolgt gemäß unserer Datenschutzerklärung und den Vorgaben der EU-Datenschutz-Grundverordnung (DSGVO).
 
-Daten werden auf EU-Servern (Frankfurt, Deutschland) gespeichert. Es werden keine Daten an Dritte verkauft.`
+Daten werden nicht an Dritte verkauft. Für Hosting, Authentifizierung, Zahlungen, E-Mail-Versand und Analysefunktionen setzen wir Dienstleister ein, die in der Datenschutzerklärung benannt werden.`
         },
         {
-            title: '§7 Verfügbarkeit & Haftung / Availability & Liability',
-            content: `Wir streben eine Verfügbarkeit von 99,5% p.a. an, übernehmen jedoch keine Garantie. Wartungsarbeiten werden nach Möglichkeit angekündigt.
+            title: '§8 Verfügbarkeit & Haftung / Availability & Liability',
+            content: `Wir streben eine hohe Verfügbarkeit an. Wartungsarbeiten, Sicherheitsupdates, Störungen bei Drittanbietern und höhere Gewalt können die Verfügbarkeit vorübergehend einschränken.
 
-Die Haftung des Anbieters ist auf Vorsatz und grobe Fahrlässigkeit beschränkt. Eine Haftung für mittelbare Schäden, entgangene Gewinne oder Datenverlust ist ausgeschlossen, sofern gesetzlich zulässig.`
+Wir haften unbeschränkt bei Vorsatz, grober Fahrlässigkeit, Verletzung von Leben, Körper oder Gesundheit sowie nach zwingenden gesetzlichen Vorschriften. Bei leicht fahrlässiger Verletzung wesentlicher Vertragspflichten haften wir begrenzt auf den vertragstypischen, vorhersehbaren Schaden. Im Übrigen ist die Haftung ausgeschlossen, soweit gesetzlich zulässig.`
         },
         {
-            title: '§8 Geistiges Eigentum / Intellectual Property',
+            title: '§9 Geistiges Eigentum / Intellectual Property',
             content: `Alle Rechte an der Plattform, dem Quellcode, Designs und Marken verbleiben beim Anbieter. Nutzern wird ein nicht übertragbares, widerrufliches Nutzungsrecht eingeräumt.
 
 Die durch Nutzer erstellten Inhalte (Rechnungen, Kundendaten) verbleiben Eigentum des Nutzers.`
         },
         {
-            title: '§9 Anwendbares Recht / Governing Law',
-            content: `Es gilt das Recht der Europäischen Union sowie, subsidiär, portugiesisches Recht.
+            title: '§10 Nutzerpflichten / User Obligations',
+            content: `Nutzer dürfen die Plattform nicht missbräuchlich verwenden, keine rechtswidrigen Inhalte verarbeiten und keine Sicherheitsmechanismen umgehen. Zugangsdaten sind vertraulich zu behandeln.
 
-Für Verbraucher gilt das zwingende Verbraucherschutzrecht des jeweiligen EU-Mitgliedstaats des Nutzers.
-
-Gerichtsstand für Streitigkeiten mit Unternehmern ist [Ihr Gerichtsstand, Portugal].`
+Bei Verstößen können wir Funktionen vorübergehend sperren oder den Vertrag kündigen, sofern dies zur Sicherheit, Missbrauchsvermeidung oder Rechtsdurchsetzung erforderlich ist.`
         },
         {
-            title: '§10 Änderungen / Amendments',
-            content: `Wir behalten uns vor, diese AGB anzupassen. Wesentliche Änderungen werden mindestens 30 Tage vor Inkrafttreten per E-Mail mitgeteilt. Widerspricht der Nutzer nicht innerhalb dieser Frist, gelten die neuen AGB als akzeptiert.`
+            title: '§11 Anwendbares Recht / Governing Law',
+            content: `Es gilt das Recht der Europäischen Union sowie ergänzend portugiesisches Recht, soweit keine zwingenden Verbraucherschutzvorschriften entgegenstehen.
+
+Für Verbraucher gilt zusätzlich der zwingende Verbraucherschutz des Staates, in dem sie ihren gewöhnlichen Aufenthalt haben. Für Streitigkeiten mit Unternehmern ist, soweit zulässig, der Sitz des Anbieters Gerichtsstand.`
+        },
+        {
+            title: '§12 Änderungen / Amendments',
+            content: `Wir können diese AGB ändern, wenn sachliche Gründe vorliegen, etwa Gesetzesänderungen, neue Funktionen, Sicherheitsanforderungen oder geänderte Geschäftsprozesse.
+
+Wesentliche Änderungen werden mindestens 30 Tage vor Inkrafttreten in Textform mitgeteilt. Für kostenpflichtige Verträge gelten Änderungen nur, wenn der Nutzer zustimmt oder ein gesetzlich zulässiger Änderungsmechanismus greift. Kündigungsrechte bleiben unberührt.`
         }
     ];
 
@@ -134,6 +149,7 @@ Gerichtsstand für Streitigkeiten mit Unternehmern ist [Ihr Gerichtsstand, Portu
                 <div style={{ display: 'flex', gap: '20px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                     <Link to="/impressum" style={{ color: '#6366f1', textDecoration: 'none', fontSize: '0.85rem' }}>Impressum</Link>
                     <Link to="/privacy" style={{ color: '#6366f1', textDecoration: 'none', fontSize: '0.85rem' }}>Datenschutz</Link>
+                    <Link to="/widerruf" style={{ color: '#6366f1', textDecoration: 'none', fontSize: '0.85rem' }}>Widerruf</Link>
                     <Link to="/" style={{ color: '#6366f1', textDecoration: 'none', fontSize: '0.85rem' }}>← Zurück / Back</Link>
                 </div>
             </div>

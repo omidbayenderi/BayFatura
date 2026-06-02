@@ -3,7 +3,7 @@
  * Stripe Webhook, Genkit AI, Email Automation & Notifications
  */
 
-import { https, pubsub, auth } from 'firebase-functions/v1';
+import { https, region } from 'firebase-functions/v1';
 import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { genkit, z } from 'genkit';
@@ -12,6 +12,9 @@ import { Resend } from 'resend';
 
 admin.initializeApp();
 const db = admin.firestore();
+const FUNCTION_REGION = 'europe-west3';
+const euFunctions = region(FUNCTION_REGION);
+const euCallable = () => euFunctions.runWith({ enforceAppCheck: true }).https;
 
 // --- Services Initialization ---
 const getStripeSecret = () => process.env.STRIPE_SECRET_KEY || '';
@@ -76,11 +79,26 @@ const toCallableError = (scope, error, fallbackMessage = 'The operation could no
     return new https.HttpsError('internal', fallbackMessage);
 };
 
-// ─── Rate Limiter (Firestore-backed) ──────────────────────────────────────────
-const AI_RATE_LIMIT_MAX = 10;       // max calls
-const AI_RATE_LIMIT_WINDOW_MS = 60_000; // per 1 minute
+// ─── Plan Definitions ─────────────────────────────────────────────────────────
+const PLANS = {
+    standard: {
+        invoicesPerMonth: 5,
+        aiCallsPerDay: 0,
+    },
+    elite: {
+        invoicesPerMonth: Infinity,
+        aiCallsPerDay: 50,
+    },
+    premium: {
+        invoicesPerMonth: Infinity,
+        aiCallsPerDay: 50,
+    },
+};
 
-const checkRateLimit = async (uid, scope) => {
+const isElitePlan = (plan) => ['elite', 'premium'].includes(plan);
+
+// ─── Rate Limiter (Firestore-backed) ──────────────────────────────────────────
+const checkRateLimit = async (uid, scope, maxCalls, windowMs) => {
     const key = `rate_limits/${uid}_${scope}`;
     const ref = db.doc(key);
     const snap = await ref.get();
@@ -91,8 +109,8 @@ const checkRateLimit = async (uid, scope) => {
         const windowStart = data.windowStart || 0;
         const count = data.count || 0;
 
-        if (now - windowStart < AI_RATE_LIMIT_WINDOW_MS) {
-            if (count >= AI_RATE_LIMIT_MAX) {
+        if (now - windowStart < windowMs) {
+            if (count >= maxCalls) {
                 throw new https.HttpsError(
                     'resource-exhausted',
                     'Too many requests. Please wait a moment and try again.',
@@ -110,10 +128,46 @@ const checkRateLimit = async (uid, scope) => {
 const requireElitePlan = async (uid) => {
     const userDoc = await db.collection('users').doc(uid).get();
     const plan = userDoc.exists ? userDoc.data()?.plan : 'standard';
-    if (!['elite', 'premium', 'lifetime'].includes(plan)) {
+    if (!isElitePlan(plan)) {
         throw new https.HttpsError(
             'permission-denied',
             'This feature requires an Elite plan. Please upgrade to access AI tools.',
+        );
+    }
+    // Elite AI daily limit: 50 calls/day to protect against abuse
+    await checkRateLimit(uid, 'ai_daily', PLANS.elite.aiCallsPerDay, 24 * 60 * 60_000);
+};
+
+// ─── Free Plan Invoice Limit ───────────────────────────────────────────────────
+const checkFreeInvoiceLimit = async (uid) => {
+    const userDoc = await db.collection('users').doc(uid).get();
+    const plan = userDoc.exists ? userDoc.data()?.plan : 'standard';
+    if (isElitePlan(plan)) return;
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+
+    const [invoicesSnap, quotesSnap] = await Promise.all([
+        db.collection('invoices')
+            .where('userId', '==', uid)
+            .where('isDeleted', '!=', true)
+            .where('createdAt', '>=', monthStart)
+            .where('createdAt', '<', monthEnd)
+            .get(),
+        db.collection('quotes')
+            .where('userId', '==', uid)
+            .where('isDeleted', '!=', true)
+            .where('createdAt', '>=', monthStart)
+            .where('createdAt', '<', monthEnd)
+            .get(),
+    ]);
+
+    const totalThisMonth = invoicesSnap.size + quotesSnap.size;
+    if (totalThisMonth >= PLANS.standard.invoicesPerMonth) {
+        throw new https.HttpsError(
+            'resource-exhausted',
+            `Free plan limit reached: ${PLANS.standard.invoicesPerMonth} invoices/quotes per month. Please upgrade to Elite.`,
         );
     }
 };
@@ -154,7 +208,7 @@ const ai = genkit({
 });
 
 // ─── 1. Stripe Webhook Handler ────────────────────────────────────────────────────
-export const stripeWebhook = https.onRequest(async (req, res) => {
+export const stripeWebhook = euFunctions.https.onRequest(async (req, res) => {
     if (!getStripeSecret()) {
         console.error('Stripe secret key is missing from environment');
         return res.status(500).send('Stripe secret key not configured');
@@ -176,9 +230,7 @@ export const stripeWebhook = https.onRequest(async (req, res) => {
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    const getPlanFromSession = (session) => {
-        const amount = session?.amount_total;
-        if (amount >= 29900) return { plan: 'elite', subscriptionType: 'lifetime' };
+    const getPlanFromSession = () => {
         return { plan: 'elite', subscriptionType: 'subscription' };
     };
 
@@ -193,7 +245,7 @@ export const stripeWebhook = https.onRequest(async (req, res) => {
                     break;
                 }
 
-                const planData = getPlanFromSession(session);
+                const planData = getPlanFromSession();
                 await db.collection('users').doc(userId).update({
                     ...planData,
                     stripeCustomerId: session.customer,
@@ -250,7 +302,7 @@ export const stripeWebhook = https.onRequest(async (req, res) => {
     }
 });
 
-export const syncUserPlan = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const syncUserPlan = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     if (!getStripeSecret()) throw new https.HttpsError('failed-precondition', 'Stripe secret key not configured');
     
@@ -263,9 +315,7 @@ export const syncUserPlan = https.runWith({ enforceAppCheck: true }).onCall(asyn
         const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
         if (session.payment_status === 'paid') {
             const userId = context.auth.uid;
-            const planData = session.amount_total >= 29900
-                ? { plan: 'elite', subscriptionType: 'lifetime' }
-                : { plan: 'elite', subscriptionType: 'subscription' };
+            const planData = { plan: 'elite', subscriptionType: 'subscription' };
 
             await db.collection('users').doc(userId).update({
                 ...planData,
@@ -284,7 +334,13 @@ export const syncUserPlan = https.runWith({ enforceAppCheck: true }).onCall(asyn
     }
 });
 
-export const syncAllAuthUsers = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const checkInvoiceLimit = euCallable().onCall(async (_data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    await checkFreeInvoiceLimit(context.auth.uid);
+    return { allowed: true };
+});
+
+export const syncAllAuthUsers = euCallable().onCall(async (_data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const adminEmail = context.auth.token.email;
     if (!['support@bayfatura.com', 'omidbayenderi@gmail.com'].includes(adminEmail)) {
@@ -328,10 +384,9 @@ export const syncAllAuthUsers = https.runWith({ enforceAppCheck: true }).onCall(
 });
 
 // ─── 2. AI: Bank Statement Matcher (Genkit) ───────────────────────────────────────
-export const analyzeBankStatement = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const analyzeBankStatement = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
-    await checkRateLimit(context.auth.uid, 'ai_bank');
     const { csvData, existingInvoices } = data;
 
     if (!csvData) throw new https.HttpsError('invalid-argument', 'Missing csvData');
@@ -376,10 +431,9 @@ export const analyzeBankStatement = https.runWith({ enforceAppCheck: true }).onC
 });
 
 // ─── 3. AI: Receipt Scanner (Genkit Vision) ───────────────────────────────────────
-export const scanReceipt = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const scanReceipt = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
-    await checkRateLimit(context.auth.uid, 'ai_receipt');
     const { base64Image, mimeType } = data;
 
     if (!base64Image) throw new https.HttpsError('invalid-argument', 'Missing base64Image');
@@ -420,10 +474,9 @@ export const scanReceipt = https.runWith({ enforceAppCheck: true }).onCall(async
 });
 
 // ─── 4. AI: Financial Forecasting (Genkit) ──────────────────────────────────────
-export const analyzeFinancials = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const analyzeFinancials = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
-    await checkRateLimit(context.auth.uid, 'ai_finance');
     const { historyData } = data;
 
     if (!historyData) throw new https.HttpsError('invalid-argument', 'Missing historyData');
@@ -632,7 +685,7 @@ const buildInvoiceEmailHtml = ({ invoice, senderName, senderEmail, type, languag
 </html>`.trim();
 };
 
-export const sendInvoiceEmail = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const sendInvoiceEmail = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const { toEmail, toName, invoiceId, type = 'invoice', language = 'de' } = data;
 
@@ -653,7 +706,7 @@ export const sendInvoiceEmail = https.runWith({ enforceAppCheck: true }).onCall(
     const collectionName = type === 'quote' ? 'quotes' : 'invoices';
 
     try {
-        await checkRateLimit(context.auth.uid, 'email_invoice');
+        await checkRateLimit(context.auth.uid, 'email_invoice', 20, 60 * 60_000);
 
         const invoiceRef = db.collection(collectionName).doc(invoiceId);
         const invoiceSnap = await invoiceRef.get();
@@ -810,7 +863,7 @@ const normalizeAppUrl = (value) => {
     }
 };
 
-export const sendInvitationEmail = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const sendInvitationEmail = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const { inviteeEmail, inviteeName, role, invitedBy, invitationId, companyName, senderName, appUrl } = data;
 
@@ -838,7 +891,7 @@ export const sendInvitationEmail = https.runWith({ enforceAppCheck: true }).onCa
     const acceptLink = `${appBaseUrl}/accept-invite?token=${invitationId}&tenant=${invitedBy}&email=${encodeURIComponent(inviteeEmail)}`;
 
     try {
-        await checkRateLimit(context.auth.uid, 'email_invite');
+        await checkRateLimit(context.auth.uid, 'email_invite', 10, 60 * 60_000);
 
         const memberRef = db.collection('users').doc(context.auth.uid).collection('team').doc(invitationId);
         const memberSnap = await memberRef.get();
@@ -918,7 +971,7 @@ export const sendInvitationEmail = https.runWith({ enforceAppCheck: true }).onCa
 });
 
 // ─── 5c. Accept Team Invitation ──────────────────────────────────────────────
-export const acceptTeamInvitation = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const acceptTeamInvitation = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const { token, tenantId } = data;
 
@@ -972,7 +1025,7 @@ export const acceptTeamInvitation = https.runWith({ enforceAppCheck: true }).onC
 
 // ─── 5. Recurring Invoice Automation ──────────────────────────────────────────
 // Runs every day at 02:00 AM - generates invoices from due recurring templates
-export const processRecurringTemplates = pubsub.schedule('0 2 * * *').timeZone('Europe/Berlin').onRun(async () => {
+export const processRecurringTemplates = euFunctions.pubsub.schedule('0 2 * * *').timeZone('Europe/Berlin').onRun(async () => {
     const now = new Date();
     let processed = 0;
 
@@ -1041,9 +1094,98 @@ export const processRecurringTemplates = pubsub.schedule('0 2 * * *').timeZone('
     }
 });
 
-// ─── 6. Cloud Operations: Notifications (Overdue Invoices) ───────────────────────
+// ─── 6. Admin: Grant Elite Plan ──────────────────────────────────────────────
+export const grantElitePlan = euCallable().onCall(async (data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    const adminEmail = context.auth.token.email;
+    if (!['support@bayfatura.com', 'omidbayenderi@gmail.com'].includes(adminEmail)) {
+        throw new https.HttpsError('permission-denied', 'Only admins can grant plans');
+    }
+
+    const { targetUserId, durationDays, reason } = data;
+    if (!targetUserId) throw new https.HttpsError('invalid-argument', 'targetUserId required');
+    if (!Number.isInteger(durationDays) || durationDays < 0) throw new https.HttpsError('invalid-argument', 'durationDays must be 0 (unlimited) or a positive integer');
+
+    const userRef = db.collection('users').doc(targetUserId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) throw new https.HttpsError('not-found', 'User not found');
+
+    const expiresAt = durationDays === 0
+        ? null  // 0 = süresiz
+        : new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+
+    await userRef.update({
+        plan: 'elite',
+        subscriptionType: 'granted',
+        planGrantedBy: adminEmail,
+        planGrantReason: reason || 'admin_grant',
+        planActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        planExpiresAt: expiresAt,
+    });
+
+    await db.collection('audit_logs').add({
+        action: 'grant_elite_plan',
+        targetUserId,
+        targetUserEmail: userSnap.data()?.email || 'unknown',
+        adminEmail,
+        durationDays: durationDays === 0 ? 'unlimited' : durationDays,
+        reason: reason || 'admin_grant',
+        planExpiresAt: expiresAt,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log(`✅ Elite granted to ${targetUserId} by ${adminEmail} — expires: ${expiresAt || 'never'}`);
+    return { success: true, planExpiresAt: expiresAt };
+});
+
+// ─── 6b. Scheduled: Downgrade expired granted plans ──────────────────────────
+// Her gün gece yarısı çalışır
+export const checkGrantedPlanExpiry = euFunctions.pubsub.schedule('0 0 * * *').timeZone('Europe/Berlin').onRun(async () => {
+    const nowIso = new Date().toISOString();
+    try {
+        const snapshot = await db.collection('users')
+            .where('subscriptionType', '==', 'granted')
+            .where('planExpiresAt', '<=', nowIso)
+            .get();
+
+        if (snapshot.empty) {
+            console.log('✅ No expired granted plans found');
+            return null;
+        }
+
+        const batch = db.batch();
+        snapshot.forEach(docSnap => {
+            batch.update(docSnap.ref, {
+                plan: 'standard',
+                subscriptionType: null,
+                planDowngradedAt: admin.firestore.FieldValue.serverTimestamp(),
+                planExpiresAt: null,
+            });
+
+            // Kullanıcıya bildirim gönder
+            const notifRef = db.collection('users').doc(docSnap.id).collection('notifications').doc();
+            batch.set(notifRef, {
+                title: 'Elite Plan Sona Erdi',
+                message: 'Ücretsiz Elite kullanım süreniz doldu. Devam etmek için Elite\'e abone olabilirsiniz.',
+                type: 'warning',
+                read: false,
+                link: '/billing',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        await batch.commit();
+        console.log(`⬇️ Downgraded ${snapshot.size} expired granted Elite plans`);
+        return null;
+    } catch (error) {
+        console.error('checkGrantedPlanExpiry failed:', error);
+        return null;
+    }
+});
+
+// ─── 7. Cloud Operations: Notifications (Overdue Invoices) ───────────────────────
 // Runs every day at 09:00 AM
-export const checkOverdueInvoices = pubsub.schedule('0 9 * * *').timeZone('Europe/Berlin').onRun(async () => {
+export const checkOverdueInvoices = euFunctions.pubsub.schedule('0 9 * * *').timeZone('Europe/Berlin').onRun(async () => {
     const nowIso = new Date().toISOString();
     const unpaidStatuses = new Set(['pending', 'sent', 'overdue']);
     try {
@@ -1101,7 +1243,7 @@ const getProxyCorsOrigin = (req) => {
     return '';
 };
 
-export const proxyImage = https.onRequest(async (req, res) => {
+export const proxyImage = euFunctions.https.onRequest(async (req, res) => {
     const corsOrigin = getProxyCorsOrigin(req);
     if (corsOrigin) {
         res.set('Access-Control-Allow-Origin', corsOrigin);
@@ -1170,7 +1312,7 @@ export const proxyImage = https.onRequest(async (req, res) => {
     }
 });
 // --- 🛡️ Auth Sync: Auto-create Firestore data when Auth user is created ---
-export const onUserCreated = auth.user().onCreate(async (user) => {
+export const onUserCreated = euFunctions.auth.user().onCreate(async (user) => {
     const uid = user.uid;
     console.log(`👤 User ${uid} created in Auth. Provisioning Firestore document...`);
     
@@ -1200,12 +1342,11 @@ export const onUserCreated = auth.user().onCreate(async (user) => {
 });
 
 // --- 🛡️ Auth Sync: Auto-delete Firestore data when Auth user is deleted ---
-export const onUserDeleted = auth.user().onDelete(async (user) => {
+export const onUserDeleted = euFunctions.auth.user().onDelete(async (user) => {
     const uid = user.uid;
     console.log(`🗑️ User ${uid} deleted from Auth. Cleaning up Firestore data...`);
-    
+
     try {
-        // Delete the main user document
         await db.collection('users').doc(uid).delete();
         console.log(`✅ User ${uid} data successfully purged from Firestore.`);
         return null;
@@ -1213,4 +1354,592 @@ export const onUserDeleted = auth.user().onDelete(async (user) => {
         console.error(`❌ Failed to purge data for user ${uid}:`, error);
         return null;
     }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🤖 BAYFATURA AGENT TEAM
+// Amaç: Müşteri edinme, aktivasyon, elde tutma ve gelir büyümesini otomatize et.
+//
+// Agents:
+//   1. Conversion Agent  — Free limit dolunca kişisel ikna emaili
+//   2. Churn Agent       — 7+ gün sessiz Elite kullanıcıya uyarı
+//   3. Onboarding Agent  — 24s kayıt, hiç fatura oluşturmamış
+//   4. Win-back Agent    — Elite'ten düşen kullanıcıyı geri kazan
+//
+// Koordinasyon: Her agent önce cooldown kontrolü yapar, sonra aksiyon alır,
+// sonra agent_logs'a yazar. Böylece kullanıcılar spam almaz ve her agent
+// diğerinin ne yaptığını bilir.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Agent Konfigürasyonu ─────────────────────────────────────────────────────
+const AGENT_CONFIG = {
+    conversion:  { cooldownDays: 7,  name: 'Conversion Agent',  emoji: '💰' },
+    churn:       { cooldownDays: 5,  name: 'Churn Agent',       emoji: '🛡️' },
+    onboarding:  { cooldownDays: 3,  name: 'Onboarding Agent',  emoji: '🚀' },
+    winback:     { cooldownDays: 14, name: 'Win-back Agent',    emoji: '🔄' },
+};
+
+const ADMIN_EMAILS = ['omidbayenderi@gmail.com', 'support@bayfatura.com'];
+
+// ─── Shared Agent Helpers ─────────────────────────────────────────────────────
+
+const getAgentResend = () => new Resend(getResendKey());
+
+/** Kullanıcının bu agent tarafından son ne zaman kontakt edildiğini kontrol eder */
+const checkAgentCooldown = async (uid, agentType) => {
+    const cfg = AGENT_CONFIG[agentType];
+    const logRef = db.collection('agent_logs')
+        .where('uid', '==', uid)
+        .where('agentType', '==', agentType)
+        .orderBy('sentAt', 'desc')
+        .limit(1);
+
+    const snap = await logRef.get();
+    if (snap.empty) return true; // hiç kontakt edilmemiş, devam et
+
+    const lastLog = snap.docs[0].data();
+    const lastSentMs = lastLog.sentAt?.toMillis?.() || 0;
+    const cooldownMs = cfg.cooldownDays * 24 * 60 * 60 * 1000;
+    return (Date.now() - lastSentMs) > cooldownMs;
+};
+
+/** Agent aksiyonunu loglar */
+const logAgentAction = async (uid, agentType, { email, subject, status, reason }) => {
+    await db.collection('agent_logs').add({
+        uid,
+        agentType,
+        agentName: AGENT_CONFIG[agentType]?.name || agentType,
+        email,
+        subject,
+        status, // 'sent' | 'skipped' | 'error'
+        reason,
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+};
+
+/** Kullanıcının bu ayki fatura + teklif sayısını ve toplam gelirini hesaplar */
+const getUserMonthlyStats = async (uid) => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [invSnap, quoteSnap, expSnap, customerSnap] = await Promise.all([
+        db.collection('invoices').where('userId', '==', uid).where('createdAt', '>=', monthStart).get(),
+        db.collection('quotes').where('userId', '==', uid).where('createdAt', '>=', monthStart).get(),
+        db.collection('expenses').where('userId', '==', uid).where('createdAt', '>=', monthStart).get(),
+        db.collection('customers').where('userId', '==', uid).get(),
+    ]);
+
+    const invoices = invSnap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+    const quotes   = quoteSnap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+    const expenses = expSnap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+
+    const totalRevenue  = invoices.reduce((s, i) => s + (i.total || 0), 0);
+    const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+    const avgInvoice    = invoices.length ? totalRevenue / invoices.length : 0;
+    const currency      = invoices[0]?.currency || 'EUR';
+
+    return {
+        invoiceCount:    invoices.length,
+        quoteCount:      quotes.length,
+        expenseCount:    expenses.length,
+        customerCount:   customerSnap.size,
+        totalRevenue,
+        totalExpenses,
+        avgInvoice,
+        currency,
+        hasExpenses:     expenses.length > 0,
+        hasQuotes:       quotes.length > 0,
+        hasCustomers:    customerSnap.size > 0,
+    };
+};
+
+/** Gemini ile kişiselleştirilmiş email yazar */
+const generatePersonalizedEmail = async ({ user, stats, agentType, extraContext = '' }) => {
+    const lang = user.appLanguage || user.language || 'en';
+    const langMap = { tr: 'Turkish', en: 'English', de: 'German', fr: 'French', es: 'Spanish', pt: 'Portuguese' };
+    const langName = langMap[lang] || 'English';
+
+    const fmt = (n) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: stats.currency || 'EUR' }).format(n);
+
+    const prompts = {
+        conversion: `You are Maya, a growth specialist at BayFatura — a professional invoicing SaaS.
+Write a SHORT, personal, data-driven sales email to convince ${user.name || 'this user'} to upgrade from FREE to Elite (€9/month).
+
+Their real account data this month:
+- Invoices created: ${stats.invoiceCount}/5 (FREE LIMIT REACHED)
+- Total invoiced: ${fmt(stats.totalRevenue)}
+- Customers in CRM: ${stats.customerCount}
+- Quotes sent: ${stats.quoteCount}
+- Tracks expenses: ${stats.hasExpenses ? 'Yes' : 'No'}
+- Industry: ${user.industry || 'general'}
+- Company: ${user.companyName || user.name}
+
+Elite benefits relevant to THEIR situation:
+- Unlimited invoices (they hit the limit — this is the #1 pain)
+- AI Receipt Scanner (auto-reads expense receipts)
+- Bank Statement Matcher (auto-matches payments)
+- Financial Forecasting
+- No ads
+
+Rules:
+- Write in ${langName}
+- Sound like a real human, not a robot
+- Reference their SPECIFIC numbers (revenue, customer count etc.)
+- Max 180 words in the body
+- Warm, professional tone — not pushy
+- End with a single CTA button text
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+
+        churn: `You are Maya, a retention specialist at BayFatura.
+Write a short, warm re-engagement email to ${user.name || 'this user'} who is an Elite subscriber but hasn't logged in for 7+ days.
+
+Their account:
+- Plan: Elite
+- Company: ${user.companyName || user.name}
+- Industry: ${user.industry || 'general'}
+- Invoices this month: ${stats.invoiceCount}
+- Total revenue tracked: ${fmt(stats.totalRevenue)}
+${extraContext}
+
+Goal: Remind them of value, offer help, bring them back.
+- Write in ${langName}
+- Max 150 words
+- Friendly, concerned tone — not salesy
+- Mention 1-2 specific Elite features they might not be using
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+
+        onboarding: `You are Maya, an onboarding specialist at BayFatura.
+Write a warm activation email to ${user.name || 'this user'} who signed up but hasn't created their first invoice yet.
+
+Their account:
+- Company: ${user.companyName || user.name}
+- Industry: ${user.industry || 'general'}
+- Signed up: recently
+
+Goal: Get them to create their first invoice. Make it feel easy and valuable.
+- Write in ${langName}
+- Max 150 words
+- Encouraging, helpful tone
+- Include a specific tip for their industry
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+
+        winback: `You are Maya, a win-back specialist at BayFatura.
+Write a compelling re-activation email to ${user.name || 'this user'} whose Elite plan recently ended.
+
+Their account:
+- Company: ${user.companyName || user.name}
+- Industry: ${user.industry || 'general'}
+- Revenue tracked while Elite: ${fmt(stats.totalRevenue)}
+${extraContext}
+
+Goal: Get them back to Elite. Offer empathy + reminder of what they're missing.
+- Write in ${langName}
+- Max 160 words
+- Empathetic, not desperate
+- Mention the specific value they had
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+    };
+
+    const aiInstance = genkit({ plugins: [googleAI()] });
+    const response = await aiInstance.generate({
+        model: googleAI.model('gemini-1.5-flash'),
+        prompt: prompts[agentType],
+    });
+
+    const text = response.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    return JSON.parse(text);
+};
+
+/** Email HTML şablonu — BayFatura branded */
+const buildAgentEmailHtml = ({ name, body, cta, ctaUrl, agentType }) => {
+    const colors = {
+        conversion: { bg: '#6366f1', light: '#eef2ff' },
+        churn:      { bg: '#f59e0b', light: '#fffbeb' },
+        onboarding: { bg: '#10b981', light: '#ecfdf5' },
+        winback:    { bg: '#8b5cf6', light: '#f5f3ff' },
+    };
+    const c = colors[agentType] || colors.conversion;
+    const bodyHtml = body.replace(/\n/g, '<br/>');
+
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.07);">
+        <!-- Header -->
+        <tr>
+          <td style="background:${c.bg};padding:28px 40px;text-align:center;">
+            <span style="color:white;font-size:22px;font-weight:800;letter-spacing:-0.5px;">⚡ BayFatura</span>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px;">
+            <p style="margin:0 0 20px;font-size:16px;color:#1e293b;line-height:1.7;">${bodyHtml}</p>
+            <!-- CTA -->
+            <div style="text-align:center;margin:32px 0 24px;">
+              <a href="${ctaUrl}" style="display:inline-block;background:${c.bg};color:white;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px;">${cta}</a>
+            </div>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background:${c.light};padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              BayFatura · <a href="https://bayfatura.com/billing" style="color:#6366f1;text-decoration:none;">Planları Gör</a> ·
+              <a href="https://bayfatura.com" style="color:#6366f1;text-decoration:none;">Uygulamayı Aç</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+};
+
+// ─── 1. Conversion Agent ──────────────────────────────────────────────────────
+const runConversionAgent = async () => {
+    console.log('💰 [ConversionAgent] Starting...');
+    const resend = getAgentResend();
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    // Bu ay 5 fatura dolan free kullanıcıları bul
+    const freeUsers = await db.collection('users')
+        .where('plan', '==', 'standard')
+        .get();
+
+    for (const userDoc of freeUsers.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+        if (user.isAnonymous) { skipped++; continue; }
+
+        try {
+            // Cooldown kontrolü
+            const canContact = await checkAgentCooldown(user.uid, 'conversion');
+            if (!canContact) { skipped++; continue; }
+
+            // Bu ayki fatura sayısını kontrol et
+            const [invSnap, quoteSnap] = await Promise.all([
+                db.collection('invoices').where('userId', '==', user.uid).where('createdAt', '>=', monthStart).get(),
+                db.collection('quotes').where('userId', '==', user.uid).where('createdAt', '>=', monthStart).get(),
+            ]);
+            const totalDocs = invSnap.docs.filter(d => !d.data().isDeleted).length +
+                              quoteSnap.docs.filter(d => !d.data().isDeleted).length;
+
+            // Sadece limite ulaşan veya 1 adım öncesinde olanları hedefle
+            if (totalDocs < 4) { skipped++; continue; }
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'conversion' });
+
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/billing',
+                agentType: 'conversion',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'conversion', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: `${totalDocs}/5 invoices this month, revenue: ${stats.totalRevenue}`,
+            });
+
+            contacted++;
+            console.log(`💰 [ConversionAgent] Sent to ${redactEmail(user.email)}`);
+        } catch (err) {
+            errors++;
+            console.error(`💰 [ConversionAgent] Error for ${user.uid}:`, err.message);
+            await logAgentAction(user.uid, 'conversion', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`💰 [ConversionAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── 2. Churn Agent ───────────────────────────────────────────────────────────
+const runChurnAgent = async () => {
+    console.log('🛡️ [ChurnAgent] Starting...');
+    const resend = getAgentResend();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Elite kullanıcılar arasında son 7 günde hiç fatura oluşturmamış olanları bul
+    const eliteUsers = await db.collection('users')
+        .where('plan', 'in', ['elite', 'premium'])
+        .get();
+
+    for (const userDoc of eliteUsers.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+
+        try {
+            const canContact = await checkAgentCooldown(user.uid, 'churn');
+            if (!canContact) { skipped++; continue; }
+
+            // Son 7 gün aktivite var mı?
+            const recentSnap = await db.collection('invoices')
+                .where('userId', '==', user.uid)
+                .where('createdAt', '>=', sevenDaysAgo)
+                .limit(1)
+                .get();
+
+            if (!recentSnap.empty) { skipped++; continue; } // aktif, geç
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const planActivated = user.planActivatedAt?.toDate?.()?.toISOString() || '';
+            const extraContext = planActivated ? `- Elite since: ${planActivated.split('T')[0]}` : '';
+
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'churn', extraContext });
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/dashboard',
+                agentType: 'churn',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'churn', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: 'No activity in 7+ days',
+            });
+
+            contacted++;
+        } catch (err) {
+            errors++;
+            console.error(`🛡️ [ChurnAgent] Error for ${user.uid}:`, err.message);
+            await logAgentAction(user.uid, 'churn', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`🛡️ [ChurnAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── 3. Onboarding Agent ─────────────────────────────────────────────────────
+const runOnboardingAgent = async () => {
+    console.log('🚀 [OnboardingAgent] Starting...');
+    const resend = getAgentResend();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    const oneDayAgo   = new Date(Date.now() - 1  * 24 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    // 1-3 gün önce kaydolmuş ve hiç fatura oluşturmamış kullanıcılar
+    const newUsers = await db.collection('users')
+        .where('createdAt', '>=', threeDaysAgo)
+        .where('createdAt', '<=', oneDayAgo)
+        .where('plan', '==', 'standard')
+        .get();
+
+    for (const userDoc of newUsers.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+        if (user.isAnonymous) { skipped++; continue; }
+
+        try {
+            const canContact = await checkAgentCooldown(user.uid, 'onboarding');
+            if (!canContact) { skipped++; continue; }
+
+            const invoiceSnap = await db.collection('invoices')
+                .where('userId', '==', user.uid)
+                .limit(1)
+                .get();
+
+            if (!invoiceSnap.empty) { skipped++; continue; } // fatura var, geç
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'onboarding' });
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/new',
+                agentType: 'onboarding',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'onboarding', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: 'Registered 1-3 days ago, no invoice created',
+            });
+
+            contacted++;
+        } catch (err) {
+            errors++;
+            await logAgentAction(user.uid, 'onboarding', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`🚀 [OnboardingAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── 4. Win-back Agent ───────────────────────────────────────────────────────
+const runWinbackAgent = async () => {
+    console.log('🔄 [WinbackAgent] Starting...');
+    const resend = getAgentResend();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Son 3 günde Elite'ten düşmüş kullanıcılar
+    const downgraded = await db.collection('users')
+        .where('plan', '==', 'standard')
+        .where('planDowngradedAt', '>=', threeDaysAgo)
+        .get();
+
+    for (const userDoc of downgraded.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+
+        try {
+            const canContact = await checkAgentCooldown(user.uid, 'winback');
+            if (!canContact) { skipped++; continue; }
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const downgradedDate = user.planDowngradedAt?.toDate?.()?.toLocaleDateString?.('tr-TR') || '';
+            const extraContext = downgradedDate ? `- Plan ended: ${downgradedDate}` : '';
+
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'winback', extraContext });
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/billing',
+                agentType: 'winback',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'winback', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: `Downgraded from Elite on ${downgradedDate}`,
+            });
+
+            contacted++;
+        } catch (err) {
+            errors++;
+            await logAgentAction(user.uid, 'winback', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`🔄 [WinbackAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── Agent Orchestrator — Her gün 10:00 Berlin ───────────────────────────────
+export const agentOrchestrator = euFunctions.pubsub.schedule('0 10 * * *').timeZone('Europe/Berlin').onRun(async () => {
+    console.log('🤖 [AgentOrchestrator] Daily run starting...');
+
+    const results = {};
+    const agents = [
+        { type: 'onboarding', fn: runOnboardingAgent },
+        { type: 'conversion', fn: runConversionAgent },
+        { type: 'churn',      fn: runChurnAgent      },
+        { type: 'winback',    fn: runWinbackAgent     },
+    ];
+
+    for (const agent of agents) {
+        try {
+            results[agent.type] = await agent.fn();
+        } catch (err) {
+            console.error(`🤖 [AgentOrchestrator] ${agent.type} failed:`, err.message);
+            results[agent.type] = { error: err.message };
+        }
+    }
+
+    // Günlük özet log
+    await db.collection('agent_runs').add({
+        runAt: admin.firestore.FieldValue.serverTimestamp(),
+        results,
+    });
+
+    console.log('🤖 [AgentOrchestrator] Done:', JSON.stringify(results));
+    return null;
+});
+
+// ─── Manuel Agent Tetikleme (DCC'den) ────────────────────────────────────────
+export const triggerAgent = euCallable().onCall(async (data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    if (!ADMIN_EMAILS.includes(context.auth.token.email)) {
+        throw new https.HttpsError('permission-denied', 'Admin only');
+    }
+
+    const { agentType } = data;
+    const agentMap = {
+        conversion: runConversionAgent,
+        churn:      runChurnAgent,
+        onboarding: runOnboardingAgent,
+        winback:    runWinbackAgent,
+    };
+
+    if (!agentMap[agentType]) throw new https.HttpsError('invalid-argument', 'Unknown agent type');
+
+    const result = await agentMap[agentType]();
+    return { success: true, result };
 });

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { enableAnalytics } from '../lib/firebase';
 
 /**
  * CookieConsent — GDPR/DSGVO Compliant Cookie Banner
@@ -31,6 +32,7 @@ const CookieConsent = () => {
         localStorage.setItem('bayfatura_cookie_consent', JSON.stringify(consent));
         // Enable Firebase Analytics
         if (window.gtag) window.gtag('consent', 'update', { analytics_storage: 'granted' });
+        enableAnalytics();
         setVisible(false);
     };
 
@@ -43,6 +45,13 @@ const CookieConsent = () => {
             version: '1.0'
         };
         localStorage.setItem('bayfatura_cookie_consent', JSON.stringify(consent));
+        if (window.gtag) {
+            window.gtag('consent', 'update', {
+                analytics_storage: prefs.analytics ? 'granted' : 'denied',
+                ad_storage: prefs.marketing ? 'granted' : 'denied'
+            });
+        }
+        if (prefs.analytics) enableAnalytics();
         setVisible(false);
     };
 
@@ -55,6 +64,12 @@ const CookieConsent = () => {
             version: '1.0'
         };
         localStorage.setItem('bayfatura_cookie_consent', JSON.stringify(consent));
+        if (window.gtag) {
+            window.gtag('consent', 'update', {
+                analytics_storage: 'denied',
+                ad_storage: 'denied'
+            });
+        }
         setVisible(false);
     };
 
@@ -238,6 +253,7 @@ const CookieConsent = () => {
                     <Link to="/impressum" style={{ color: '#475569', fontSize: '0.72rem', textDecoration: 'none' }}>Impressum</Link>
                     <Link to="/privacy" style={{ color: '#475569', fontSize: '0.72rem', textDecoration: 'none' }}>Datenschutz</Link>
                     <Link to="/terms" style={{ color: '#475569', fontSize: '0.72rem', textDecoration: 'none' }}>AGB</Link>
+                    <Link to="/widerruf" style={{ color: '#475569', fontSize: '0.72rem', textDecoration: 'none' }}>Widerruf</Link>
                 </div>
             </div>
 

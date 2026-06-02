@@ -1,14 +1,16 @@
 export function registerServiceWorker() {
+    const isPreviewChannel = window.location.hostname.includes('--preview-');
+
     // ⚠️ CRITICAL: Never register SW in development mode.
     // It intercepts Vite's HMR (hot module replacement) websocket and
     // module requests (src/main.jsx?t=...), causing a blank white screen.
-    if (import.meta.env.DEV) {
-        // In dev: unregister any previously installed SW to clear bad state
+    if (import.meta.env.DEV || isPreviewChannel) {
+        // In dev/preview: unregister any previously installed SW to clear stale content.
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(registrations => {
                 registrations.forEach(reg => {
                     reg.unregister();
-                    console.log('[SW] Unregistered dev SW:', reg.scope);
+                    console.log('[SW] Unregistered SW:', reg.scope);
                 });
             });
             // Clear all caches that might be serving stale content

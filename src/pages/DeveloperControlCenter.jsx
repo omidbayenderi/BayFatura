@@ -1,14 +1,171 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    Cpu, Users, Zap, Shield, Activity, Database, Globe, 
+import {
+    Cpu, Users, Zap, Shield, Activity, Database, Globe,
     Settings, Crown, Terminal, Radio, Server,
-    Lock, Search, X, RefreshCw, Mail, Trash2, AlertTriangle
+    Lock, Search, X, RefreshCw, Mail, Trash2, AlertTriangle, Gift, Clock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, limit } from 'firebase/firestore';
 import { db, functions } from '../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
+
+const AGENT_META = {
+    conversion:  { emoji: '💰', label: 'Conversion',  color: '#6366f1', desc: 'Free limit → Elite ikna' },
+    churn:       { emoji: '🛡️', label: 'Churn',       color: '#f59e0b', desc: '7 gün sessiz Elite uyarı' },
+    onboarding:  { emoji: '🚀', label: 'Onboarding',  color: '#10b981', desc: '24s kayıt, fatura yok' },
+    winback:     { emoji: '🔄', label: 'Win-back',    color: '#8b5cf6', desc: 'Elite düşen → geri kazan' },
+};
+
+const AgentControlCenter = () => {
+    const [logs, setLogs] = React.useState([]);
+    const [runs, setRuns] = React.useState([]);
+    const [triggering, setTriggering] = React.useState(null);
+    const [triggerResult, setTriggerResult] = React.useState(null);
+
+    React.useEffect(() => {
+        const unsubLogs = onSnapshot(
+            query(collection(db, 'agent_logs'), orderBy('sentAt', 'desc'), limit(20)),
+            snap => setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+        );
+        const unsubRuns = onSnapshot(
+            query(collection(db, 'agent_runs'), orderBy('runAt', 'desc'), limit(5)),
+            snap => setRuns(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+        );
+        return () => { unsubLogs(); unsubRuns(); };
+    }, []);
+
+    const handleTrigger = async (agentType) => {
+        setTriggering(agentType);
+        setTriggerResult(null);
+        try {
+            const fn = httpsCallable(functions, 'triggerAgent');
+            const res = await fn({ agentType });
+            setTriggerResult({ type: agentType, success: true, result: res.data.result });
+        } catch (err) {
+            setTriggerResult({ type: agentType, success: false, error: err.message });
+        } finally {
+            setTriggering(null);
+        }
+    };
+
+    const lastRun = runs[0];
+    const totalSent = logs.filter(l => l.status === 'sent').length;
+    const totalErrors = logs.filter(l => l.status === 'error').length;
+
+    return (
+        <div className="dcc-card" style={{ padding: '24px' }}>
+            <h4 style={{ margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', color: '#6366f1' }}>
+                <Cpu size={18} color="#6366f1" /> 🤖 AGENT TEAM — GROWTH ENGINE
+            </h4>
+
+            {/* Son çalışma özeti */}
+            {lastRun && (
+                <div style={{ background: '#0d1117', border: '1px solid #6366f130', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', fontSize: '0.72rem' }}>
+                    <span style={{ color: '#555' }}>Son çalışma: </span>
+                    <span style={{ color: '#94a3b8' }}>{lastRun.runAt?.toDate?.()?.toLocaleString('tr-TR') || '—'}</span>
+                    {lastRun.results && (
+                        <span style={{ marginLeft: '12px', color: '#6366f1' }}>
+                            {Object.entries(lastRun.results).map(([k, v]) =>
+                                `${AGENT_META[k]?.emoji || ''} ${v.contacted || 0} gönderildi`
+                            ).join(' · ')}
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Agent kartları + tetikleme */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+                {Object.entries(AGENT_META).map(([type, meta]) => {
+                    const agentLogs = logs.filter(l => l.agentType === type);
+                    const sent = agentLogs.filter(l => l.status === 'sent').length;
+                    const isTriggering = triggering === type;
+                    return (
+                        <div key={type} style={{ background: '#111', borderRadius: '12px', border: `1px solid ${meta.color}25`, padding: '14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                <div>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: '700', color: meta.color }}>{meta.emoji} {meta.label}</div>
+                                    <div style={{ fontSize: '0.62rem', color: '#555', marginTop: '2px' }}>{meta.desc}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontSize: '1rem', fontWeight: '800', color: meta.color }}>{sent}</div>
+                                    <div style={{ fontSize: '0.6rem', color: '#555' }}>gönderildi</div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => handleTrigger(type)}
+                                disabled={!!triggering}
+                                style={{
+                                    width: '100%', padding: '7px', borderRadius: '8px', fontSize: '0.65rem', fontWeight: '700',
+                                    background: isTriggering ? `${meta.color}30` : '#0a0a0a',
+                                    border: `1px solid ${meta.color}40`, color: meta.color,
+                                    cursor: triggering ? 'not-allowed' : 'pointer', opacity: triggering && !isTriggering ? 0.4 : 1,
+                                }}
+                            >
+                                {isTriggering ? '⏳ ÇALIŞIYOR...' : '▶ MANUEL ÇALIŞTIR'}
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Tetikleme sonucu */}
+            {triggerResult && (
+                <div style={{
+                    padding: '10px 14px', borderRadius: '10px', fontSize: '0.72rem', marginBottom: '16px',
+                    background: triggerResult.success ? '#10b98115' : '#ef444415',
+                    border: `1px solid ${triggerResult.success ? '#10b98130' : '#ef444430'}`,
+                    color: triggerResult.success ? '#10b981' : '#ef4444',
+                }}>
+                    {triggerResult.success
+                        ? `✅ ${AGENT_META[triggerResult.type]?.label}: ${triggerResult.result?.contacted || 0} gönderildi, ${triggerResult.result?.skipped || 0} atlandı`
+                        : `❌ Hata: ${triggerResult.error}`}
+                </div>
+            )}
+
+            {/* Son loglar */}
+            <div style={{ fontSize: '0.7rem', color: '#555', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>SON AKSİYONLAR</span>
+                <span style={{ color: '#10b981' }}>{totalSent} gönderildi · <span style={{ color: '#ef4444' }}>{totalErrors} hata</span></span>
+            </div>
+            <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {logs.length === 0 && (
+                    <div style={{ color: '#333', fontSize: '0.72rem', textAlign: 'center', padding: '20px' }}>
+                        Henüz agent aksiyonu yok. Manuel çalıştır veya yarınki otomatik çalışmayı bekle.
+                    </div>
+                )}
+                {logs.map(log => {
+                    const meta = AGENT_META[log.agentType] || { emoji: '🤖', color: '#666' };
+                    return (
+                        <div key={log.id} style={{
+                            background: '#0a0a0a', borderRadius: '8px', padding: '8px 12px',
+                            display: 'flex', gap: '10px', alignItems: 'center',
+                            border: `1px solid ${log.status === 'sent' ? '#10b98115' : log.status === 'error' ? '#ef444415' : '#222'}`,
+                        }}>
+                            <span style={{ fontSize: '0.8rem' }}>{meta.emoji}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <span style={{ color: meta.color, fontSize: '0.65rem', fontWeight: '700' }}>{log.agentName || log.agentType}</span>
+                                    <span style={{
+                                        fontSize: '0.6rem', padding: '1px 6px', borderRadius: '4px',
+                                        background: log.status === 'sent' ? '#10b98120' : log.status === 'error' ? '#ef444420' : '#22222230',
+                                        color: log.status === 'sent' ? '#10b981' : log.status === 'error' ? '#ef4444' : '#666',
+                                    }}>{log.status}</span>
+                                </div>
+                                <div style={{ color: '#444', fontSize: '0.62rem', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {log.email} {log.subject ? `· ${log.subject}` : log.reason ? `· ${log.reason}` : ''}
+                                </div>
+                            </div>
+                            <span style={{ color: '#333', fontSize: '0.6rem', flexShrink: 0 }}>
+                                {log.sentAt?.toDate?.()?.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) || ''}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 const DCC = () => {
     const { currentUser } = useAuth();
@@ -26,10 +183,16 @@ const DCC = () => {
     // DB Recovery Tool States
     const [orphanStats, setOrphanStats] = useState([]);
     const [isMigrating, setIsMigrating] = useState(false);
-    
+
     // LocalStorage Recovery State
     const [localCache, setLocalCache] = useState({ invoices: 0, quotes: 0, expenses: 0 });
     const [isSyncing, setIsSyncing] = useState(false);
+
+    // Grant Elite State
+    const [grantDuration, setGrantDuration] = useState(30);
+    const [grantReason, setGrantReason] = useState('reward');
+    const [isGranting, setIsGranting] = useState(false);
+    const [grantResult, setGrantResult] = useState(null);
 
     const handleSyncAuthUsers = async () => {
         setIsSyncing(true);
@@ -219,6 +382,34 @@ const DCC = () => {
         }
     };
 
+    const handleGrantElite = async () => {
+        if (!selectedTenant) return;
+        setIsGranting(true);
+        setGrantResult(null);
+        try {
+            const grantFn = httpsCallable(functions, 'grantElitePlan');
+            const res = await grantFn({
+                targetUserId: selectedTenant.id,
+                durationDays: grantDuration,
+                reason: grantReason,
+            });
+            const expiresAt = res.data?.planExpiresAt;
+            setGrantResult({
+                success: true,
+                msg: grantDuration === 0
+                    ? `✅ Süresiz Elite verildi.`
+                    : `✅ Elite verildi — ${new Date(expiresAt).toLocaleDateString('tr-TR')} tarihinde sona erer.`,
+            });
+            // Seçili kullanıcıyı güncelle
+            setSelectedTenant(prev => ({ ...prev, plan: 'elite', subscriptionType: 'granted', planExpiresAt: expiresAt }));
+            setTenants(prev => prev.map(t => t.id === selectedTenant.id ? { ...t, plan: 'elite' } : t));
+        } catch (err) {
+            setGrantResult({ success: false, msg: '❌ Hata: ' + (err.message || 'Bilinmeyen hata') });
+        } finally {
+            setIsGranting(false);
+        }
+    };
+
     const handleDelete = async (userId) => {
         setIsUpdating(true);
         try {
@@ -300,8 +491,8 @@ const DCC = () => {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                 <div style={{ gridColumn: 'span 2' }}>
                                     <label style={{ fontSize: '0.75rem', color: '#666', display: 'block', marginBottom: '12px' }}>OVERRIDE SUBSCRIPTION PLAN (REAL-TIME)</label>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                                        {['standard', 'premium', 'elite', 'lifetime'].map(p => (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                                        {['standard', 'premium', 'elite'].map(p => (
                                             <button 
                                                 key={p}
                                                 onClick={() => handleAction(selectedTenant.id, { plan: p })}
@@ -339,7 +530,93 @@ const DCC = () => {
                                 </div>
                             </div>
 
-                            <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '0.65rem', color: '#333' }}>
+                            {/* ── Elite Ödülü Ver ── */}
+                            <div style={{ marginTop: '24px', background: '#0d1117', border: '1px solid #6366f130', borderRadius: '16px', padding: '20px' }}>
+                                <label style={{ fontSize: '0.75rem', color: '#6366f1', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px', fontWeight: '700', textTransform: 'uppercase' }}>
+                                    <Gift size={13} /> Elite Ödülü Ver
+                                </label>
+
+                                {/* Sebep */}
+                                <div style={{ marginBottom: '12px' }}>
+                                    <div style={{ fontSize: '0.7rem', color: '#555', marginBottom: '6px' }}>SEBEP</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                                        {[
+                                            { value: 'reward', label: '🎁 Ödül' },
+                                            { value: 'partner', label: '🤝 Ortak' },
+                                            { value: 'trial', label: '🧪 Deneme' },
+                                            { value: 'support', label: '💬 Destek' },
+                                        ].map(opt => (
+                                            <button key={opt.value} onClick={() => setGrantReason(opt.value)}
+                                                style={{
+                                                    padding: '8px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: '600', cursor: 'pointer',
+                                                    background: grantReason === opt.value ? '#6366f120' : '#111',
+                                                    border: `1px solid ${grantReason === opt.value ? '#6366f1' : '#222'}`,
+                                                    color: grantReason === opt.value ? '#818cf8' : '#555',
+                                                }}
+                                            >{opt.label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Süre */}
+                                <div style={{ marginBottom: '14px' }}>
+                                    <div style={{ fontSize: '0.7rem', color: '#555', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Clock size={10} /> SÜRE
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                                        {[
+                                            { days: 7, label: '1 Hafta' },
+                                            { days: 30, label: '1 Ay' },
+                                            { days: 60, label: '2 Ay' },
+                                            { days: 0, label: '♾ Süresiz' },
+                                        ].map(opt => (
+                                            <button key={opt.days} onClick={() => setGrantDuration(opt.days)}
+                                                style={{
+                                                    padding: '8px 4px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: '700', cursor: 'pointer',
+                                                    background: grantDuration === opt.days ? '#6366f120' : '#111',
+                                                    border: `1px solid ${grantDuration === opt.days ? '#6366f1' : '#222'}`,
+                                                    color: grantDuration === opt.days ? '#818cf8' : '#555',
+                                                }}
+                                            >{opt.label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Mevcut durum */}
+                                {selectedTenant.subscriptionType === 'granted' && selectedTenant.planExpiresAt && (
+                                    <div style={{ fontSize: '0.7rem', color: '#f59e0b', marginBottom: '10px', background: '#f59e0b10', padding: '6px 10px', borderRadius: '8px' }}>
+                                        ⏳ Mevcut: {new Date(selectedTenant.planExpiresAt).toLocaleDateString('tr-TR')} tarihine kadar verilmiş Elite
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={handleGrantElite}
+                                    disabled={isGranting}
+                                    style={{
+                                        width: '100%', padding: '12px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: '700', cursor: isGranting ? 'not-allowed' : 'pointer',
+                                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                        border: 'none', color: 'white',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                        opacity: isGranting ? 0.6 : 1,
+                                    }}
+                                >
+                                    <Gift size={14} />
+                                    {isGranting ? 'VERİLİYOR...' : `ELİTE VER — ${grantDuration === 0 ? 'SÜRESİZ' : grantDuration + ' GÜN'}`}
+                                </button>
+
+                                {grantResult && (
+                                    <div style={{
+                                        marginTop: '10px', padding: '8px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600',
+                                        background: grantResult.success ? '#10b98115' : '#ef444415',
+                                        color: grantResult.success ? '#10b981' : '#ef4444',
+                                        border: `1px solid ${grantResult.success ? '#10b98130' : '#ef444430'}`,
+                                    }}>
+                                        {grantResult.msg}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.65rem', color: '#333' }}>
                                 <p>CAUTION: Plan changes trigger instant feature unlocking for the user.</p>
                             </div>
                         </motion.div>
@@ -574,20 +851,8 @@ const DCC = () => {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-                        {/* Agent Pulse Monitor */}
-                        <div className="dcc-card" style={{ padding: '24px' }}>
-                            <h4 style={{ margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem' }}>
-                                <Cpu size={18} color="#10b981" /> AGENT STATUS
-                            </h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                {agentStats.map(agent => (
-                                    <div key={agent.name} style={{ background: '#111', padding: '12px', borderRadius: '12px', border: '1px solid #222' }}>
-                                        <div style={{ fontSize: '0.65rem', color: '#666' }}>{agent.name}</div>
-                                        <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: agent.color }}>{agent.health}%</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        {/* Agent Control Center */}
+                        <AgentControlCenter />
 
                         {/* Database Recovery & Claims Tool */}
                         <div className="dcc-card" style={{ padding: '24px' }}>

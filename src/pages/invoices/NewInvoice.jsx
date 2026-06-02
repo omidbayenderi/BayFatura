@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useInvoice } from '../../context/InvoiceContext';
 import InvoicePaper from '../../components/InvoicePaper';
+import InvoiceLimitModal from '../../components/InvoiceLimitModal';
 import { Save, Download, Plus, Trash2, Search, X, Package, Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
@@ -539,6 +540,7 @@ const NewInvoice = () => {
     const location = useLocation();
     const invoiceRef = useRef();
     const [isSaving, setIsSaving] = useState(false);
+    const [showLimitModal, setShowLimitModal] = useState(false);
     const [customerSearch, setCustomerSearch] = useState('');
     const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
     const [showProductPicker, setShowProductPicker] = useState(false);
@@ -752,13 +754,18 @@ const NewInvoice = () => {
             }
         } catch (error) {
             console.error("Error saving invoice:", error);
-            showToast(t('saveFailed') + " " + error.message, 'error');
+            if (error?.code === 'functions/resource-exhausted') {
+                setShowLimitModal(true);
+            } else {
+                showToast(t('saveFailed') + " " + error.message, 'error');
+            }
             setIsSaving(false);
         }
     };
 
     return (
         <div className="page-container">
+            <InvoiceLimitModal isOpen={showLimitModal} onClose={() => setShowLimitModal(false)} usedCount={5} limitCount={5} />
             <header className="page-header">
                 <h1>{t('newInvoice')}</h1>
                 <div className="actions">

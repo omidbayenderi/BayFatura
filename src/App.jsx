@@ -36,6 +36,7 @@ const Notifications = React.lazy(() => import('./pages/settings/Notifications.js
 const Privacy = React.lazy(() => import('./pages/legal/Privacy'));
 const Impressum = React.lazy(() => import('./pages/legal/Impressum'));
 const Terms = React.lazy(() => import('./pages/legal/Terms'));
+const Withdrawal = React.lazy(() => import('./pages/legal/Withdrawal'));
 const DeveloperControlCenter = React.lazy(() => import('./pages/DeveloperControlCenter'));
 const AcceptInvite = React.lazy(() => import('./pages/crm/AcceptInvite'));
 
@@ -78,6 +79,7 @@ function App() {
         <Route path="/terms" element={<LazyRoute><Terms /></LazyRoute>} />
         <Route path="/privacy" element={<LazyRoute><Privacy /></LazyRoute>} />
         <Route path="/impressum" element={<LazyRoute><Impressum /></LazyRoute>} />
+        <Route path="/widerruf" element={<LazyRoute><Withdrawal /></LazyRoute>} />
         
         {/* DCC Portal - ONLY accessible by the Super Admin, others get 404 */}
         {currentUser?.email === 'omidbayenderi@gmail.com' && (

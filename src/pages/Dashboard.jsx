@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useInvoice } from '../context/InvoiceContext';
 import { motion } from 'framer-motion';
-import { FileText, TrendingUp, TrendingDown, Users, Clock, PlusCircle, Receipt, Sparkles, Lock, ArrowRightLeft, Database } from 'lucide-react';
+import { FileText, TrendingUp, TrendingDown, Users, Clock, PlusCircle, Receipt, Sparkles, Lock, ArrowRightLeft, Database, Zap } from 'lucide-react';
+import InvoiceLimitModal from '../components/InvoiceLimitModal';
+import AdsComponent from '../components/AdsComponent';
 import { Link, useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +15,103 @@ import PremiumModal from '../components/PremiumModal';
 import LoadingPage from '../components/LoadingPage';
 import { generateDemoData } from '../lib/demoDataGenerator';
 import { db } from '../lib/firebase';
+
+const FREE_PLAN_LIMIT = 5;
+
+const FreePlanBanner = ({ used, limit, onUpgrade, t }) => {
+    const pct = Math.min((used / limit) * 100, 100);
+    const isAtLimit = used >= limit;
+    const accentColor = isAtLimit ? '#ef4444' : used >= limit - 1 ? '#f97316' : '#6366f1';
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+                background: isAtLimit
+                    ? 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(249,115,22,0.06))'
+                    : 'linear-gradient(135deg, rgba(99,102,241,0.07), rgba(139,92,246,0.05))',
+                border: `1px solid ${accentColor}30`,
+                borderRadius: '16px',
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                marginBottom: '20px',
+                flexWrap: 'wrap',
+            }}
+        >
+            {/* Sol: İkon + Metin */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '200px' }}>
+                <div style={{
+                    width: '36px', height: '36px', flexShrink: 0,
+                    background: `${accentColor}18`,
+                    borderRadius: '10px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                    <Zap size={18} color={accentColor} fill={isAtLimit ? accentColor : 'none'} />
+                </div>
+                <div>
+                    <p style={{ margin: 0, fontWeight: '600', fontSize: '0.88rem', color: isAtLimit ? '#ef4444' : '#1e293b' }}>
+                        {isAtLimit ? t('freeBannerLimitReached') : t('freeBannerTitle')}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', marginTop: '1px' }}>
+                        {t('freeBannerResets')}
+                    </p>
+                </div>
+            </div>
+
+            {/* Orta: Progress bar */}
+            <div style={{ flex: 2, minWidth: '140px', maxWidth: '260px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{t('freeBannerUsage')}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: accentColor }}>
+                        {used}/{limit}
+                    </span>
+                </div>
+                <div style={{ height: '6px', background: 'rgba(0,0,0,0.07)', borderRadius: '99px', overflow: 'hidden' }}>
+                    <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.9, ease: 'easeOut', delay: 0.1 }}
+                        style={{
+                            height: '100%',
+                            borderRadius: '99px',
+                            background: isAtLimit
+                                ? 'linear-gradient(90deg, #ef4444, #f97316)'
+                                : 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+                        }}
+                    />
+                </div>
+            </div>
+
+            {/* Sağ: CTA */}
+            <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={onUpgrade}
+                style={{
+                    padding: '9px 18px',
+                    background: isAtLimit
+                        ? 'linear-gradient(135deg, #ef4444, #f97316)'
+                        : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '0.82rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: `0 4px 12px ${accentColor}30`,
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                }}
+            >
+                <Zap size={13} fill="white" />
+                {t('freeBannerCta')}
+            </motion.button>
+        </motion.div>
+    );
+};
 
 const StatCard = ({ title, value, icon: Icon, color }) => (
     <motion.div
@@ -42,6 +141,15 @@ const Dashboard = () => {
     // Bank Matcher & Demo Logic
     const unpaidInvoices = invoices.filter(inv => inv.status !== 'paid');
     const [showPremiumModal, setShowPremiumModal] = useState(false);
+    const [showLimitModal, setShowLimitModal] = useState(false);
+
+    // Bu ayın fatura + teklif sayısı (free plan banner için)
+    const thisMonthUsed = React.useMemo(() => {
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const count = (arr) => arr.filter(d => !d.isDeleted && d.createdAt >= monthStart).length;
+        return count(invoices) + count(quotes);
+    }, [invoices, quotes]);
     const [isMatching, setIsMatching] = useState(false);
     const [matchedToday, setMatchedToday] = useState(0);
     const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
@@ -171,7 +279,17 @@ const Dashboard = () => {
             </header>
 
             <PremiumModal isOpen={showPremiumModal} onClose={() => setShowPremiumModal(false)} />
+            <InvoiceLimitModal isOpen={showLimitModal} onClose={() => setShowLimitModal(false)} usedCount={thisMonthUsed} limitCount={FREE_PLAN_LIMIT} />
             <QuickAddExpenseModal isOpen={showQuickExpense} onClose={() => setShowQuickExpense(false)} />
+
+            {!isPro && (
+                <FreePlanBanner
+                    used={thisMonthUsed}
+                    limit={FREE_PLAN_LIMIT}
+                    onUpgrade={() => setShowLimitModal(true)}
+                    t={t}
+                />
+            )}
 
                 <div className="stats-grid">
                 <StatCard
@@ -308,6 +426,12 @@ const Dashboard = () => {
                     )}
                 </div>
             </div>
+
+            {!isPro && (
+                <div style={{ marginTop: '8px' }}>
+                    <AdsComponent slot="3201234567" format="auto" />
+                </div>
+            )}
 
             {(invoices.length > 0 || expenses.length > 0) && (
                 <div className="dev-clear-data-wrapper">

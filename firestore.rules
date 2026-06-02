@@ -11,10 +11,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.email in ['support@bayfatura.com', 'omidbayenderi@gmail.com'];
     }
 
-    function isOwner(uid) {
-      return isAuthenticated() && request.auth.uid == uid;
-    }
-
     function userEditableKeys() {
       return [
         'name',

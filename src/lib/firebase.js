@@ -76,11 +76,42 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'europe-west3');
 
-// Analytics - only in production and when measurementId exists
+const getStoredCookieConsent = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+        return JSON.parse(localStorage.getItem('bayfatura_cookie_consent') || 'null');
+    } catch {
+        return null;
+    }
+};
+
+const hasAnalyticsConsent = () => getStoredCookieConsent()?.analytics === true;
+
+// Analytics - only in production, when measurementId exists, and after consent.
 export let analytics = null;
-if (typeof window !== 'undefined' && firebaseConfig.measurementId && import.meta.env.PROD) {
+export const enableAnalytics = async () => {
+    if (analytics || typeof window === 'undefined' || !firebaseConfig.measurementId || !import.meta.env.PROD) {
+        return analytics;
+    }
+
+    try {
+        const { getAnalytics, isSupported } = await import('firebase/analytics');
+        if (!(await isSupported())) {
+            logger.info('Firebase', 'Analytics desteklenmeyen ortamda atlandı');
+            return null;
+        }
+
+        analytics = getAnalytics(app);
+        return analytics;
+    } catch (err) {
+        logger.warn('Firebase', 'Analytics yüklenemedi', err);
+        return null;
+    }
+};
+
+if (typeof window !== 'undefined' && hasAnalyticsConsent()) {
     import('firebase/analytics').then(async ({ getAnalytics, isSupported }) => {
         if (!(await isSupported())) {
             logger.info('Firebase', 'Analytics desteklenmeyen ortamda atlandı');

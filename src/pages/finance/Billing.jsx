@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion } from 'framer-motion';
@@ -17,8 +18,7 @@ const Billing = () => {
     const { t } = useLanguage();
     const [billingCycle, setBillingCycle] = useState('monthly');
 
-    const hasEliteAccess = ['elite', 'premium', 'lifetime'].includes(currentUser?.plan) ||
-        currentUser?.subscriptionType === 'lifetime' ||
+    const hasEliteAccess = ['elite', 'premium'].includes(currentUser?.plan) ||
         currentUser?.featureAccess === 'all';
 
     const handleUpgrade = (planType) => {
@@ -114,7 +114,7 @@ const Billing = () => {
 
                     <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 32px 0', display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
                         <li style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#475569' }}>
-                            <Check size={18} color="#10b981" /> {t('upTo50Invoices')}
+                            <Check size={18} color="#10b981" /> {t('upTo5Invoices')}
                         </li>
                         <li style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#475569' }}>
                             <Check size={18} color="#10b981" /> {t('expenses')}
@@ -193,8 +193,17 @@ const Billing = () => {
                         onClick={() => handleUpgrade(billingCycle)}
                         style={{ width: '100%', padding: '14px', borderRadius: '12px' }}
                     >
-                        {hasEliteAccess ? t('active') : t('upgradeToElite')}
+                        {hasEliteAccess ? t('active') : 'Zahlungspflichtig bestellen'}
                     </button>
+                    {!hasEliteAccess && (
+                        <p style={{ margin: '12px 0 0', color: hasEliteAccess ? '#64748b' : '#cbd5e1', fontSize: '0.76rem', lineHeight: 1.6 }}>
+                            Preis inkl. gesetzlicher Umsatzsteuer, soweit anwendbar. Abonnement mit automatischer Verlängerung,
+                            kündbar zum Ende des Abrechnungszeitraums. Es gelten{' '}
+                            <Link to="/terms" style={{ color: '#a5b4fc' }}>AGB</Link>,{' '}
+                            <Link to="/privacy" style={{ color: '#a5b4fc' }}>Datenschutz</Link> und{' '}
+                            <Link to="/widerruf" style={{ color: '#a5b4fc' }}>Widerrufsbelehrung</Link>.
+                        </p>
+                    )}
                 </motion.div>
             </div>
 
