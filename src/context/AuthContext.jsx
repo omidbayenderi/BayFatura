@@ -417,9 +417,9 @@ export const AuthProvider = ({ children }) => {
         if (!user) return { success: false, error: 'No user' };
 
         try {
-            // Delete Firestore data
+            // Delete user doc first (while still authenticated — rules require auth.uid == userId)
+            // onUserDeleted Cloud Function handles cascade deletion of all other collections
             await deleteDoc(doc(db, 'users', user.uid));
-            // In a real app, you'd delete all tenant data too, but here we just delete the user record
             
             await deleteUser(user);
             return { success: true };

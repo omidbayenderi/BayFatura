@@ -64,7 +64,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         isSuperAdmin() || (request.auth.uid == userId && isSafeUserUpdate())
       );
-      allow delete: if isAuthenticated() && isSuperAdmin();
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
     }
 
     // =============================
