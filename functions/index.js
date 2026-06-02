@@ -1344,11 +1344,59 @@ export const onUserCreated = euFunctions.auth.user().onCreate(async (user) => {
 // --- 🛡️ Auth Sync: Auto-delete Firestore data when Auth user is deleted ---
 export const onUserDeleted = euFunctions.auth.user().onDelete(async (user) => {
     const uid = user.uid;
-    console.log(`🗑️ User ${uid} deleted from Auth. Cleaning up Firestore data...`);
+    console.log(`🗑️ User ${uid} deleted from Auth. Purging all Firestore data...`);
+
+    // Delete all docs in a query in batches of 400 (safe under 500-op limit)
+    const deleteQuery = async (query) => {
+        const snap = await query.get();
+        if (snap.empty) return 0;
+        let count = 0;
+        const chunks = [];
+        for (let i = 0; i < snap.docs.length; i += 400) {
+            chunks.push(snap.docs.slice(i, i + 400));
+        }
+        for (const chunk of chunks) {
+            const batch = db.batch();
+            chunk.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            count += chunk.length;
+        }
+        return count;
+    };
+
+    // Delete all docs in a subcollection
+    const deleteSubcollection = async (parentRef, subcollection) => {
+        return deleteQuery(parentRef.collection(subcollection));
+    };
 
     try {
-        await db.collection('users').doc(uid).delete();
-        console.log(`✅ User ${uid} data successfully purged from Firestore.`);
+        const userRef = db.collection('users').doc(uid);
+        const topCollections = [
+            'invoices', 'quotes', 'expenses', 'recurring_templates',
+            'customers', 'products', 'rate_limits', 'audit_logs', 'agent_logs',
+        ];
+
+        const results = await Promise.allSettled([
+            // Top-level collections scoped by userId
+            ...topCollections.map(col =>
+                deleteQuery(db.collection(col).where('userId', '==', uid))
+            ),
+            // rate_limits keyed as uid_scope — also catch with startsWith pattern
+            deleteQuery(db.collection('rate_limits').where('__name__', '>=', `${uid}_`).where('__name__', '<', `${uid}_￿`)),
+            // customizations single doc
+            db.collection('customizations').doc(uid).delete().catch(() => null),
+            // Subcollections under users/{uid}
+            deleteSubcollection(userRef, 'notifications'),
+            deleteSubcollection(userRef, 'team'),
+            // Finally the user doc itself
+            userRef.delete(),
+        ]);
+
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+            failed.forEach(f => console.error('❌ Partial delete error:', f.reason));
+        }
+        console.log(`✅ User ${uid} fully purged. ${failed.length} partial errors.`);
         return null;
     } catch (error) {
         console.error(`❌ Failed to purge data for user ${uid}:`, error);
