@@ -124,7 +124,9 @@ if (typeof window !== 'undefined' && hasAnalyticsConsent()) {
     });
 }
 
-// App Check — güvenlik katmanı (console'da etkinleştirilmeli)
+// App Check — security layer. Requires VITE_FIREBASE_APP_CHECK_KEY in .env.
+// To configure staging: Firebase Console → App Check → Register app → reCAPTCHA v3 site key
+// → add key to .env.preview as VITE_FIREBASE_APP_CHECK_KEY
 if (import.meta.env.VITE_FIREBASE_APP_CHECK_KEY) {
     import('firebase/app-check').then(({ initializeAppCheck, ReCaptchaV3Provider }) => {
         initializeAppCheck(app, {
@@ -134,6 +136,10 @@ if (import.meta.env.VITE_FIREBASE_APP_CHECK_KEY) {
     }).catch((err) => {
         logger.warn('Firebase', 'App Check yüklenemedi', err);
     });
+} else if (import.meta.env.PROD) {
+    console.error('[BayFatura] VITE_FIREBASE_APP_CHECK_KEY is not set — App Check disabled in production!');
+} else {
+    console.warn('[BayFatura] App Check disabled — set VITE_FIREBASE_APP_CHECK_KEY in .env.preview to enable for staging.');
 }
 
 // Providers
