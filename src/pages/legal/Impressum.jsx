@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Globe, Mail, MapPin, Star, Award, Shield } from 'lucide-react';
+import { Building2, Globe, Mail, MapPin, Award, Shield } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
 /**
@@ -273,29 +273,10 @@ const Impressum = () => {
                                 <Shield size={18} style={{ color: '#fbbf24' }} />
                                 <div>
                                     <div style={{ fontSize: '0.75rem', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Zertifizierung
+                                        Datenschutz
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: '600', marginTop: '2px' }}>
-                                        ISO 27001 / GDPR
-                                    </div>
-                                </div>
-                            </div>
-                            <div style={{
-                                padding: '16px',
-                                background: 'rgba(245,158,11,0.08)',
-                                borderRadius: '10px',
-                                border: '1px solid rgba(245,158,11,0.15)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px'
-                            }}>
-                                <Star size={18} style={{ color: '#fbbf24' }} />
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Bewertung
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: '600', marginTop: '2px' }}>
-                                        4.9/5.0 ★★★★★
+                                        GDPR konform
                                     </div>
                                 </div>
                             </div>
