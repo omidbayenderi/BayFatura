@@ -15,10 +15,16 @@ const CookieConsent = () => {
     useEffect(() => {
         const consent = localStorage.getItem('bayfatura_cookie_consent');
         if (!consent) {
-            // Small delay so it doesn't flash immediately on load
             const timer = setTimeout(() => setVisible(true), 1200);
             return () => clearTimeout(timer);
         }
+    }, []);
+
+    // Allow any part of the app to reopen the banner via a custom event
+    useEffect(() => {
+        const handler = () => setVisible(true);
+        window.addEventListener('bayfatura:open-cookie-settings', handler);
+        return () => window.removeEventListener('bayfatura:open-cookie-settings', handler);
     }, []);
 
     const acceptAll = () => {

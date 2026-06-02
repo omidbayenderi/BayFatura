@@ -212,6 +212,10 @@ const Landing = () => {
                         <Link to="/privacy">Datenschutz</Link>
                         <Link to="/terms">AGB</Link>
                         <Link to="/widerruf">Widerruf</Link>
+                        <button
+                            onClick={() => window.dispatchEvent(new Event('bayfatura:open-cookie-settings'))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                        >Cookie Einstellungen</button>
                     </div>
                     <div className="footer-copyright">
                         © 2026 BayFatura. All rights reserved. | Made in PT
