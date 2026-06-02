@@ -302,6 +302,28 @@ export const stripeWebhook = euFunctions.https.onRequest(async (req, res) => {
     }
 });
 
+// ─── Stripe Customer Portal ───────────────────────────────────────────────────
+export const createPortalSession = euCallable().onCall(async (data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    if (!getStripeSecret()) throw new https.HttpsError('failed-precondition', 'Stripe not configured');
+
+    const uid = context.auth.uid;
+    const userDoc = await db.collection('users').doc(uid).get();
+    const stripeCustomerId = userDoc.data()?.stripeCustomerId;
+    if (!stripeCustomerId) {
+        throw new https.HttpsError('not-found', 'No active subscription found');
+    }
+
+    const returnUrl = data.returnUrl || 'https://bayfatura.com/billing';
+    const stripeInstance = getStripe();
+    const session = await stripeInstance.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        return_url: returnUrl,
+    });
+
+    return { url: session.url };
+});
+
 export const syncUserPlan = euCallable().onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     if (!getStripeSecret()) throw new https.HttpsError('failed-precondition', 'Stripe secret key not configured');

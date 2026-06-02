@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion } from 'framer-motion';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../lib/firebase';
 import {
     Check, Star, Sparkles, TrendingUp, Users,
-    Zap, Shield, Clock, FileSpreadsheet, Ghost
+    Zap, Shield, Clock, FileSpreadsheet, Ghost, ExternalLink
 } from 'lucide-react';
 
 const stripeLinks = {
@@ -17,6 +19,21 @@ const Billing = () => {
     const { currentUser } = useAuth();
     const { t } = useLanguage();
     const [billingCycle, setBillingCycle] = useState('monthly');
+    const [portalLoading, setPortalLoading] = useState(false);
+
+    const openCustomerPortal = async () => {
+        setPortalLoading(true);
+        try {
+            const createPortalSession = httpsCallable(functions, 'createPortalSession');
+            const result = await createPortalSession({ returnUrl: window.location.href });
+            window.location.assign(result.data.url);
+        } catch (err) {
+            console.error('Portal session error:', err);
+            alert('Fehler beim Öffnen des Kundenportals. Bitte versuche es später erneut.');
+        } finally {
+            setPortalLoading(false);
+        }
+    };
 
     const hasEliteAccess = ['elite', 'premium'].includes(currentUser?.plan) ||
         currentUser?.featureAccess === 'all';
@@ -192,9 +209,21 @@ const Billing = () => {
                         className="primary-btn"
                         onClick={() => handleUpgrade(billingCycle)}
                         style={{ width: '100%', padding: '14px', borderRadius: '12px' }}
+                        disabled={hasEliteAccess}
                     >
                         {hasEliteAccess ? t('active') : 'Zahlungspflichtig bestellen'}
                     </button>
+                    {hasEliteAccess && currentUser?.subscriptionType === 'subscription' && (
+                        <button
+                            className="secondary-btn"
+                            onClick={openCustomerPortal}
+                            disabled={portalLoading}
+                            style={{ width: '100%', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                        >
+                            <ExternalLink size={15} />
+                            {portalLoading ? 'Wird geöffnet…' : 'Abonnement verwalten / kündigen'}
+                        </button>
+                    )}
                     {!hasEliteAccess && (
                         <p style={{ margin: '12px 0 0', color: hasEliteAccess ? '#64748b' : '#cbd5e1', fontSize: '0.76rem', lineHeight: 1.6 }}>
                             Preis inkl. gesetzlicher Umsatzsteuer, soweit anwendbar. Abonnement mit automatischer Verlängerung,
