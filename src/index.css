@@ -1602,7 +1602,9 @@ label {
   .content-wrapper {
     padding: 16px;
     width: 100%;
-    overflow-x: hidden;
+    /* overflow-x: clip lets child elements scroll independently (overflow-x: auto)
+       while still preventing the page itself from scrolling sideways */
+    overflow-x: clip;
   }
 
   .settings-grid {
