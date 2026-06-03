@@ -122,15 +122,15 @@ const DashboardChart = ({ revenue, profit, expenses }) => {
 
                 {/* --- RIGHT: 6-MONTH TREND LINE (2/3) --- */}
                 <div className="chart-section right-section" style={{ flex: '2 1 60%', padding: '24px', position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '20px' }}>
                         <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b' }}>
                             {t('revenueTrend')}
                         </h3>
                         {/* Legend */}
-                        <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                             {lines.map(line => (
-                                <div key={line.key} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#64748b' }}>
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: line.color }}></span>
+                                <div key={line.key} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: line.color, flexShrink: 0 }}></span>
                                     {line.label}
                                 </div>
                             ))}
