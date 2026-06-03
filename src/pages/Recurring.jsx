@@ -106,6 +106,7 @@ const Recurring = () => {
             )}
 
             <div className="card">
+                <div className="table-scroll">
                 <table className="modern-table">
                     <thead>
                         <tr>
@@ -166,6 +167,7 @@ const Recurring = () => {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     );

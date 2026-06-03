@@ -411,6 +411,7 @@ const Expenses = () => {
             )}
 
             <div className="card">
+                <div className="table-scroll">
                 <table className="modern-table">
                     <thead>
                         <tr>
@@ -475,6 +476,7 @@ const Expenses = () => {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {/* Receipt Modal */}

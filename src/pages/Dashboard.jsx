@@ -422,6 +422,7 @@ const Dashboard = () => {
                             </div>
                         </div>
                     ) : (
+                        <div className="table-scroll">
                         <table className="modern-table">
                             <thead>
                                 <tr>
@@ -448,6 +449,7 @@ const Dashboard = () => {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     )}
                 </div>
             </div>
