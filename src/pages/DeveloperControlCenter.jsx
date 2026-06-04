@@ -3,12 +3,172 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Cpu, Users, Zap, Shield, Activity, Database, Globe,
     Settings, Crown, Terminal, Radio, Server,
-    Lock, Search, X, RefreshCw, Mail, Trash2, AlertTriangle, Gift, Clock
+    Lock, Search, X, RefreshCw, Mail, Trash2, AlertTriangle, Gift, Clock, TrendingUp
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, limit } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, limit, where } from 'firebase/firestore';
 import { db, functions } from '../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
+
+// ── SEO Agent Dashboard ────────────────────────────────────────────────────────
+const SEO_COUNTRIES = ['DE', 'AT', 'PT', 'ES', 'FR', 'EN'];
+const SEO_COUNTRY_FLAGS = { DE: '🇩🇪', AT: '🇦🇹', PT: '🇵🇹', ES: '🇪🇸', FR: '🇫🇷', EN: '🌍' };
+
+const SeoDashboard = () => {
+    const [loading, setLoading] = useState(false);
+    const [running, setRunning] = useState(false);
+    const [report, setReport] = useState(null);
+    const [contentQueue, setContentQueue] = useState([]);
+    const [opportunities, setOpportunities] = useState([]);
+    const [selectedCountry, setSelectedCountry] = useState('DE');
+    const [selectedModule, setSelectedModule] = useState('content');
+
+    const triggerSeo = httpsCallable(functions, 'triggerSeoAgent');
+
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            try {
+                // Son içerik kuyruğu
+                const qSnap = await getDocs(query(
+                    collection(db, 'seo_content_queue'),
+                    orderBy('createdAt', 'desc'),
+                    limit(10)
+                ));
+                setContentQueue(qSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+                // Backlink fırsatları
+                const oSnap = await getDocs(query(
+                    collection(db, 'seo_opportunities'),
+                    where('status', '==', 'identified'),
+                    limit(10)
+                ));
+                setOpportunities(oSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+                // Son rapor
+                const rSnap = await getDocs(query(
+                    collection(db, 'seo_reports'),
+                    orderBy('startedAt', 'desc'),
+                    limit(1)
+                ));
+                if (!rSnap.empty) setReport(rSnap.docs[0].data());
+            } catch (err) {
+                console.error('SEO dashboard load error:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, []);
+
+    const handleRun = async () => {
+        setRunning(true);
+        try {
+            const res = await triggerSeo({ country: selectedCountry, module: selectedModule });
+            alert(`✅ SEO Agent tamamlandı!\n${JSON.stringify(res.data?.result || {}, null, 2)}`);
+        } catch (err) {
+            alert('❌ Hata: ' + err.message);
+        } finally {
+            setRunning(false);
+        }
+    };
+
+    const typeLabel = { blog_post: '📝 Blog', programmatic_page: '🚀 Sayfa', keyword_gap: '🔍 Gap' };
+    const statusColor = { draft: '#f59e0b', ready_to_publish: '#10b981', published: '#3b82f6', analysis_complete: '#8b5cf6' };
+
+    return (
+        <div style={{ marginTop: 32, background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 24, padding: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+                <TrendingUp size={20} color="#10b981" />
+                <h3 style={{ margin: 0, color: '#fff', fontSize: '1rem', fontWeight: 700 }}>SEO Agent</h3>
+                <span style={{ background: '#10b98120', color: '#10b981', padding: '2px 10px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 600 }}>
+                    Her gece 03:00 Berlin
+                </span>
+            </div>
+
+            {/* Ülke + Modül seçimi */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                {SEO_COUNTRIES.map(c => (
+                    <button key={c} onClick={() => setSelectedCountry(c)}
+                        style={{ padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem',
+                            background: selectedCountry === c ? '#2563eb' : '#1a1a1a',
+                            color: selectedCountry === c ? '#fff' : '#888' }}>
+                        {SEO_COUNTRY_FLAGS[c]} {c}
+                    </button>
+                ))}
+                <select value={selectedModule} onChange={e => setSelectedModule(e.target.value)}
+                    style={{ background: '#1a1a1a', color: '#888', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <option value="content">Content Intelligence</option>
+                    <option value="programmatic">Programmatic Pages</option>
+                    <option value="backlinks">Backlink Scout</option>
+                    <option value="audit">Technical Audit</option>
+                    <option value="all">Tümü</option>
+                </select>
+                <button onClick={handleRun} disabled={running}
+                    style={{ padding: '6px 18px', borderRadius: 8, border: 'none', cursor: running ? 'not-allowed' : 'pointer',
+                        background: running ? '#333' : '#10b981', color: '#fff', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {running ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span> Çalışıyor...</> : '▶ Manuel Çalıştır'}
+                </button>
+            </div>
+
+            {/* Son rapor */}
+            {report && (
+                <div style={{ background: '#111', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: '0.75rem', color: '#666' }}>
+                    Son çalışma: {report.startedAt?.slice(0, 16).replace('T', ' ')} |
+                    Ülkeler: {Object.keys(report.results || {}).join(', ')}
+                </div>
+            )}
+
+            {/* İçerik kuyruğu */}
+            {contentQueue.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                    <div style={{ color: '#666', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: 10 }}>İçerik Kuyruğu</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {contentQueue.map(item => (
+                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#111', borderRadius: 8, padding: '8px 12px' }}>
+                                <span style={{ fontSize: '0.75rem' }}>{SEO_COUNTRY_FLAGS[item.country] || '🌍'}</span>
+                                <span style={{ fontSize: '0.75rem', color: '#888' }}>{typeLabel[item.type] || item.type}</span>
+                                <span style={{ flex: 1, fontSize: '0.75rem', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {item.targetKeyword || item.title || item.slug}
+                                </span>
+                                <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: '0.65rem', fontWeight: 600,
+                                    background: (statusColor[item.status] || '#555') + '20',
+                                    color: statusColor[item.status] || '#888' }}>
+                                    {item.status}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Backlink fırsatları */}
+            {opportunities.length > 0 && (
+                <div>
+                    <div style={{ color: '#666', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: 10 }}>🔗 Backlink Fırsatları</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {opportunities.map(opp => (
+                            <div key={opp.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#111', borderRadius: 8, padding: '8px 12px' }}>
+                                <span style={{ fontSize: '0.75rem' }}>{SEO_COUNTRY_FLAGS[opp.country] || '🌍'}</span>
+                                <span style={{ flex: 1, fontSize: '0.75rem', color: '#ccc' }}>{opp.site}</span>
+                                <span style={{ fontSize: '0.7rem', color: '#888' }}>DA {opp.da}</span>
+                                <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: '0.65rem', background: '#2563eb20', color: '#60a5fa', fontWeight: 600 }}>
+                                    {opp.action}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {!loading && contentQueue.length === 0 && opportunities.length === 0 && (
+                <div style={{ color: '#444', fontSize: '0.8rem', textAlign: 'center', padding: '20px 0' }}>
+                    SEO Agent henüz çalışmadı. "Manuel Çalıştır" ile başlat.
+                </div>
+            )}
+        </div>
+    );
+};
 
 const AGENT_META = {
     conversion:  { emoji: '💰', label: 'Conversion',  color: '#6366f1', desc: 'Free limit → Elite ikna' },
@@ -937,6 +1097,9 @@ const DCC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* ── SEO Agent Panel ── */}
+            <SeoDashboard />
 
             <style>{`
                 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }

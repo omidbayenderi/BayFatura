@@ -2013,3 +2013,534 @@ export const triggerAgent = euCallable().onCall(async (data, context) => {
     const result = await agentMap[agentType]();
     return { success: true, result };
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔍 SEO AGENT
+// Amaç: BayFatura'yı hedef ülkelerde Google'da üst sıralara taşımak.
+//
+// Modüller:
+//   1. Country Intelligence  — ülkeye özel keyword stratejisi
+//   2. Content Intelligence  — Gemini ile içerik fırsatı analizi
+//   3. Programmatic SEO      — otomatik landing page kuyruğu
+//   4. Technical Audit       — sitemap, meta, schema kontrolleri
+//   5. Rank Tracker          — keyword pozisyon takibi
+//   6. Backlink Scout        — fırsat ve dizin takibi
+//
+// Çalışma: Her gece 03:00 Berlin saati
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Keyword Haritası ─────────────────────────────────────────────────────────
+const SEO_KEYWORD_MAP = {
+    DE: {
+        locale: 'de-DE',
+        lang: 'de',
+        market: 'Deutschland / DACH',
+        primary: [
+            'Rechnungsprogramm kostenlos',
+            'Rechnung erstellen online',
+            'Buchhaltungssoftware Kleinunternehmer',
+            'Rechnung schreiben App',
+            'Online Rechnungstellung',
+        ],
+        longTail: [
+            'Kleinunternehmer Rechnung Vorlage §19 UStG',
+            'Rechnung erstellen kostenlos ohne Anmeldung',
+            'Rechnungsprogramm Freelancer Deutschland',
+            'XRechnung erstellen kostenlos',
+            'Buchhaltungssoftware Selbstständige kostenlos',
+            'Rechnung mit Mehrwertsteuer erstellen',
+            'Angebot erstellen Vorlage kostenlos',
+        ],
+        competitors: ['sevdesk.de', 'lexoffice.de', 'fastbill.com', 'invoicefetcher.com'],
+        programmaticTemplates: [
+            { slug: 'kleinunternehmer', title: 'Rechnung erstellen für Kleinunternehmer (§19 UStG)' },
+            { slug: 'freiberufler', title: 'Rechnung erstellen für Freiberufler' },
+            { slug: 'handwerker', title: 'Rechnung erstellen für Handwerker' },
+            { slug: 'arzt', title: 'Rechnung erstellen für Ärzte & Heilberufe' },
+            { slug: 'it-dienstleister', title: 'Rechnung erstellen für IT-Dienstleister' },
+            { slug: 'xrechnung', title: 'XRechnung erstellen — B2G Rechnungen kostenlos' },
+        ],
+    },
+    AT: {
+        locale: 'de-AT',
+        lang: 'de',
+        market: 'Österreich',
+        primary: ['Rechnung erstellen Österreich', 'Buchhaltungsprogramm Österreich'],
+        longTail: ['Rechnung schreiben kostenlos Österreich', 'Kleinunternehmer Rechnung AT'],
+        competitors: ['billomat.com', 'easybill.de'],
+        programmaticTemplates: [
+            { slug: 'oesterreich', title: 'Rechnung erstellen in Österreich — kostenlos & konform' },
+        ],
+    },
+    PT: {
+        locale: 'pt-PT',
+        lang: 'pt',
+        market: 'Portugal',
+        primary: [
+            'programa de faturação gratuito',
+            'criar fatura online',
+            'software de faturação',
+            'fatura eletrónica Portugal',
+        ],
+        longTail: [
+            'criar fatura online grátis sem registo',
+            'programa faturação certificado AT Portugal',
+            'fatura recibo verde online',
+            'faturação eletrónica PME Portugal',
+            'ATCUD fatura online',
+        ],
+        competitors: ['invoicexpress.com', 'moloni.pt', 'phc.pt'],
+        programmaticTemplates: [
+            { slug: 'freelancer', title: 'Criar Fatura Online para Freelancer — Grátis' },
+            { slug: 'pequena-empresa', title: 'Software de Faturação para Pequenas Empresas' },
+            { slug: 'recibo-verde', title: 'Fatura Recibo Verde Online — Gerador Gratuito' },
+            { slug: 'ue-b2g', title: 'Fatura UBL CIUS-PT para Entidades Públicas (eSPap)' },
+        ],
+    },
+    ES: {
+        locale: 'es-ES',
+        lang: 'es',
+        market: 'España',
+        primary: ['programa de facturación gratuito', 'crear factura online', 'factura electrónica'],
+        longTail: [
+            'crear factura online gratis sin registro',
+            'programa facturación autónomos gratis',
+            'factura electrónica pymes España',
+        ],
+        competitors: ['facturaplus.es', 'holded.com', 'anfix.com'],
+        programmaticTemplates: [
+            { slug: 'autonomos', title: 'Crear Factura para Autónomos — Gratis Online' },
+            { slug: 'pymes', title: 'Software de Facturación para PYMEs — Gratis' },
+        ],
+    },
+    FR: {
+        locale: 'fr-FR',
+        lang: 'fr',
+        market: 'France',
+        primary: ['logiciel de facturation gratuit', 'créer une facture en ligne', 'facture électronique'],
+        longTail: [
+            'créer facture gratuit sans inscription',
+            'logiciel facturation auto-entrepreneur gratuit',
+            'facture électronique entreprise France',
+        ],
+        competitors: ['debitoor.fr', 'facture.net', 'zervant.com'],
+        programmaticTemplates: [
+            { slug: 'auto-entrepreneur', title: 'Créer une Facture Auto-Entrepreneur — Gratuit' },
+            { slug: 'pme', title: 'Logiciel de Facturation PME — Gratuit en Ligne' },
+        ],
+    },
+    EN: {
+        locale: 'en-US',
+        lang: 'en',
+        market: 'Global / English',
+        primary: ['free invoicing software', 'online invoice generator', 'invoice maker free'],
+        longTail: [
+            'create invoice online free no sign up',
+            'free invoice generator for small business',
+            'invoice template freelancer download',
+            'best free invoicing app 2025',
+            'multi-language invoice software',
+        ],
+        competitors: ['invoiceninja.com', 'wave.com', 'zoho.com/invoice'],
+        programmaticTemplates: [
+            { slug: 'freelancer', title: 'Free Invoice Generator for Freelancers' },
+            { slug: 'small-business', title: 'Free Invoicing Software for Small Business' },
+            { slug: 'consultant', title: 'Invoice Template for Consultants — Free Download' },
+            { slug: 'germany-b2g', title: 'XRechnung Generator — Free B2G Invoicing for Germany' },
+        ],
+    },
+};
+
+// Öncelik sırası: DE > AT > PT > ES > FR > EN
+const SEO_COUNTRY_PRIORITY = ['DE', 'AT', 'PT', 'ES', 'FR', 'EN'];
+
+// ─── Yardımcı: Gemini ile içerik analizi ──────────────────────────────────────
+const getSeoAI = () => genkit({ plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })] });
+
+async function generateSeoContent({ country, keyword, contentType, existingTitle = '' }) {
+    const ai = getSeoAI();
+    const config = SEO_KEYWORD_MAP[country];
+
+    const prompts = {
+        meta_description: `Write an SEO meta description (max 155 characters) in ${config.lang} for BayFatura invoicing software.
+Target keyword: "${keyword}"
+Market: ${config.market}
+Requirements: Include keyword naturally, highlight free/kostenlos/gratuito, end with a CTA.
+Output ONLY the meta description text, nothing else.`,
+
+        blog_outline: `You are an SEO expert writing for BayFatura, a free online invoicing SaaS targeting ${config.market}.
+Create a detailed blog post outline in ${config.lang} targeting the keyword: "${keyword}"
+Include:
+- SEO title (H1) with keyword
+- Meta description (155 chars)
+- 5-7 H2 sections with bullet sub-points
+- FAQ section (5 questions users actually search)
+- Internal link suggestions
+Output as structured JSON.`,
+
+        landing_page: `You are an SEO copywriter for BayFatura, free invoicing software.
+Write a landing page in ${config.lang} for the URL path targeting: "${keyword}"
+Market: ${config.market}
+${existingTitle ? `Page title: ${existingTitle}` : ''}
+Structure:
+- H1: keyword-optimized headline
+- Hero paragraph (2 sentences, include keyword)
+- 3 feature bullets (localized benefits)
+- CTA text
+- FAQ (3 questions)
+Output as JSON with keys: h1, hero, features (array), cta, faq (array of {q,a}).`,
+
+        keyword_gap: `You are an SEO strategist for BayFatura (${config.market} market).
+Competitors: ${config.competitors.join(', ')}
+Our primary keywords: ${config.primary.join(', ')}
+Identify 10 high-value keywords we are likely missing that competitors rank for.
+Focus on: free/kostenlos/gratuito, templates, specific industries, compliance terms.
+Output as JSON array: [{keyword, difficulty: low|medium|high, intent: informational|commercial|transactional, priority: 1-10}]`,
+    };
+
+    const response = await ai.generate({
+        model: 'googleai/gemini-1.5-flash',
+        prompt: prompts[contentType],
+        config: { temperature: 0.3 },
+    });
+
+    return response.text;
+}
+
+// ─── Modül 1: Technical SEO Audit ─────────────────────────────────────────────
+async function runTechnicalAudit() {
+    const issues = [];
+    const now = new Date().toISOString();
+
+    // Kontrol: sitemap.xml son güncelleme
+    const sitemapRef = db.collection('seo_tasks').doc('sitemap_status');
+    const sitemapDoc = await sitemapRef.get();
+    const lastSitemapUpdate = sitemapDoc.exists ? sitemapDoc.data().lastUpdated : null;
+    const daysSinceSitemap = lastSitemapUpdate
+        ? Math.floor((Date.now() - new Date(lastSitemapUpdate).getTime()) / 86400000)
+        : 999;
+
+    if (daysSinceSitemap > 7) {
+        issues.push({ type: 'sitemap_stale', severity: 'high', message: `Sitemap ${daysSinceSitemap} gündür güncellenmedi` });
+    }
+
+    // Kontrol: hreflang yapılandırması
+    const hreflangRef = db.collection('seo_tasks').doc('hreflang_status');
+    const hreflangDoc = await hreflangRef.get();
+    if (!hreflangDoc.exists || !hreflangDoc.data()?.configured) {
+        issues.push({ type: 'hreflang_missing', severity: 'critical', message: 'Hreflang tags yapılandırılmamış — çok dilli SEO için kritik' });
+    }
+
+    // Kontrol: programmatik sayfalar eksik mi?
+    const progPages = await db.collection('seo_content_queue')
+        .where('type', '==', 'programmatic_page')
+        .where('status', '==', 'published')
+        .get();
+    if (progPages.size < 5) {
+        issues.push({ type: 'low_programmatic_pages', severity: 'medium', message: `Sadece ${progPages.size} programmatik SEO sayfası yayında` });
+    }
+
+    await db.collection('seo_reports').add({
+        type: 'technical_audit',
+        issues,
+        issueCount: issues.length,
+        createdAt: now,
+    });
+
+    console.log(`🔍 Technical audit: ${issues.length} issue bulundu`);
+    return issues;
+}
+
+// ─── Modül 2: Content Intelligence ────────────────────────────────────────────
+async function runContentIntelligence(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const queued = [];
+
+    // Keyword gap analizi — her ülke için haftada 1
+    const gapKey = `keyword_gap_${country}_${new Date().toISOString().slice(0, 7)}`;
+    const gapExists = await db.collection('seo_content_queue').doc(gapKey).get();
+
+    if (!gapExists.exists) {
+        try {
+            const gapAnalysis = await generateSeoContent({
+                country,
+                keyword: config.primary[0],
+                contentType: 'keyword_gap',
+            });
+
+            let gaps = [];
+            try { gaps = JSON.parse(gapAnalysis); } catch { gaps = []; }
+
+            await db.collection('seo_content_queue').doc(gapKey).set({
+                type: 'keyword_gap',
+                country,
+                market: config.market,
+                data: gaps,
+                status: 'analysis_complete',
+                createdAt: now,
+            });
+            queued.push({ type: 'keyword_gap', country });
+            console.log(`📊 Keyword gap analizi tamamlandı: ${country} (${gaps.length} fırsat)`);
+        } catch (err) {
+            console.error(`Keyword gap hatası (${country}):`, err.message);
+        }
+    }
+
+    // En yüksek öncelikli long-tail keyword için blog taslağı
+    const targetKeyword = config.longTail[Math.floor(Math.random() * config.longTail.length)];
+    const blogKey = `blog_${country}_${targetKeyword.replace(/[^a-z0-9]/gi, '_').slice(0, 40)}`;
+    const blogExists = await db.collection('seo_content_queue').doc(blogKey).get();
+
+    if (!blogExists.exists) {
+        try {
+            const blogOutline = await generateSeoContent({
+                country,
+                keyword: targetKeyword,
+                contentType: 'blog_outline',
+            });
+
+            await db.collection('seo_content_queue').doc(blogKey).set({
+                type: 'blog_post',
+                country,
+                lang: config.lang,
+                market: config.market,
+                targetKeyword,
+                outline: blogOutline,
+                status: 'draft',
+                createdAt: now,
+            });
+            queued.push({ type: 'blog_post', country, keyword: targetKeyword });
+            console.log(`✍️ Blog taslağı oluşturuldu: "${targetKeyword}" (${country})`);
+        } catch (err) {
+            console.error(`Blog taslağı hatası (${country}):`, err.message);
+        }
+    }
+
+    return queued;
+}
+
+// ─── Modül 3: Programmatic SEO Generator ──────────────────────────────────────
+async function generateProgrammaticPages(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const generated = [];
+
+    for (const template of config.programmaticTemplates) {
+        const pageId = `prog_${country.toLowerCase()}_${template.slug}`;
+        const existing = await db.collection('seo_content_queue').doc(pageId).get();
+
+        if (existing.exists && existing.data()?.status === 'published') continue;
+        if (existing.exists && existing.data()?.contentGeneratedAt) continue;
+
+        try {
+            const pageContent = await generateSeoContent({
+                country,
+                keyword: template.title,
+                contentType: 'landing_page',
+                existingTitle: template.title,
+            });
+
+            let content = {};
+            try { content = JSON.parse(pageContent); } catch {
+                content = { h1: template.title, hero: pageContent.slice(0, 200), features: [], cta: 'Kostenlos starten', faq: [] };
+            }
+
+            const metaDesc = await generateSeoContent({
+                country,
+                keyword: template.title,
+                contentType: 'meta_description',
+            });
+
+            await db.collection('seo_content_queue').doc(pageId).set({
+                type: 'programmatic_page',
+                country,
+                lang: config.lang,
+                locale: config.locale,
+                slug: template.slug,
+                urlPath: `/${config.lang}/rechnung-erstellen/${template.slug}`,
+                title: template.title,
+                content,
+                metaDescription: metaDesc.trim().slice(0, 155),
+                status: 'ready_to_publish',
+                contentGeneratedAt: now,
+                createdAt: now,
+            });
+
+            generated.push({ country, slug: template.slug, title: template.title });
+            console.log(`🚀 Programmatik sayfa hazır: ${country}/${template.slug}`);
+        } catch (err) {
+            console.error(`Programmatik sayfa hatası (${country}/${template.slug}):`, err.message);
+        }
+    }
+
+    return generated;
+}
+
+// ─── Modül 4: Rank Tracker ─────────────────────────────────────────────────────
+async function trackRankings(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const weekKey = now.slice(0, 10);
+
+    // Simüle edilmiş ranking verisi (Google Search Console API entegre edilince gerçek veri)
+    // Production'da: googleapis.com/webmasters/v3/sites/{site}/searchAnalytics/query
+    const rankingData = config.primary.map(keyword => ({
+        keyword,
+        country,
+        lang: config.lang,
+        estimatedPosition: null, // GSC API bağlanınca dolacak
+        lastChecked: now,
+        status: 'pending_gsc_integration',
+        weekKey,
+    }));
+
+    const batch = db.batch();
+    rankingData.forEach(data => {
+        const docId = `${country}_${data.keyword.replace(/[^a-z0-9]/gi, '_').slice(0, 50)}_${weekKey}`;
+        batch.set(db.collection('seo_rankings').doc(docId), data);
+    });
+    await batch.commit();
+
+    console.log(`📈 Ranking tracker: ${rankingData.length} keyword izleniyor (${country})`);
+    return rankingData.length;
+}
+
+// ─── Modül 5: Backlink Scout ───────────────────────────────────────────────────
+async function scoutBacklinkOpportunities(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const weekKey = now.slice(0, 7); // YYYY-MM
+
+    const opportunities = [
+        // Her ülke için bilinen yüksek DA dizin siteleri
+        ...(country === 'DE' ? [
+            { site: 'gruenderszene.de', type: 'startup_directory', da: 72, action: 'submit_listing' },
+            { site: 'capterra.de', type: 'software_review', da: 88, action: 'claim_listing' },
+            { site: 'trusted.de', type: 'review_platform', da: 65, action: 'request_review' },
+            { site: 'appvizer.de', type: 'software_directory', da: 58, action: 'submit_listing' },
+            { site: 'g2.com/de', type: 'b2b_review', da: 91, action: 'claim_listing' },
+        ] : []),
+        ...(country === 'PT' ? [
+            { site: 'capterra.pt', type: 'software_review', da: 88, action: 'claim_listing' },
+            { site: 'appvizer.pt', type: 'software_directory', da: 58, action: 'submit_listing' },
+            { site: 'sifted.eu', type: 'startup_media', da: 62, action: 'pitch_story' },
+        ] : []),
+        ...(country === 'EN' ? [
+            { site: 'producthunt.com', type: 'product_launch', da: 90, action: 'schedule_launch' },
+            { site: 'alternativeto.net', type: 'alternative_directory', da: 82, action: 'add_product' },
+            { site: 'capterra.com', type: 'software_review', da: 90, action: 'claim_listing' },
+            { site: 'getapp.com', type: 'software_directory', da: 85, action: 'claim_listing' },
+        ] : []),
+    ];
+
+    const batch = db.batch();
+    opportunities.forEach(opp => {
+        const docId = `${country}_${opp.site.replace(/[^a-z0-9]/gi, '_')}_${weekKey}`;
+        batch.set(db.collection('seo_opportunities').doc(docId), {
+            ...opp,
+            country,
+            lang: config.lang,
+            market: config.market,
+            status: 'identified',
+            createdAt: now,
+        }, { merge: true });
+    });
+    await batch.commit();
+
+    console.log(`🔗 Backlink fırsatları: ${opportunities.length} kayıt edildi (${country})`);
+    return opportunities.length;
+}
+
+// ─── Ana SEO Agent Scheduler ───────────────────────────────────────────────────
+export const seoAgent = euFunctions
+    .runWith({ timeoutSeconds: 540, memory: '1GB' })
+    .pubsub.schedule('0 3 * * *')
+    .timeZone('Europe/Berlin')
+    .onRun(async () => {
+        const now = new Date().toISOString();
+        const dayOfWeek = new Date().getDay(); // 0=Pazar, 1=Pazartesi...
+        const isWeekly = dayOfWeek === 1; // Pazartesi = haftalık görevler
+
+        console.log(`🔍 SEO Agent başlıyor — ${now} (weekly=${isWeekly})`);
+
+        const report = {
+            startedAt: now,
+            isWeekly,
+            countries: SEO_COUNTRY_PRIORITY,
+            results: {},
+        };
+
+        // Technical audit — sadece pazartesi
+        if (isWeekly) {
+            const auditIssues = await runTechnicalAudit();
+            report.results.technical_audit = { issueCount: auditIssues.length };
+        }
+
+        // Her ülke için modüller çalıştır
+        for (const country of SEO_COUNTRY_PRIORITY) {
+            report.results[country] = {};
+
+            try {
+                // Content Intelligence — her gün
+                const content = await runContentIntelligence(country);
+                report.results[country].content = content.length;
+
+                // Programmatik sayfalar — pazartesi ve perşembe
+                if (isWeekly || dayOfWeek === 4) {
+                    const pages = await generateProgrammaticPages(country);
+                    report.results[country].programmaticPages = pages.length;
+                }
+
+                // Rank tracking — her gün
+                const tracked = await trackRankings(country);
+                report.results[country].keywordsTracked = tracked;
+
+                // Backlink scout — sadece pazartesi
+                if (isWeekly) {
+                    const opps = await scoutBacklinkOpportunities(country);
+                    report.results[country].backlinkOpportunities = opps;
+                }
+
+            } catch (err) {
+                console.error(`SEO Agent hata (${country}):`, err.message);
+                report.results[country].error = err.message;
+            }
+        }
+
+        report.completedAt = new Date().toISOString();
+
+        await db.collection('seo_reports').add({
+            ...report,
+            type: 'weekly_seo_run',
+        });
+
+        console.log('✅ SEO Agent tamamlandı:', JSON.stringify(report.results));
+        return null;
+    });
+
+// ─── Manuel tetikleme (DCC'den test için) ─────────────────────────────────────
+export const triggerSeoAgent = euFunctions.runWith({ timeoutSeconds: 540, memory: '1GB' })
+    .https.onCall(async (data, context) => {
+        if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+        const adminEmails = ['omidbayenderi@gmail.com', 'support@bayfatura.com'];
+        if (!adminEmails.includes(context.auth.token.email)) {
+            throw new https.HttpsError('permission-denied', 'Admin only');
+        }
+
+        const country = data.country || 'DE';
+        const module = data.module || 'content';
+        console.log(`🔍 SEO Agent manuel tetikleme: ${country}/${module}`);
+
+        let result = {};
+        if (module === 'content') result = await runContentIntelligence(country);
+        if (module === 'programmatic') result = await generateProgrammaticPages(country);
+        if (module === 'backlinks') result.opps = await scoutBacklinkOpportunities(country);
+        if (module === 'audit') result.issues = await runTechnicalAudit();
+        if (module === 'all') {
+            result.content = await runContentIntelligence(country);
+            result.pages = await generateProgrammaticPages(country);
+        }
+
+        return { success: true, country, module, result };
+    });
