@@ -175,7 +175,7 @@ const SeoLandingPage = () => {
             {/* Related Pages */}
             {relatedPages.length > 0 && (
                 <section style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 64px' }}>
-                    <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 20, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.8rem' }}>
+                    <h2 style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 20, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         Weitere Themen / Related
                     </h2>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>

@@ -899,6 +899,9 @@ const DCC = () => {
                     <MetricCard title="TOTAL INVOICES" value={orphanStats.reduce((sum, s) => sum + s.invoiceCount, 0)} trend="DB" icon={<Server size={20} color="#8b5cf6" />} />
                 </div>
 
+                {/* ── SEO Agent ── */}
+                <SeoDashboard />
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '30px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                         {/* Tenant Manager */}
@@ -1097,9 +1100,6 @@ const DCC = () => {
                     </div>
                 </div>
             </div>
-
-            {/* ── SEO Agent Panel ── */}
-            <SeoDashboard />
 
             <style>{`
                 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
