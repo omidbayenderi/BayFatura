@@ -51,8 +51,13 @@ jobs:
           credential_project="$(jq -r '.project_id // empty' "$GOOGLE_APPLICATION_CREDENTIALS")"
           credential_email="$(jq -r '.client_email // empty' "$GOOGLE_APPLICATION_CREDENTIALS")"
 
-          test "$credential_project" = "$FIREBASE_PROJECT_ID" || {
+          test "$credential_project" = "bayfatura-b283c" || {
             echo "::error::FIREBASE_SERVICE_ACCOUNT belongs to a different Firebase project."
+            exit 1
+          }
+
+          test "$FIREBASE_PROJECT_ID" = "bayfatura-b283c" || {
+            echo "::error::VITE_FIREBASE_PROJECT_ID does not target the production Firebase project."
             exit 1
           }
 

@@ -71,6 +71,23 @@ jobs:
           VITE_FIREBASE_APP_CHECK_KEY: ${{ secrets.VITE_FIREBASE_APP_CHECK_KEY }}
           VITE_APP_ENV: production
 
+      - name: Verify production deployment target
+        run: |
+          test "$FIREBASE_PROJECT_ID" = "bayfatura-b283c" || {
+            echo "::error::VITE_FIREBASE_PROJECT_ID does not target the production Firebase project."
+            exit 1
+          }
+
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/production-service-account.json"
+          credential_project="$(jq -r '.project_id // empty' "$RUNNER_TEMP/production-service-account.json")"
+          test "$credential_project" = "bayfatura-b283c" || {
+            echo "::error::FIREBASE_SERVICE_ACCOUNT does not target the production Firebase project."
+            exit 1
+          }
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
       - name: Deploy to Firebase Hosting (Production)
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
