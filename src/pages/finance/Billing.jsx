@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion } from 'framer-motion';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../lib/firebase';
+import { usePanel } from '../../context/PanelContext';
 import {
     Check, Star, Sparkles, TrendingUp, Users,
     Zap, Shield, Clock, FileSpreadsheet, Ghost
@@ -15,7 +18,9 @@ const stripeLinks = {
 const Billing = () => {
     const { currentUser } = useAuth();
     const { t } = useLanguage();
+    const { showToast } = usePanel();
     const [billingCycle, setBillingCycle] = useState('monthly');
+    const [isOpeningPortal, setIsOpeningPortal] = useState(false);
 
     const hasEliteAccess = ['elite', 'premium', 'lifetime'].includes(currentUser?.plan) ||
         currentUser?.subscriptionType === 'lifetime' ||
@@ -32,6 +37,29 @@ const Billing = () => {
         }
 
         window.location.assign(checkoutUrl.toString());
+    };
+
+    const canManageSubscription = hasEliteAccess
+        && currentUser?.subscriptionType !== 'lifetime'
+        && Boolean(currentUser?.stripeCustomerId);
+
+    const handleManageSubscription = async () => {
+        if (!canManageSubscription || isOpeningPortal) return;
+
+        setIsOpeningPortal(true);
+        try {
+            const createPortalSession = httpsCallable(functions, 'createBillingPortalSession');
+            const result = await createPortalSession();
+            const portalUrl = result?.data?.url;
+            if (!portalUrl || !portalUrl.startsWith('https://')) {
+                throw new Error(t('subscriptionPortalError'));
+            }
+            window.location.assign(portalUrl);
+        } catch (error) {
+            console.error('Billing portal error:', error);
+            showToast(t('subscriptionPortalError'), 'error');
+            setIsOpeningPortal(false);
+        }
     };
 
     const eliteIconColor = hasEliteAccess ? 'var(--primary)' : '#fcd34d';
@@ -190,10 +218,17 @@ const Billing = () => {
 
                     <button
                         className="primary-btn"
-                        onClick={() => handleUpgrade(billingCycle)}
+                        onClick={() => canManageSubscription ? handleManageSubscription() : handleUpgrade(billingCycle)}
+                        disabled={hasEliteAccess && !canManageSubscription || isOpeningPortal}
                         style={{ width: '100%', padding: '14px', borderRadius: '12px' }}
                     >
-                        {hasEliteAccess ? t('active') : t('upgradeToElite')}
+                        {isOpeningPortal
+                            ? t('openingSubscriptionPortal')
+                            : canManageSubscription
+                                ? t('manageSubscription')
+                                : hasEliteAccess
+                                    ? t('active')
+                                    : t('upgradeToElite')}
                     </button>
                 </motion.div>
             </div>

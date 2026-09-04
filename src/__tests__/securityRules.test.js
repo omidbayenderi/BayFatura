@@ -10,7 +10,7 @@ describe('Firestore security rules guardrails', () => {
       expect(rules).toContain(`'${field}'`);
     }
 
-    const editableKeys = rules.match(/function userEditableKeys\(\) \{[\s\S]*?\n    \}/)?.[0] || '';
+    const editableKeys = rules.match(/function userEditableKeys\(\) \{[\s\S]*?\n {4}\}/)?.[0] || '';
     for (const field of ['plan', 'role', 'tenantId', 'subscriptionId']) {
       expect(editableKeys).not.toContain(`'${field}'`);
     }

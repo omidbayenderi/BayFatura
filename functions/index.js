@@ -284,6 +284,42 @@ export const syncUserPlan = https.runWith({ enforceAppCheck: true }).onCall(asyn
     }
 });
 
+export const createBillingPortalSession = https.runWith({ enforceAppCheck: true }).onCall(async (_data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    if (!getStripeSecret()) throw new https.HttpsError('failed-precondition', 'Stripe secret key not configured');
+
+    const userId = context.auth.uid;
+
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            throw new https.HttpsError('not-found', 'User profile not found');
+        }
+
+        const userData = userDoc.data() || {};
+        if (userData.subscriptionType === 'lifetime') {
+            throw new https.HttpsError('failed-precondition', 'Lifetime plans do not have a recurring subscription to manage');
+        }
+        if (!userData.stripeCustomerId) {
+            throw new https.HttpsError('failed-precondition', 'No Stripe subscription was found for this account');
+        }
+
+        const configuredAppUrl = process.env.APP_URL || 'https://bayfatura.com';
+        const appUrl = new URL(configuredAppUrl);
+        const returnUrl = new URL('/billing', appUrl).toString();
+        const portalSession = await getStripe().billingPortal.sessions.create({
+            customer: userData.stripeCustomerId,
+            return_url: returnUrl,
+        });
+
+        return { url: portalSession.url };
+    } catch (err) {
+        throw toCallableError('createBillingPortalSession', err, 'Subscription management could not be opened. Please try again later.', {
+            userId,
+        });
+    }
+});
+
 export const syncAllAuthUsers = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const adminEmail = context.auth.token.email;
