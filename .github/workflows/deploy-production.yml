@@ -133,7 +133,7 @@ jobs:
 
       - name: Deploy selected Cloud Functions
         if: ${{ inputs.deployFunctions == true && inputs.functionTargets != '' }}
-        run: npx -y firebase-tools@latest deploy --only "$FUNCTION_TARGETS" --project "$FIREBASE_PROJECT_ID"
+        run: npx -y firebase-tools@latest deploy --debug --only "$FUNCTION_TARGETS" --project "$FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
           FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
