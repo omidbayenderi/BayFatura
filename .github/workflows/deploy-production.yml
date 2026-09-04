@@ -16,6 +16,10 @@ on:
         type: string
         required: false
         default: ''
+      deployStorageRules:
+        description: 'Deploy Firebase Storage rules too?'
+        type: boolean
+        default: true
 
 concurrency:
   group: production-deploy
@@ -146,8 +150,15 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
           FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
 
-      - name: Deploy Firestore & Storage Rules
-        run: npx -y firebase-tools@latest deploy --only firestore,storage --project "$FIREBASE_PROJECT_ID"
+      - name: Deploy Firestore Rules
+        run: npx -y firebase-tools@latest deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+
+      - name: Deploy Storage Rules
+        if: ${{ inputs.deployStorageRules == true }}
+        run: npx -y firebase-tools@latest deploy --only storage --project "$FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
           FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
