@@ -1,0 +1,53 @@
+name: Deploy Production Firestore Rules
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for the Firestore rules deploy'
+        required: true
+
+concurrency:
+  group: production-firestore-rules-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-deploy:
+    name: Validate & Deploy Firestore Rules
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Firestore rules guardrails
+        run: npm run test:rules
+
+      - name: Prepare production Firebase credentials
+        run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/production-service-account.json"
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy Firestore rules only
+        run: npx -y firebase-tools@latest deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
