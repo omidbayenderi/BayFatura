@@ -46,6 +46,41 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
+      - name: Verify production credential target
+        run: |
+          credential_project="$(jq -r '.project_id // empty' "$GOOGLE_APPLICATION_CREDENTIALS")"
+          credential_email="$(jq -r '.client_email // empty' "$GOOGLE_APPLICATION_CREDENTIALS")"
+
+          test "$credential_project" = "$FIREBASE_PROJECT_ID" || {
+            echo "::error::FIREBASE_SERVICE_ACCOUNT belongs to a different Firebase project."
+            exit 1
+          }
+
+          case "$credential_email" in
+            firebase-adminsdk-fbsvc@bayfatura-b283c.iam.gserviceaccount.com)
+              echo "credential_kind=firebase-adminsdk" >> "$GITHUB_OUTPUT"
+              ;;
+            845794218840-compute@developer.gserviceaccount.com)
+              echo "credential_kind=default-compute" >> "$GITHUB_OUTPUT"
+              ;;
+            bayfatura-b283c@appspot.gserviceaccount.com)
+              echo "credential_kind=app-engine-default" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::FIREBASE_SERVICE_ACCOUNT uses an unexpected production service account."
+              exit 1
+              ;;
+          esac
+        id: verify_credentials
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+
+      - name: Report production credential kind
+        run: echo "Production credential kind is $CREDENTIAL_KIND"
+        env:
+          CREDENTIAL_KIND: ${{ steps.verify_credentials.outputs.credential_kind }}
+
       - name: Deploy Firestore rules only
         run: npx -y firebase-tools@latest deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID"
         env:
