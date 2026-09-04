@@ -99,6 +99,33 @@ describeWithEmulator('Firestore rules emulator', () => {
     }));
   });
 
+  test('users can update their own company address without changing protected account fields', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'users', 'user-a'), {
+        name: 'User A',
+        email: 'user-a@example.com',
+        plan: 'standard',
+        role: 'admin',
+        tenantId: 'user-a',
+      });
+    });
+
+    const db = authedDb('user-a', 'user-a@example.com');
+
+    await assertSucceeds(updateDoc(doc(db, 'users', 'user-a'), {
+      street: 'Schillerstrasse',
+      houseNum: '2',
+      zip: '37269',
+      city: 'Eschwege',
+      country: 'DE',
+    }));
+
+    await assertFails(updateDoc(doc(db, 'users', 'user-a'), {
+      street: 'Schillerstrasse',
+      plan: 'elite',
+    }));
+  });
+
   test('users cannot transfer business documents by changing userId', async () => {
     await seed(async (db) => {
       await setDoc(doc(db, 'invoices', 'invoice-a'), {

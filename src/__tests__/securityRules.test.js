@@ -5,6 +5,17 @@ import path from 'path';
 const rules = fs.readFileSync(path.join(process.cwd(), 'firestore.rules'), 'utf8');
 
 describe('Firestore security rules guardrails', () => {
+  test('company address fields are user-editable while account authority fields remain protected', () => {
+    for (const field of ['street', 'houseNum', 'zip', 'city', 'country']) {
+      expect(rules).toContain(`'${field}'`);
+    }
+
+    const editableKeys = rules.match(/function userEditableKeys\(\) \{[\s\S]*?\n    \}/)?.[0] || '';
+    for (const field of ['plan', 'role', 'tenantId', 'subscriptionId']) {
+      expect(editableKeys).not.toContain(`'${field}'`);
+    }
+  });
+
   test('feature flag config is readable but writable only by super admins', () => {
     expect(rules).toContain('match /app_config/{docId}');
     expect(rules).toContain('allow read: if isAuthenticated();');
