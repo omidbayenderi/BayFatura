@@ -11,6 +11,11 @@ on:
         description: 'Deploy Cloud Functions too?'
         type: boolean
         default: false
+      functionTargets:
+        description: 'Optional comma-separated Firebase --only targets (for example: functions:createBillingPortalSession)'
+        type: string
+        required: false
+        default: ''
 
 concurrency:
   group: production-deploy
@@ -126,8 +131,16 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
 
-      - name: Deploy Cloud Functions
-        if: ${{ inputs.deployFunctions == true }}
+      - name: Deploy selected Cloud Functions
+        if: ${{ inputs.deployFunctions == true && inputs.functionTargets != '' }}
+        run: npx -y firebase-tools@latest deploy --only "$FUNCTION_TARGETS" --project "$FIREBASE_PROJECT_ID"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          FUNCTION_TARGETS: ${{ inputs.functionTargets }}
+
+      - name: Deploy all Cloud Functions
+        if: ${{ inputs.deployFunctions == true && inputs.functionTargets == '' }}
         run: npx -y firebase-tools@latest deploy --only functions --project "$FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
