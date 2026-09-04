@@ -3,7 +3,7 @@
  * Stripe Webhook, Genkit AI, Email Automation & Notifications
  */
 
-import { https, pubsub, auth } from 'firebase-functions/v1';
+import { https, pubsub, auth, runWith } from 'firebase-functions/v1';
 import admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { genkit, z } from 'genkit';
@@ -250,7 +250,7 @@ export const stripeWebhook = https.onRequest(async (req, res) => {
     }
 });
 
-export const syncUserPlan = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const syncUserPlan = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     if (!getStripeSecret()) throw new https.HttpsError('failed-precondition', 'Stripe secret key not configured');
     
@@ -284,7 +284,7 @@ export const syncUserPlan = https.runWith({ enforceAppCheck: true }).onCall(asyn
     }
 });
 
-export const createBillingPortalSession = https.runWith({ enforceAppCheck: true }).onCall(async (_data, context) => {
+export const createBillingPortalSession = runWith({ enforceAppCheck: true }).https.onCall(async (_data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     if (!getStripeSecret()) throw new https.HttpsError('failed-precondition', 'Stripe secret key not configured');
 
@@ -320,7 +320,7 @@ export const createBillingPortalSession = https.runWith({ enforceAppCheck: true 
     }
 });
 
-export const syncAllAuthUsers = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const syncAllAuthUsers = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const adminEmail = context.auth.token.email;
     if (!['support@bayfatura.com', 'omidbayenderi@gmail.com'].includes(adminEmail)) {
@@ -364,7 +364,7 @@ export const syncAllAuthUsers = https.runWith({ enforceAppCheck: true }).onCall(
 });
 
 // ─── 2. AI: Bank Statement Matcher (Genkit) ───────────────────────────────────────
-export const analyzeBankStatement = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const analyzeBankStatement = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
     await checkRateLimit(context.auth.uid, 'ai_bank');
@@ -412,7 +412,7 @@ export const analyzeBankStatement = https.runWith({ enforceAppCheck: true }).onC
 });
 
 // ─── 3. AI: Receipt Scanner (Genkit Vision) ───────────────────────────────────────
-export const scanReceipt = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const scanReceipt = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
     await checkRateLimit(context.auth.uid, 'ai_receipt');
@@ -456,7 +456,7 @@ export const scanReceipt = https.runWith({ enforceAppCheck: true }).onCall(async
 });
 
 // ─── 4. AI: Financial Forecasting (Genkit) ──────────────────────────────────────
-export const analyzeFinancials = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const analyzeFinancials = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
     await checkRateLimit(context.auth.uid, 'ai_finance');
@@ -668,7 +668,7 @@ const buildInvoiceEmailHtml = ({ invoice, senderName, senderEmail, type, languag
 </html>`.trim();
 };
 
-export const sendInvoiceEmail = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const sendInvoiceEmail = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const { toEmail, toName, invoiceId, type = 'invoice', language = 'de' } = data;
 
@@ -846,7 +846,7 @@ const normalizeAppUrl = (value) => {
     }
 };
 
-export const sendInvitationEmail = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const sendInvitationEmail = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const { inviteeEmail, inviteeName, role, invitedBy, invitationId, companyName, senderName, appUrl } = data;
 
@@ -954,7 +954,7 @@ export const sendInvitationEmail = https.runWith({ enforceAppCheck: true }).onCa
 });
 
 // ─── 5c. Accept Team Invitation ──────────────────────────────────────────────
-export const acceptTeamInvitation = https.runWith({ enforceAppCheck: true }).onCall(async (data, context) => {
+export const acceptTeamInvitation = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const { token, tenantId } = data;
 

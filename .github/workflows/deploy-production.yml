@@ -105,8 +105,8 @@ jobs:
       - name: Install functions dependencies
         run: npm ci --prefix functions
 
-      - name: Validate functions syntax
-        run: node --check functions/index.js
+      - name: Validate functions runtime loading
+        run: node --input-type=module -e "await import('./functions/index.js')"
 
       - name: Prepare production functions environment
         run: |
