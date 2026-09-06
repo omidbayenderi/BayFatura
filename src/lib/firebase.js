@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { logger } from './logger';
 import { Capacitor } from '@capacitor/core';
 
@@ -55,6 +56,20 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// App Check must be initialized before Firestore, Storage, or Functions make
+// their first request. Production APIs enforce App Check, so loading it later
+// can make the initial profile and subscription reads fail with permission-denied.
+if (import.meta.env.VITE_FIREBASE_APP_CHECK_KEY) {
+    try {
+        initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(import.meta.env.VITE_FIREBASE_APP_CHECK_KEY),
+            isTokenAutoRefreshEnabled: true
+        });
+    } catch (err) {
+        logger.warn('Firebase', 'App Check başlatılamadı', err);
+    }
+}
+
 // Initialize Auth explicitly so Safari redirect flows have deterministic persistence.
 export const auth = (() => {
     const persistence = Capacitor.isNativePlatform()
@@ -90,18 +105,6 @@ if (typeof window !== 'undefined' && firebaseConfig.measurementId && import.meta
         analytics = getAnalytics(app);
     }).catch((err) => {
         logger.warn('Firebase', 'Analytics yüklenemedi', err);
-    });
-}
-
-// App Check — güvenlik katmanı (console'da etkinleştirilmeli)
-if (import.meta.env.VITE_FIREBASE_APP_CHECK_KEY) {
-    import('firebase/app-check').then(({ initializeAppCheck, ReCaptchaV3Provider }) => {
-        initializeAppCheck(app, {
-            provider: new ReCaptchaV3Provider(import.meta.env.VITE_FIREBASE_APP_CHECK_KEY),
-            isTokenAutoRefreshEnabled: true
-        });
-    }).catch((err) => {
-        logger.warn('Firebase', 'App Check yüklenemedi', err);
     });
 }
 
