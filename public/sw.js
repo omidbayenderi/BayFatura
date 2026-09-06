@@ -56,6 +56,9 @@ if (IS_DEV) {
         const { request } = event;
         const url = new URL(request.url);
 
+        // External authentication and attestation scripts must stay live.
+        if (url.origin !== self.location.origin) return;
+
         // Skip non-GET requests
         if (request.method !== 'GET') return;
 

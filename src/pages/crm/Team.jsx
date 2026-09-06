@@ -80,6 +80,7 @@ const Team = () => {
     const [inviteData, setInviteData] = useState({ name: '', email: '', role: 'member' });
     const [manualInvite, setManualInvite] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [teamMembers, setTeamMembers] = useState([]);
 
     const buildInviteLink = (invitationId, email) => {
@@ -115,12 +116,19 @@ const Team = () => {
     };
 
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser) { setIsLoading(false); return; }
+
+        const timeout = setTimeout(() => {
+            setLoadError(true);
+            setIsLoading(false);
+        }, 15000);
 
         const teamRef = collection(db, 'users', currentUser.uid, 'team');
         const q = query(teamRef);
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
+            clearTimeout(timeout);
+            setLoadError(false);
             const members = snapshot.docs.map(d => ({
                 id: d.id,
                 ...d.data()
@@ -135,21 +143,31 @@ const Team = () => {
                     joinedAt: new Date().toISOString(),
                     createdBy: currentUser.uid
                 };
-                addDoc(teamRef, ownerDoc);
+                // Render the owner without creating duplicate records on page visits.
+                setTeamMembers([{ id: currentUser.uid, ...ownerDoc }]);
             } else {
                 setTeamMembers(members);
             }
             setIsLoading(false);
         }, (error) => {
+            clearTimeout(timeout);
+            setLoadError(true);
             console.error('Team snapshot error:', error);
             setIsLoading(false);
         });
 
-        return () => unsubscribe();
+        return () => { clearTimeout(timeout); unsubscribe(); };
     }, [currentUser]);
 
     if (isLoading) {
         return <TeamSkeleton />;
+    }
+
+    if (loadError) {
+        return <div className="team-page-container"><div className="card" role="alert">
+            <p>{appLanguage === 'tr' ? 'Ekip bilgileri yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.' : appLanguage === 'de' ? 'Teamdaten konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.' : 'Team data could not be loaded. Check your connection and try again.'}</p>
+            <button onClick={() => window.location.reload()}>{appLanguage === 'tr' ? 'Tekrar dene' : appLanguage === 'de' ? 'Erneut versuchen' : 'Try again'}</button>
+        </div></div>;
     }
 
     const handleInvite = async (e) => {
