@@ -82,11 +82,6 @@ jobs:
 
       - name: Verify production deployment target
         run: |
-          test "$FIREBASE_PROJECT_ID" = "bayfatura-b283c" || {
-            echo "::error::VITE_FIREBASE_PROJECT_ID does not target the production Firebase project."
-            exit 1
-          }
-
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/production-service-account.json"
           credential_project="$(jq -r '.project_id // empty' "$RUNNER_TEMP/production-service-account.json")"
           test "$credential_project" = "bayfatura-b283c" || {
@@ -94,7 +89,6 @@ jobs:
             exit 1
           }
         env:
-          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Deploy to Firebase Hosting (Production)
@@ -102,7 +96,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          projectId: bayfatura-b283c
           channelId: live
 
       - name: Prepare production Firebase credentials
@@ -140,7 +134,7 @@ jobs:
         run: npx -y firebase-tools@latest deploy --debug --only "$FUNCTION_TARGETS" --project "$FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
-          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          FIREBASE_PROJECT_ID: bayfatura-b283c
           FUNCTION_TARGETS: ${{ inputs.functionTargets }}
 
       - name: Deploy all Cloud Functions
@@ -148,17 +142,17 @@ jobs:
         run: npx -y firebase-tools@latest deploy --only functions --project "$FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
-          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          FIREBASE_PROJECT_ID: bayfatura-b283c
 
       - name: Deploy Firestore Rules
         run: npx -y firebase-tools@latest deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
-          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          FIREBASE_PROJECT_ID: bayfatura-b283c
 
       - name: Deploy Storage Rules
         if: ${{ inputs.deployStorageRules == true }}
         run: npx -y firebase-tools@latest deploy --only storage --project "$FIREBASE_PROJECT_ID"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/production-service-account.json
-          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          FIREBASE_PROJECT_ID: bayfatura-b283c
