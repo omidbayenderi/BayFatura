@@ -14,7 +14,7 @@ const TABS = ['general', 'finance', 'premium'];
 const Settings = () => {
     const navigate = useNavigate();
     const { companyProfile, updateProfile, invoiceCustomization, updateCustomization, loading } = useInvoice();
-    const { currentUser, updateUser, isPro } = useAuth();
+    const { currentUser, isPro } = useAuth();
     const { appLanguage, setAppLanguage, invoiceLanguage, setInvoiceLanguage, t, LANGUAGES } = useLanguage();
     const { showToast } = usePanel();
     const [activeTab, setActiveTab] = useState('general');
@@ -189,8 +189,13 @@ const Settings = () => {
     const handleSave = async () => {
         try {
             setIsSaving(true);
-            await updateProfile(formData);
-            await updateCustomization(customizationData);
+            // These documents are independent.  Writing concurrently cuts the
+            // visible save time in half and a rejected profile write is still
+            // surfaced to the user instead of being masked by the second call.
+            await Promise.all([
+                updateProfile(formData),
+                updateCustomization(customizationData)
+            ]);
             showToast(t('saveSuccessful'), 'success');
         } catch (error) {
             console.error("Save error detail:", error);

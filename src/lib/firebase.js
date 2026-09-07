@@ -84,7 +84,11 @@ export const auth = (() => {
 
 // Firestore - offline persistence aktif (mobil için kritik)
 export const db = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    // Some corporate and mobile networks reset Firestore's streaming channel
+    // (ERR_QUIC_PROTOCOL_ERROR).  Long polling is slower in ideal conditions,
+    // but is materially more reliable for the browser clients we support and
+    // avoids repeated reconnect/backoff cycles that made the UI appear frozen.
+    experimentalForceLongPolling: true,
     localCache: persistentLocalCache({
         tabManager: persistentSingleTabManager()
     })

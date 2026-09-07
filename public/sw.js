@@ -1,3 +1,16 @@
+// Legacy worker cleanup. Offline caching is deliberately disabled until it can
+// be reintroduced without delaying data and authentication updates.
+const cleanup = async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key.startsWith('bayfatura-')).map(key => caches.delete(key)));
+    await self.registration.unregister();
+    await self.clients.claim();
+};
+
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', event => event.waitUntil(cleanup()));
+
+/*
 // BayFatura Service Worker v2
 // ⚠️ CRITICAL: Development mode detection
 // In dev mode, this SW must be a no-op to avoid intercepting Vite HMR requests
@@ -158,3 +171,4 @@ if (IS_DEV) {
         }
     });
 }
+*/

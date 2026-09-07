@@ -41,6 +41,20 @@ const INITIAL_COMPANY_PROFILE = {
     paymentTerms: '', industry: 'general'
 };
 
+// Keep Settings writes intentionally narrow.  The user document also contains
+// server-controlled plan, role and tenant fields; sending the whole document
+// back from the browser makes a harmless bank-details change vulnerable to a
+// rules rejection when the document schema evolves.
+const COMPANY_PROFILE_EDITABLE_FIELDS = [
+    'name', 'companyName', 'email', 'avatar', 'phone', 'address', 'city', 'country',
+    'owner', 'companyEmail', 'companyPhone', 'website', 'taxId', 'vatId', 'street',
+    'houseNum', 'zip', 'bankName', 'iban', 'bic', 'logo', 'signature', 'signatureUrl',
+    'stamp', 'stampUrl', 'paymentTerms', 'industry', 'industryData', 'logoDisplayMode',
+    'kleinunternehmer', 'kleinunternehmerText', 'defaultCurrency', 'defaultTaxRate',
+    'paypalMe', 'stripeLink', 'atValidationCode', 'invoiceSeries', 'ptQrEnabled',
+    'ptDocType', 'language', 'stripePublicKey', 'paypalClientId'
+];
+
 export const InvoiceProvider = ({ children }) => {
     const { currentUser } = useAuth();
     const [invoices, setInvoices] = useState([]);
@@ -201,22 +215,13 @@ export const InvoiceProvider = ({ children }) => {
     };
 
     const updateProfile = async (d) => {
-        if (!currentUser) return;
-        const sanitizedData = cleanData(d);
-        [
-            'plan',
-            'subscriptionType',
-            'stripeCustomerId',
-            'subscriptionId',
-            'planActivatedAt',
-            'planExpiresAt',
-            'planDowngradedAt',
-            'lastPaymentAt',
-            'featureAccess',
-            'testingEnabled',
-            'trialOverride',
-            'status'
-        ].forEach(field => delete sanitizedData[field]);
+        if (!currentUser) throw new Error('Authentication required');
+        const editableData = Object.fromEntries(
+            COMPANY_PROFILE_EDITABLE_FIELDS
+                .filter(field => d[field] !== undefined)
+                .map(field => [field, d[field]])
+        );
+        const sanitizedData = cleanData(editableData);
 
         await setDoc(doc(db, 'users', currentUser.uid), sanitizedData, { merge: true });
     };
