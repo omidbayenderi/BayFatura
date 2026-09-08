@@ -394,7 +394,7 @@ export const syncAllAuthUsers = https.onCall(async (data, context) => {
 // ─── 2. Super Admin: Multilingual Blog & SEO Content ──────────────────────────
 // The model runs server-side. A draft is returned for human review; publishing is
 // always an explicit action in DCC.
-export const generateAdminBlogPost = https.onCall(async (data, context) => {
+export const generateAdminBlogPost = runWith({ region: 'europe-west3' }).https.onCall(async (data, context) => {
     requireSuperAdmin(context);
     const topic = String(data?.topic || '').trim();
     const language = String(data?.language || 'de').trim();

@@ -95,7 +95,9 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+// Production callable functions are deployed in europe-west3. Keeping the
+// client region explicit prevents the SDK from silently calling us-central1.
+export const functions = getFunctions(app, 'europe-west3');
 
 // Analytics - only in production and when measurementId exists
 export let analytics = null;
