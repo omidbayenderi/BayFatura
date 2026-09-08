@@ -150,7 +150,7 @@ describeWithEmulator('Firestore rules emulator', () => {
       await setDoc(doc(db, 'expenses', 'expense-a'), { userId: 'user-a', amount: 42 });
     });
 
-    const db = authedDb('admin-user', 'support@bayfatura.com');
+    const db = authedDb('admin-user', 'omidbayenderi@gmail.com');
 
     await assertSucceeds(getDoc(doc(db, 'expenses', 'expense-a')));
   });
@@ -161,7 +161,7 @@ describeWithEmulator('Firestore rules emulator', () => {
     });
 
     const userDb = authedDb('user-a');
-    const adminDb = authedDb('admin-user', 'support@bayfatura.com');
+    const adminDb = authedDb('admin-user', 'omidbayenderi@gmail.com');
 
     await assertSucceeds(getDoc(doc(userDb, 'app_config', 'feature_flags')));
     await assertFails(updateDoc(doc(userDb, 'app_config', 'feature_flags'), { flags: { test: true } }));
