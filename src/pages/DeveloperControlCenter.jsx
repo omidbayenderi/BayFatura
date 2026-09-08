@@ -36,8 +36,8 @@ const DCC = () => {
         try {
             const syncFn = httpsCallable(functions, 'syncAllAuthUsers');
             const result = await syncFn();
-            const { totalAuthUsers, createdMissingProfiles } = result.data;
-            alert(`Sync complete! Checked ${totalAuthUsers} accounts in Firebase Auth. Created ${createdMissingProfiles} missing Firestore profiles.`);
+            const { totalAuthUsers, createdMissingProfiles, normalizedRoles = 0 } = result.data;
+            alert(`Sync complete! Checked ${totalAuthUsers} accounts in Firebase Auth. Created ${createdMissingProfiles} missing Firestore profiles and normalized ${normalizedRoles} account roles.`);
         } catch (error) {
             console.error("Sync Auth Users Error:", error);
             alert("Sync failed: " + error.message);

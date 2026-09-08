@@ -87,7 +87,9 @@ export const AuthProvider = ({ children }) => {
                     updates = { ...updates, email: user.email };
                 }
 
-                const appUser = { uid: user.uid, email: user.email, ...data, ...updates };
+                // Firebase Auth is the authority for the sign-in address.  A
+                // stale profile document must never replace it in the UI.
+                const appUser = { uid: user.uid, ...data, ...updates, email: user.email || data.email };
                 if (Object.keys(updates).length > 0) {
                     await updateDoc(userRef, updates);
                 }
@@ -99,7 +101,7 @@ export const AuthProvider = ({ children }) => {
                 name: user.isAnonymous ? 'Demo User' : (user.displayName || 'User'),
                 email: user.email || 'guest@bayfatura.com',
                 plan: 'standard',
-                role: 'admin',
+                role: user.email === 'omidbayenderi@gmail.com' ? 'admin' : 'owner',
                 tenantId: user.uid,
                 createdAt: new Date().toISOString()
             };
@@ -112,7 +114,7 @@ export const AuthProvider = ({ children }) => {
             const fallbackUser = {
                 uid: user.uid,
                 email: user.email || 'guest@bayfatura.com',
-                role: 'admin',
+                role: user.email === 'omidbayenderi@gmail.com' ? 'admin' : 'owner',
                 tenantId: user.uid,
                 plan: 'standard'
             };

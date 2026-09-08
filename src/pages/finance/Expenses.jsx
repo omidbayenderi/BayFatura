@@ -41,6 +41,8 @@ const Expenses = () => {
     const [formData, setFormData] = useState({
         title: '',
         amount: '',
+        quantity: '1',
+        unit: 'Stück',
         category: 'spareParts',
         currency: 'EUR',
         receiptImage: null
@@ -52,9 +54,10 @@ const Expenses = () => {
         e.preventDefault();
         saveExpense({
             ...formData,
-            amount: parseFloat(formData.amount)
+            amount: parseFloat(formData.amount),
+            quantity: parseFloat(formData.quantity) || 1
         });
-        setFormData({ title: '', amount: '', category: 'spareParts', currency: 'EUR', receiptImage: null });
+        setFormData({ title: '', amount: '', quantity: '1', unit: 'Stück', category: 'spareParts', currency: 'EUR', receiptImage: null });
         setShowForm(false);
         showToast(appLanguage === 'tr' ? 'Gider kaydedildi' : 'Ausgabe gespeichert', 'success');
     };
@@ -218,6 +221,18 @@ const Expenses = () => {
                                     value={formData.amount}
                                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                 />
+                            </div>
+                            <div className="form-group">
+                                <label>{t('quantity')}</label>
+                                <input type="number" min="0.001" step="0.001" className="form-input" required value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label>{t('unit')}</label>
+                                <select className="form-input" value={formData.unit} onChange={(e) => setFormData({ ...formData, unit: e.target.value })}>
+                                    <option value="Stück">Adet / Stück</option>
+                                    <option value="kg">kg</option>
+                                    <option value="l">Litre / l</option>
+                                </select>
                             </div>
                             <div className="form-group">
                                 <label>{t('currency')}</label>
@@ -417,6 +432,7 @@ const Expenses = () => {
                             <th>{t('date')}</th>
                             <th>{t('category')}</th>
                             <th>{t('description')}</th>
+                            <th style={{ textAlign: 'right' }}>{t('quantity')}</th>
                             <th style={{ textAlign: 'center' }}>{t('receipt')}</th>
                             <th style={{ textAlign: 'right' }}>{t('amount')}</th>
                             <th style={{ textAlign: 'right' }}>{t('actions')}</th>
@@ -428,6 +444,7 @@ const Expenses = () => {
                                 <td>{new Date(exp.date).toLocaleDateString(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE')}</td>
                                 <td><span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>{t(exp.category)}</span></td>
                                 <td><strong>{exp.title}</strong></td>
+                                <td style={{ textAlign: 'right' }}>{exp.quantity ?? 1} {exp.unit || 'Stück'}</td>
                                 <td style={{ textAlign: 'center' }}>
                                     {exp.receiptImage ? (
                                         <button
@@ -467,7 +484,7 @@ const Expenses = () => {
                         ))}
                         {activeExpenses.length === 0 && (
                             <tr>
-                                <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                                     <Receipt size={40} style={{ marginBottom: '12px', opacity: 0.3 }} /><br />
                                     {showTrash ? (appLanguage === 'tr' ? "Çöp kutusu boş!" : "Papierkorb leer!") : t('noData')}
                                 </td>

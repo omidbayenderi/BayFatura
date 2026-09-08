@@ -79,9 +79,20 @@ export const InvoiceProvider = ({ children }) => {
         if (!currentUser) {
             setInvoices([]); setQuotes([]); setExpenses([]); setRecurringTemplates([]);
             setDeletedInvoices([]); setDeletedQuotes([]); setDeletedExpenses([]);
+            setCompanyProfile(INITIAL_COMPANY_PROFILE);
             setLoading(false);
             return;
         }
+
+        // Never keep the previous account's company/country details on screen
+        // while Firestore loads the next user's profile.
+        setCompanyProfile(INITIAL_COMPANY_PROFILE);
+        setInvoiceCustomization({
+            primaryColor: '#3b82f6', secondaryColor: '#1e293b', fontFamily: 'Inter',
+            template: 'classic', showLogo: true, showTax: true, showTotalInWords: false,
+            notes: '', quoteValidityDays: 30
+        });
+        setLoading(true);
 
         // Defensive Listener Wrapper
         const safeListen = (refOrQuery, callback, contextName) => {

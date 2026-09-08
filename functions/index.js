@@ -330,33 +330,53 @@ export const syncAllAuthUsers = runWith({ enforceAppCheck: true }).https.onCall(
     try {
         let count = 0;
         let created = 0;
-        
-        const listUsersResult = await admin.auth().listUsers(1000);
-        const batch = db.batch();
-        
-        for (const userRecord of listUsersResult.users) {
-            count++;
-            const userRef = db.collection('users').doc(userRecord.uid);
-            const userDoc = await userRef.get();
-            
-            if (!userDoc.exists) {
-                batch.set(userRef, {
-                    name: userRecord.displayName || userRecord.email?.split('@')[0] || 'User',
-                    email: userRecord.email || 'guest@bayfatura.com',
-                    plan: 'standard',
-                    role: 'admin',
-                    tenantId: userRecord.uid,
-                    createdAt: new Date(userRecord.metadata.creationTime).toISOString()
-                });
-                created++;
+        let normalizedRoles = 0;
+        let pageToken;
+        let batch = db.batch();
+        let writes = 0;
+        const flush = async () => {
+            if (writes > 0) await batch.commit();
+            batch = db.batch();
+            writes = 0;
+        };
+
+        // Auth listing is paginated and Firestore batches are limited to 500
+        // writes. The former implementation used one unbounded batch, which
+        // produced the generic "internal" error and skipped many accounts.
+        do {
+            const page = await admin.auth().listUsers(1000, pageToken);
+            for (const userRecord of page.users) {
+                count++;
+                const userRef = db.collection('users').doc(userRecord.uid);
+                const userDoc = await userRef.get();
+                const isPlatformAdmin = userRecord.email === 'omidbayenderi@gmail.com';
+                if (!userDoc.exists) {
+                    batch.set(userRef, {
+                        name: userRecord.displayName || userRecord.email?.split('@')[0] || 'User',
+                        email: userRecord.email || 'guest@bayfatura.com',
+                        plan: 'standard',
+                        role: isPlatformAdmin ? 'admin' : 'owner',
+                        tenantId: userRecord.uid,
+                        createdAt: new Date(userRecord.metadata.creationTime).toISOString()
+                    });
+                    created++;
+                    writes++;
+                } else {
+                    const profile = userDoc.data() || {};
+                    const desiredRole = isPlatformAdmin ? 'admin' : 'owner';
+                    if (profile.role !== desiredRole || profile.email !== userRecord.email) {
+                        batch.set(userRef, { role: desiredRole, email: userRecord.email || profile.email || '' }, { merge: true });
+                        normalizedRoles++;
+                        writes++;
+                    }
+                }
+                if (writes >= 450) await flush();
             }
-        }
-        
-        if (created > 0) {
-            await batch.commit();
-        }
-        
-        return { success: true, totalAuthUsers: count, createdMissingProfiles: created };
+            pageToken = page.pageToken;
+        } while (pageToken);
+        await flush();
+
+        return { success: true, totalAuthUsers: count, createdMissingProfiles: created, normalizedRoles };
     } catch (error) {
         console.error('Error syncing auth users:', error);
         throw new https.HttpsError('internal', error.message);

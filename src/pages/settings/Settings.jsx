@@ -767,7 +767,7 @@ const Settings = () => {
 
                 {activeTab === 'finance' && (
                 <>
-                    <div className="settings-card card">
+                    <div className="settings-card card full-width bank-details-card">
                         <h3>{t('bankDetails')}</h3>
                         <div className="form-row">
                             <div className="form-group">

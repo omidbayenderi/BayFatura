@@ -111,7 +111,9 @@ const ProfileSettings = () => {
             const result = await updateUser({
                 ...currentUser,
                 name: formData.name,
-                email: formData.email,
+                // Email belongs to Firebase Authentication and cannot be
+                // changed from this profile form.
+                email: currentUser.email,
                 stripePublicKey: formData.stripePublicKey,
                 paypalClientId: formData.paypalClientId
             });
@@ -295,8 +297,8 @@ const ProfileSettings = () => {
                                 type="email"
                                 className="form-input"
                                 name="email"
-                                value={formData.email}
-                                onChange={handleChange}
+                                value={currentUser?.email || ''}
+                                readOnly
                                 style={{ paddingLeft: '40px' }}
                                 placeholder="email@example.com"
                             />

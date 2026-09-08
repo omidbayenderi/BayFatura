@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Eye, Trash2, Edit, AlertTriangle, Bell, Search, Filter,
     Download, Mail, Clock, CheckCircle, FileText, TrendingUp,
-    Send, X, Loader, Check, ChevronDown, AlertOctagon, RotateCcw
+    Send, X, Loader, Check, ChevronDown, AlertOctagon, RotateCcw, Upload
 } from 'lucide-react';
 import { getIndustryFields } from '../../config/industryFields';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -101,6 +101,18 @@ const exportCSV = (invoices, t, language) => {
     a.href = url;
     a.download = `Rechnungen_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
+};
+
+// Native exports preserve every field (items, addresses, notes and status) and
+// can be restored without losing invoice fidelity.
+const exportBayFaturaJSON = (invoices) => {
+    const blob = new Blob([JSON.stringify({ format: 'bayfatura-invoices', version: 1, invoices }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `BayFatura_Rechnungen_${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
     URL.revokeObjectURL(url);
 };
 
@@ -236,7 +248,7 @@ const ReminderModal = ({ invoice, companyProfile, onClose, t, showToast, appLang
 const Archive = () => {
     const { 
         invoices, deleteInvoice, restoreInvoice, deleteInvoicePermanently, deletedInvoices,
-        updateInvoiceStatus, STATUSES, companyProfile 
+        updateInvoiceStatus, STATUSES, companyProfile, saveInvoice
     } = useInvoice();
     const { t, appLanguage } = useLanguage();
     const { showToast } = usePanel();
@@ -249,6 +261,59 @@ const Archive = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showTrash, setShowTrash] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+
+    const numberFromImport = (value) => {
+        if (typeof value === 'number') return value;
+        return Number(String(value ?? '0').replace(/\./g, '').replace(',', '.')) || 0;
+    };
+
+    const normalizeImportedInvoice = (source) => ({
+        invoiceNumber: source.invoiceNumber || source['Rechnungsnummer'] || source['invoice_number'] || `IMP-${Date.now()}`,
+        date: source.date || source['Datum'] || new Date().toISOString().slice(0, 10),
+        recipientName: source.recipientName || source.customer || source['Kunde'] || source['Kunde / Firma'] || '',
+        recipientEmail: source.recipientEmail || source.email || '',
+        recipientStreet: source.recipientStreet || '', recipientHouseNum: source.recipientHouseNum || '',
+        recipientZip: source.recipientZip || '', recipientCity: source.recipientCity || '',
+        recipientCountry: source.recipientCountry || '', recipientVatId: source.recipientVatId || '',
+        items: Array.isArray(source.items) ? source.items : [],
+        subtotal: numberFromImport(source.subtotal ?? source.net ?? source['Netto']),
+        tax: numberFromImport(source.tax ?? source.vat ?? source['MwSt.']),
+        total: numberFromImport(source.total ?? source.gross ?? source['Brutto']),
+        currency: source.currency || source['Währung'] || 'EUR',
+        status: source.status || source['Status'] || 'draft',
+        notes: source.notes || ''
+    });
+
+    const handleImport = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        setIsImporting(true);
+        try {
+            const text = await file.text();
+            let entries;
+            if (file.name.toLowerCase().endsWith('.json')) {
+                const parsed = JSON.parse(text);
+                entries = Array.isArray(parsed) ? parsed : parsed.invoices;
+            } else {
+                const [header, ...rows] = text.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
+                const keys = header.split(';').map(key => key.replace(/^"|"$/g, '').trim());
+                entries = rows.filter(Boolean).map(row => {
+                    const values = row.split(';').map(value => value.replace(/^"|"$/g, '').trim());
+                    return Object.fromEntries(keys.map((key, index) => [key, values[index] || '']));
+                });
+            }
+            if (!Array.isArray(entries) || entries.length === 0) throw new Error('No invoices found in this file.');
+            if (entries.length > 200) throw new Error('A maximum of 200 invoices can be imported at once.');
+            for (const entry of entries) await saveInvoice(normalizeImportedInvoice(entry));
+            showToast(`${entries.length} invoice${entries.length === 1 ? '' : 's'} imported successfully.`, 'success');
+        } catch (error) {
+            showToast(error.message || 'Import failed. Please use a BayFatura JSON or CSV export.', 'error');
+        } finally {
+            setIsImporting(false);
+        }
+    };
 
     const industryConfig = getIndustryFields(companyProfile.industry || 'general');
     const isAutomotive = companyProfile.industry === 'automotive';
@@ -338,6 +403,10 @@ const Archive = () => {
                         </h1>
                     </div>
                     <div className="page-header-actions">
+                        <label className="secondary-btn export-btn" style={{ cursor: isImporting ? 'wait' : 'pointer', opacity: isImporting ? 0.65 : 1 }}>
+                            <Upload size={16} /> {isImporting ? 'Importing…' : 'Import'}
+                            <input type="file" accept=".json,.csv,text/csv,application/json" onChange={handleImport} disabled={isImporting} style={{ display: 'none' }} />
+                        </label>
                         <div className="export-wrapper">
                             <button className="secondary-btn export-btn" onClick={() => setShowExportMenu(p => !p)}>
                                 <Download size={16} /> {t('export')} <ChevronDown size={14} />
@@ -347,6 +416,10 @@ const Archive = () => {
                                     <button onClick={() => { exportCSV(filtered, t, appLanguage); setShowExportMenu(false); }}
                                         className="export-dropdown-item">
                                         <FileText size={16} color="#6366f1" /> CSV Export
+                                    </button>
+                                    <button onClick={() => { exportBayFaturaJSON(filtered); setShowExportMenu(false); }}
+                                        className="export-dropdown-item">
+                                        <Download size={16} color="#0ea5e9" /> BayFatura JSON
                                     </button>
                                     <button onClick={() => { exportDATEV(filtered, companyProfile); setShowExportMenu(false); }}
                                         className="export-dropdown-item">

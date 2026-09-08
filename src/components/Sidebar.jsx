@@ -14,6 +14,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
     const { getMenuItems } = usePanel();
 
     const menuItems = getMenuItems(currentUser?.role || 'admin');
+    const planLabel = ({ standard: 'Free', premium: 'Premium', elite: 'Elite', lifetime: 'Lifetime' }[currentUser?.plan] || 'Free');
 
     return (
         <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
@@ -64,7 +65,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
                     </div>
                     <div className="info" style={{ flex: 1 }}>
                         <span className="name" style={{ fontSize: '0.85rem', fontWeight: '600', color: 'white' }}>{currentUser?.name || 'User'}</span>
-                        <span className="role" style={{ fontSize: '0.7rem', opacity: 0.6 }}>{currentUser?.role || t('role_admin')}</span>
+                        <span className="role" style={{ fontSize: '0.7rem', opacity: 0.6 }}>{planLabel}</span>
                     </div>
                 </div>
 

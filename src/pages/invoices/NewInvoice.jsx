@@ -784,7 +784,7 @@ const NewInvoice = () => {
                         </h3>
                         {/* Customer Autocomplete */}
                         <div className="form-group form-group-relative">
-                            <label>{t('customer')}</label>
+                            <label>{appLanguage === 'de' ? 'Kunde / Firma' : t('customer')}</label>
                             <div className="form-group-relative">
                                 <Search size={16} className="input-search-icon" />
                                 <input

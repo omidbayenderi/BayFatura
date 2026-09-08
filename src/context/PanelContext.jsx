@@ -36,7 +36,9 @@ export const PanelProvider = ({ children }) => {
 
         const rawRole = (role || 'admin').toLowerCase();
         // Map common synonyms to standard roles
-        const userRole = rawRole === 'administrator' ? 'admin' : rawRole;
+        // A business owner has the same operational access as the legacy
+        // "admin" role, without presenting every customer as a platform admin.
+        const userRole = ['administrator', 'owner'].includes(rawRole) ? 'admin' : rawRole;
         
         return items.filter(item => item.roles.includes(userRole));
     };

@@ -520,6 +520,14 @@ h4 {
   grid-column: span 2;
 }
 
+.bank-details-card {
+  max-width: none;
+}
+
+.bank-details-card > .form-row {
+  max-width: 980px;
+}
+
 .premium-api-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
