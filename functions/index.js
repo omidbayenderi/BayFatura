@@ -35,6 +35,15 @@ const escapeHtml = (value = '') => String(value)
 
 const normalizeEmail = (value = '') => String(value).trim().toLowerCase();
 const isValidEmail = (value = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
+const SUPER_ADMIN_EMAIL = 'omidbayenderi@gmail.com';
+const requireSuperAdmin = (context) => {
+    if (!context.auth) {
+        throw new https.HttpsError('unauthenticated', 'Super Admin sign-in is required.');
+    }
+    if (normalizeEmail(context.auth.token.email) !== SUPER_ADMIN_EMAIL) {
+        throw new https.HttpsError('permission-denied', 'This operation is restricted to the BayFatura Super Admin.');
+    }
+};
 
 const logFunctionError = (scope, error, meta = {}) => {
     console.error(`[${scope}]`, {
@@ -324,11 +333,7 @@ export const createBillingPortalSession = runWith({ enforceAppCheck: true }).htt
 // token from the two platform administrators.  Do not make recovery of
 // missing user profiles depend on a browser App Check token being available.
 export const syncAllAuthUsers = https.onCall(async (data, context) => {
-    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
-    const adminEmail = context.auth.token.email;
-    if (!['support@bayfatura.com', 'omidbayenderi@gmail.com'].includes(adminEmail)) {
-        throw new https.HttpsError('permission-denied', 'Only Super Admins can invoke this function');
-    }
+    requireSuperAdmin(context);
 
     try {
         let count = 0;
@@ -386,7 +391,39 @@ export const syncAllAuthUsers = https.onCall(async (data, context) => {
     }
 });
 
-// ─── 2. AI: Bank Statement Matcher (Genkit) ───────────────────────────────────────
+// ─── 2. Super Admin: Multilingual Blog & SEO Content ──────────────────────────
+// The model runs server-side. A draft is returned for human review; publishing is
+// always an explicit action in DCC.
+export const generateAdminBlogPost = https.onCall(async (data, context) => {
+    requireSuperAdmin(context);
+    const topic = String(data?.topic || '').trim();
+    const language = String(data?.language || 'de').trim();
+    const audience = String(data?.audience || 'small businesses').trim();
+    const supportedLanguages = new Set(['de', 'en', 'tr', 'pt', 'fr', 'es']);
+    if (!topic || topic.length > 180 || !supportedLanguages.has(language)) {
+        throw new https.HttpsError('invalid-argument', 'Provide a topic up to 180 characters and a supported language.');
+    }
+    await checkRateLimit(context.auth.uid, 'admin_blog');
+    try {
+        const response = await ai.generate({
+            model: googleAI.model('gemini-1.5-flash'),
+            prompt: `You are BayFatura's B2B content editor. Write an accurate, original SEO-ready blog post in ${language} for ${audience}. Topic: ${topic}. Do not invent legal, tax, pricing, or product facts. Use clear Markdown. Return JSON with title, slug (ASCII lowercase hyphenated), metaTitle (max 60 chars), metaDescription (max 155 chars), keywords (array of 5-8 strings), excerpt (max 250 chars), content (900-1400 words Markdown), and faq (array of 3 objects with question and answer).`,
+            output: {
+                format: 'json',
+                schema: z.object({
+                    title: z.string(), slug: z.string(), metaTitle: z.string(), metaDescription: z.string(),
+                    keywords: z.array(z.string()), excerpt: z.string(), content: z.string(),
+                    faq: z.array(z.object({ question: z.string(), answer: z.string() })),
+                }),
+            },
+        });
+        return { post: { ...response.output, language, topic, audience } };
+    } catch (error) {
+        throw toCallableError('generateAdminBlogPost', error, 'Blog content could not be generated. Please try again.', { topicLength: topic.length, language });
+    }
+});
+
+// ─── 3. AI: Bank Statement Matcher (Genkit) ───────────────────────────────────────
 export const analyzeBankStatement = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);

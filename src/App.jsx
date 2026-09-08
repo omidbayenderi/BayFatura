@@ -37,6 +37,7 @@ const Privacy = React.lazy(() => import('./pages/legal/Privacy'));
 const Impressum = React.lazy(() => import('./pages/legal/Impressum'));
 const Terms = React.lazy(() => import('./pages/legal/Terms'));
 const DeveloperControlCenter = React.lazy(() => import('./pages/DeveloperControlCenter'));
+const SuperAdminLogin = React.lazy(() => import('./pages/SuperAdminLogin'));
 const AcceptInvite = React.lazy(() => import('./pages/crm/AcceptInvite'));
 
 const LazyRoute = ({ children }) => (
@@ -79,8 +80,9 @@ function App() {
         <Route path="/privacy" element={<LazyRoute><Privacy /></LazyRoute>} />
         <Route path="/impressum" element={<LazyRoute><Impressum /></LazyRoute>} />
         
+        <Route path="/superadmin" element={<LazyRoute><SuperAdminLogin /></LazyRoute>} />
         {/* DCC Portal - ONLY accessible by the Super Admin, others get 404 */}
-        {currentUser?.email === 'omidbayenderi@gmail.com' && (
+        {currentUser?.email?.toLowerCase() === 'omidbayenderi@gmail.com' && (
           <Route path="/dcc-portal" element={<LazyRoute><DeveloperControlCenter /></LazyRoute>} />
         )}
 

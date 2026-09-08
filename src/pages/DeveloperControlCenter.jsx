@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
     Cpu, Users, Zap, Shield, Activity, Database, Globe, 
     Settings, Crown, Terminal, Radio, Server,
-    Lock, Search, X, RefreshCw, Mail, Trash2, AlertTriangle
+    Lock, Search, X, RefreshCw, Mail, Trash2, AlertTriangle, FileText, Gift, PenLine, Save, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, onSnapshot, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, limit } from 'firebase/firestore';
 import { db, functions } from '../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 
@@ -21,6 +21,7 @@ const DCC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [confirmAction, setConfirmAction] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [workspace, setWorkspace] = useState('operations');
     const usersPerPage = 10;
     
     // DB Recovery Tool States
@@ -232,7 +233,7 @@ const DCC = () => {
         }
     };
 
-    const isOwner = ['support@bayfatura.com', 'omidbayenderi@gmail.com'].includes(currentUser?.email);
+    const isOwner = currentUser?.email?.toLowerCase() === 'omidbayenderi@gmail.com';
 
     const filteredTenants = tenants.filter(t => 
         t.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -240,7 +241,7 @@ const DCC = () => {
         t.id?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    if (!isOwner && process.env.NODE_ENV === 'production') {
+    if (!isOwner) {
         return (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#000', color: '#fff' }}>
                 <div style={{ textAlign: 'center' }}>
@@ -432,6 +433,12 @@ const DCC = () => {
                         <p style={{ color: '#666', margin: '4px 0 0', fontSize: '0.85rem' }}>DEVELOPER CONTROL CENTER · REAL-TIME FIREBASE LINK</p>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <button
+                            onClick={() => setWorkspace(workspace === 'operations' ? 'content' : 'operations')}
+                            style={{ background: workspace === 'content' ? '#8b5cf615' : '#111', border: `1px solid ${workspace === 'content' ? '#8b5cf6' : '#222'}`, color: workspace === 'content' ? '#c4b5fd' : '#ddd', padding: '10px 16px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            <PenLine size={14} /> {workspace === 'content' ? 'OPERATIONS' : 'CONTENT & SEO'}
+                        </button>
                         <button 
                             onClick={handleSyncAuthUsers}
                             disabled={isSyncing}
@@ -462,7 +469,11 @@ const DCC = () => {
                     <MetricCard title="TOTAL INVOICES" value={orphanStats.reduce((sum, s) => sum + s.invoiceCount, 0)} trend="DB" icon={<Server size={20} color="#8b5cf6" />} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '30px' }}>
+                {workspace === 'content' && (
+                    <ContentStudio tenants={tenants} onGrant={handleAction} currentUser={currentUser} />
+                )}
+
+                <div style={{ display: workspace === 'operations' ? 'grid' : 'none', gridTemplateColumns: '2fr 1fr', gap: '30px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                         {/* Tenant Manager */}
                         <div className="dcc-card">
@@ -688,6 +699,123 @@ const DCC = () => {
                 .dcc-table td { padding: 15px; border-bottom: 1px solid #111; font-size: 0.85rem; }
             `}</style>
         </div>
+    );
+};
+
+const ContentStudio = ({ tenants, onGrant, currentUser }) => {
+    const [topic, setTopic] = useState('');
+    const [language, setLanguage] = useState('de');
+    const [audience, setAudience] = useState('small businesses');
+    const [draft, setDraft] = useState(null);
+    const [posts, setPosts] = useState([]);
+    const [busy, setBusy] = useState(false);
+    const [message, setMessage] = useState('');
+    const [giftUserId, setGiftUserId] = useState('');
+    const [giftPlan, setGiftPlan] = useState('elite');
+    const [giftNote, setGiftNote] = useState('Promotional membership');
+
+    useEffect(() => {
+        const postsQuery = query(collection(db, 'admin_blog_posts'), orderBy('updatedAt', 'desc'), limit(30));
+        return onSnapshot(postsQuery, (snapshot) => setPosts(snapshot.docs.map(item => ({ id: item.id, ...item.data() }))), (error) => {
+            console.error('DCC blog listing failed', error);
+            setMessage('Saved blog posts could not be loaded.');
+        });
+    }, []);
+
+    const generate = async () => {
+        if (!topic.trim()) {
+            setMessage('Enter a topic first.');
+            return;
+        }
+        setBusy(true);
+        setMessage('');
+        try {
+            const generator = httpsCallable(functions, 'generateAdminBlogPost');
+            const result = await generator({ topic: topic.trim(), language, audience: audience.trim() || 'small businesses' });
+            setDraft(result.data.post);
+            setMessage('Draft generated. Review it, then save as draft or publish.');
+        } catch (error) {
+            console.error('DCC blog generation failed', error);
+            setMessage(error?.message || 'Blog generation failed.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const savePost = async (status) => {
+        if (!draft) return;
+        setBusy(true);
+        try {
+            await addDoc(collection(db, 'admin_blog_posts'), {
+                ...draft,
+                status,
+                authorEmail: currentUser.email,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+                publishedAt: status === 'published' ? serverTimestamp() : null,
+            });
+            setMessage(status === 'published' ? 'Post published to the editorial library.' : 'Draft saved to the editorial library.');
+            setDraft(null);
+        } catch (error) {
+            console.error('DCC blog save failed', error);
+            setMessage(error?.message || 'The post could not be saved.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const grantGift = async () => {
+        if (!giftUserId) {
+            setMessage('Choose a user for the complimentary membership.');
+            return;
+        }
+        const recipient = tenants.find((user) => user.id === giftUserId);
+        if (!window.confirm(`Grant ${giftPlan.toUpperCase()} access to ${recipient?.email || 'this user'}?`)) return;
+        try {
+            await onGrant(giftUserId, {
+                plan: giftPlan,
+                membershipGrant: { type: 'complimentary', note: giftNote.trim().slice(0, 240), grantedBy: currentUser.email, grantedAt: new Date().toISOString() },
+            });
+            setMessage('Complimentary membership granted and recorded in the audit log.');
+        } catch (error) {
+            setMessage(error?.message || 'Membership could not be granted.');
+        }
+    };
+
+    const card = { background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 24, padding: 28 };
+    const field = { width: '100%', boxSizing: 'border-box', background: '#111', border: '1px solid #2a2a2a', color: '#fff', padding: 11, borderRadius: 10, marginTop: 7 };
+    return (
+        <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(280px, .8fr)', gap: 24 }}>
+            <div style={card}>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}><Sparkles color="#a78bfa" /> MULTILINGUAL BLOG & SEO</h2>
+                <p style={{ color: '#888', fontSize: 13, lineHeight: 1.5 }}>Generates a reviewable article with title, slug, meta description, keywords, FAQ and Markdown content. It is not published automatically.</p>
+                <label style={{ color: '#aaa', fontSize: 12 }}>TOPIC<input value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={180} placeholder="e.g. E-invoicing for small businesses" style={field} /></label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+                    <label style={{ color: '#aaa', fontSize: 12 }}>LANGUAGE<select value={language} onChange={(event) => setLanguage(event.target.value)} style={field}><option value="de">Deutsch</option><option value="en">English</option><option value="tr">Türkçe</option><option value="pt">Português</option><option value="fr">Français</option><option value="es">Español</option></select></label>
+                    <label style={{ color: '#aaa', fontSize: 12 }}>AUDIENCE<input value={audience} onChange={(event) => setAudience(event.target.value)} style={field} /></label>
+                </div>
+                <button onClick={generate} disabled={busy} style={{ marginTop: 18, background: '#8b5cf6', border: 0, color: '#fff', padding: '11px 15px', borderRadius: 10, fontWeight: 800, cursor: 'pointer' }}>{busy ? 'GENERATING…' : 'GENERATE SEO DRAFT'}</button>
+                {message && <p role="status" style={{ color: '#a7f3d0', fontSize: 13 }}>{message}</p>}
+                {draft && <div style={{ marginTop: 22, borderTop: '1px solid #222', paddingTop: 20 }}>
+                    <h3 style={{ margin: 0 }}>{draft.title}</h3>
+                    <p style={{ color: '#a78bfa', fontSize: 12 }}>{draft.metaTitle} · {draft.slug}</p>
+                    <p style={{ color: '#bbb' }}>{draft.metaDescription}</p>
+                    <p style={{ color: '#888', fontSize: 12 }}>Keywords: {draft.keywords?.join(', ')}</p>
+                    <textarea aria-label="Generated blog content" value={draft.content} onChange={(event) => setDraft({ ...draft, content: event.target.value })} style={{ ...field, minHeight: 250, fontFamily: 'monospace', lineHeight: 1.5 }} />
+                    <div style={{ display: 'flex', gap: 10, marginTop: 12 }}><button onClick={() => savePost('draft')} disabled={busy} style={{ background: '#222', border: '1px solid #555', color: '#fff', padding: '10px 13px', borderRadius: 10, cursor: 'pointer' }}><Save size={14} /> SAVE DRAFT</button><button onClick={() => savePost('published')} disabled={busy} style={{ background: '#10b981', border: 0, color: '#042f20', padding: '10px 13px', borderRadius: 10, fontWeight: 800, cursor: 'pointer' }}><FileText size={14} /> PUBLISH</button></div>
+                </div>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <div style={card}>
+                    <h3 style={{ display: 'flex', gap: 9, alignItems: 'center', marginTop: 0 }}><Gift color="#f59e0b" /> COMPLIMENTARY MEMBERSHIP</h3>
+                    <label style={{ color: '#aaa', fontSize: 12 }}>RECIPIENT<select value={giftUserId} onChange={(event) => setGiftUserId(event.target.value)} style={field}><option value="">Choose user…</option>{tenants.filter((user) => user.email !== currentUser.email).map((user) => <option key={user.id} value={user.id}>{user.email || user.name || user.id}</option>)}</select></label>
+                    <label style={{ color: '#aaa', fontSize: 12, display: 'block', marginTop: 12 }}>PLAN<select value={giftPlan} onChange={(event) => setGiftPlan(event.target.value)} style={field}><option value="premium">Premium</option><option value="elite">Elite</option><option value="lifetime">Lifetime</option></select></label>
+                    <label style={{ color: '#aaa', fontSize: 12, display: 'block', marginTop: 12 }}>INTERNAL NOTE<input value={giftNote} onChange={(event) => setGiftNote(event.target.value)} maxLength={240} style={field} /></label>
+                    <button onClick={grantGift} style={{ marginTop: 16, width: '100%', background: '#f59e0b', color: '#2b1600', border: 0, padding: 11, borderRadius: 10, fontWeight: 800, cursor: 'pointer' }}>GRANT MEMBERSHIP</button>
+                </div>
+                <div style={card}><h3 style={{ marginTop: 0 }}>EDITORIAL LIBRARY</h3>{posts.length ? posts.map((post) => <div key={post.id} style={{ borderTop: '1px solid #222', padding: '12px 0' }}><strong style={{ fontSize: 13 }}>{post.title}</strong><div style={{ color: '#888', fontSize: 11 }}>{post.language?.toUpperCase()} · {post.status}</div></div>) : <p style={{ color: '#666', fontSize: 13 }}>No saved drafts or published posts yet.</p>}</div>
+            </div>
+        </section>
     );
 };
 

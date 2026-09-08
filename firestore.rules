@@ -8,7 +8,7 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && request.auth.token.email in ['support@bayfatura.com', 'omidbayenderi@gmail.com'];
+      return isAuthenticated() && request.auth.token.email == 'omidbayenderi@gmail.com';
     }
 
     function isOwner(uid) {
@@ -76,7 +76,13 @@ service cloud.firestore {
         && request.resource.data.tenantId == userId
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.plan == 'standard'
-        && request.resource.data.role == 'admin';
+        // Ordinary accounts are owners of their own workspace, never admins.
+        // The only platform-admin profile may be bootstrapped by its Firebase
+        // Auth identity during the initial sign-in.
+        && (
+          request.resource.data.role == 'owner' ||
+          (request.auth.token.email == 'omidbayenderi@gmail.com' && request.resource.data.role == 'admin')
+        );
     }
 
     function isSafeUserUpdate() {
@@ -309,6 +315,11 @@ service cloud.firestore {
     match /email_logs/{docId} {
       allow read: if isSuperAdmin();
       allow create, update, delete: if false;
+    }
+
+    // Editorial content can only be managed by the platform owner.
+    match /admin_blog_posts/{postId} {
+      allow read, write: if isSuperAdmin();
     }
 
     // =============================
