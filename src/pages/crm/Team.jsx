@@ -315,8 +315,8 @@ const Team = () => {
                     </div>
                 </div>
 
-                {/* Team List */}
-                <div className="table-scroll">
+                {/* Team List — Desktop */}
+                <div className="table-scroll list-desktop-table">
                     <table className="modern-table">
                         <thead>
                             <tr>
@@ -389,6 +389,44 @@ const Team = () => {
                             })}
                         </tbody>
                     </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="list-mobile-cards">
+                    {filteredMembers.length === 0 && (
+                        <div className="lmc-empty">{t('nothingFound')}</div>
+                    )}
+                    {filteredMembers.map(member => {
+                        const memberName = member.name || member.email || '-';
+                        const memberRole = roles[member.role] || roles.member;
+                        const memberStatus = getMemberStatus(member.status);
+                        return (
+                            <div key={member.id} className="lmc-row lmc-row-team">
+                                <div className="lmc-top">
+                                    <div className="member-info">
+                                        <div className={`member-avatar-base ${member.role === 'owner' ? 'member-avatar-owner' : ''}`}>
+                                            {memberName.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <div className="member-name">{memberName}</div>
+                                            <div className="member-email">{member.email}</div>
+                                        </div>
+                                    </div>
+                                    <div className="lmc-actions">
+                                        {(member.status === 'pending' || member.status === 'email_failed') && (
+                                            <button className="icon-btn" onClick={() => copyInviteLink(buildInviteLink(member.id, member.email))}><Copy size={18} /></button>
+                                        )}
+                                        {member.role !== 'owner' && (
+                                            <button className="icon-btn delete delete-btn-red" onClick={() => handleDelete(member.id)}><Trash2 size={18} /></button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="lmc-bottom">
+                                    <div className={`role-badge-base role-badge-${member.role}`}>{memberRole.icon}{memberRole.label}</div>
+                                    <div className={`badge ${memberStatus.className}`}>{memberStatus.label}</div>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 

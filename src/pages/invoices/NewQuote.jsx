@@ -15,7 +15,7 @@ const INDUSTRY_ICONS = {
 
 const NewQuote = () => {
     const { companyProfile, saveQuote } = useInvoice();
-    const { t, appLanguage } = useLanguage();
+    const { t, invoiceLanguage } = useLanguage();
     const { showToast } = usePanel();
     const navigate = useNavigate();
     const invoiceRef = useRef();
@@ -107,6 +107,7 @@ const NewQuote = () => {
 
         // Quote Specifics
         ...invoiceData,
+        language: invoiceLanguage,
         // Flatten industryData for paper
         ...invoiceData.industryData
     };
@@ -127,7 +128,8 @@ const NewQuote = () => {
             const newQuote = await saveQuote({
                 ...invoiceData,
                 ...totals,
-                senderSnapshot: companyProfile
+                senderSnapshot: companyProfile,
+                language: invoiceLanguage
             });
 
             // 2. Navigate to Quote View with autoprint

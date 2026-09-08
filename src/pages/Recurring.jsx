@@ -106,7 +106,8 @@ const Recurring = () => {
             )}
 
             <div className="card">
-                <div className="table-scroll">
+                {/* Desktop table */}
+                <div className="table-scroll list-desktop-table">
                 <table className="modern-table">
                     <thead>
                         <tr>
@@ -167,6 +168,43 @@ const Recurring = () => {
                         )}
                     </tbody>
                 </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="list-mobile-cards">
+                    {recurringTemplates.length === 0 && (
+                        <div className="lmc-empty">{t('nothingFound') || 'Keine Daten'}</div>
+                    )}
+                    {recurringTemplates.map(tpl => {
+                        const nextDate = tpl.nextInvoiceDate ? new Date(tpl.nextInvoiceDate + 'T00:00:00') : null;
+                        const isOverdue = nextDate && nextDate <= new Date();
+                        return (
+                            <div key={tpl.id} className="lmc-row">
+                                <div className="lmc-top">
+                                    <div>
+                                        <span className="lmc-title">{tpl.recipientName}</span>
+                                        {tpl.description && <span className="lmc-sub">{tpl.description}</span>}
+                                    </div>
+                                    <div className="lmc-actions">
+                                        <button className="icon-btn" onClick={() => toggleActive(tpl)}>
+                                            {tpl.active ? <ToggleRight size={22} color="#10b981" /> : <ToggleLeft size={22} color="#94a3b8" />}
+                                        </button>
+                                        <button className="icon-btn delete" onClick={() => deleteRecurringTemplate(tpl.id)}>
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="lmc-bottom">
+                                    <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.75rem' }}>
+                                        <RefreshCcw size={11} style={{ marginRight: '3px' }} />{t(FREQ_LABELS[tpl.frequency]) || tpl.frequency}
+                                    </span>
+                                    <span className="lmc-date" style={{ color: isOverdue ? '#ef4444' : '#64748b' }}>
+                                        <Calendar size={12} /> {nextDate ? nextDate.toLocaleDateString('de-DE') : '-'}
+                                    </span>
+                                    <span className="lmc-amount">{new Intl.NumberFormat('de-DE', { style: 'currency', currency: tpl.currency || 'EUR' }).format(tpl.amount)}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>

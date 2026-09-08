@@ -21,6 +21,7 @@ const Settings = () => {
     const [formData, setFormData] = useState(companyProfile);
     const [customizationData, setCustomizationData] = useState(invoiceCustomization);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [managedItem, setManagedItem] = useState(null); // 'logo', 'signature', or 'stamp'
     const [isLangOpen, setIsLangOpen] = useState(false);
     const [isSyncEnabled, setIsSyncEnabled] = useState(appLanguage === invoiceLanguage);
@@ -29,12 +30,12 @@ const Settings = () => {
     const [showPremiumModal, setShowPremiumModal] = useState(false);
 
     useEffect(() => {
-        if (!loading && !isInitialized) {
+        if (!loading && (!isInitialized || !hasUnsavedChanges)) {
             setFormData(companyProfile);
             setCustomizationData(invoiceCustomization);
             setIsInitialized(true);
         }
-    }, [loading, companyProfile, invoiceCustomization, isInitialized]);
+    }, [loading, companyProfile, invoiceCustomization, isInitialized, hasUnsavedChanges]);
 
     const extractColors = (imageSrc) => {
         return new Promise((resolve) => {
@@ -94,6 +95,7 @@ const Settings = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        setHasUnsavedChanges(true);
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
@@ -127,6 +129,7 @@ const Settings = () => {
 
         try {
             setIsUploading(true);
+            setHasUnsavedChanges(true);
             showToast(t('uploading'), 'info');
 
             // Delete old file from Storage if it's a Storage URL (not base64)
@@ -138,18 +141,29 @@ const Settings = () => {
             // Upload to Storage and get download URL
             const downloadUrl = await uploadToStorage(uid, file, filename);
 
+            let nextFormData = formData;
+            let nextCustomizationData = customizationData;
+
             if (itemType === 'logo') {
-                setFormData(prev => ({ ...prev, logo: downloadUrl }));
                 // Extract palette from file using a temporary object URL
                 const tempUrl = URL.createObjectURL(file);
                 const palette = await extractColors(tempUrl);
                 URL.revokeObjectURL(tempUrl);
-                setCustomizationData(prev => ({ ...prev, brandPalette: palette }));
+                nextFormData = { ...formData, logo: downloadUrl };
+                nextCustomizationData = { ...customizationData, brandPalette: palette };
             } else if (itemType === 'signature') {
-                setFormData(prev => ({ ...prev, signatureUrl: downloadUrl }));
+                nextFormData = { ...formData, signatureUrl: downloadUrl };
             } else if (itemType === 'stamp') {
-                setFormData(prev => ({ ...prev, stampUrl: downloadUrl }));
+                nextFormData = { ...formData, stampUrl: downloadUrl };
             }
+
+            setFormData(nextFormData);
+            setCustomizationData(nextCustomizationData);
+            await updateProfile(nextFormData);
+            if (itemType === 'logo') {
+                await updateCustomization(nextCustomizationData);
+            }
+            setHasUnsavedChanges(false);
 
             showToast(t('uploadSuccess'), 'success');
             setManagedItem(null);
@@ -161,14 +175,18 @@ const Settings = () => {
         }
     };
 
-    const handleDeleteItem = async () => {
-        if ((managedItem === 'signature' || managedItem === 'stamp') && !isPro) {
+    const handleDeleteItem = async (directItem = null) => {
+        const itemType = typeof directItem === 'string' ? directItem : managedItem;
+
+        if ((itemType === 'signature' || itemType === 'stamp') && !isPro) {
             setShowPremiumModal(true);
             return;
         }
 
         const fieldMap = { logo: 'logo', signature: 'signatureUrl', stamp: 'stampUrl' };
-        const field = fieldMap[managedItem];
+        const field = fieldMap[itemType];
+        if (!field) return;
+
         const oldUrl = formData[field];
 
         // Delete from Firebase Storage if it's a Storage URL
@@ -176,12 +194,27 @@ const Settings = () => {
             deleteFromStorage(oldUrl); // fire-and-forget
         }
 
-        if (managedItem === 'logo') {
-            setFormData(prev => ({ ...prev, logo: null }));
-        } else if (managedItem === 'signature') {
-            setFormData(prev => ({ ...prev, signatureUrl: null }));
-        } else if (managedItem === 'stamp') {
-            setFormData(prev => ({ ...prev, stampUrl: null }));
+        const nextFormData = { ...formData, [field]: null };
+        const nextCustomizationData = itemType === 'logo'
+            ? { ...customizationData, brandPalette: [] }
+            : customizationData;
+
+        try {
+            setIsUploading(true);
+            setHasUnsavedChanges(true);
+            setFormData(nextFormData);
+            setCustomizationData(nextCustomizationData);
+            await updateProfile(nextFormData);
+            if (itemType === 'logo') {
+                await updateCustomization(nextCustomizationData);
+            }
+            setHasUnsavedChanges(false);
+            showToast(t('saveSuccessful'), 'success');
+        } catch (err) {
+            console.error('Delete item persistence error:', err);
+            showToast(t('saveFailed'), 'error');
+        } finally {
+            setIsUploading(false);
         }
         setManagedItem(null);
     };
@@ -196,6 +229,7 @@ const Settings = () => {
                 updateProfile(formData),
                 updateCustomization(customizationData)
             ]);
+            setHasUnsavedChanges(false);
             showToast(t('saveSuccessful'), 'success');
         } catch (error) {
             console.error("Save error detail:", error);
@@ -215,7 +249,7 @@ const Settings = () => {
     };
 
     return (
-        <div className="page-container">
+        <div className="page-container settings-page">
             <PremiumModal isOpen={showPremiumModal} onClose={() => setShowPremiumModal(false)} />
             
             {/* Unified Management Modal */}
@@ -354,15 +388,18 @@ const Settings = () => {
             <div className="settings-tabs">
                 <button className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`} onClick={() => setActiveTab('general')}>
                     <Building2 size={18} />
-                    {t('general')}
+                    <span className="tab-label-full">{t('general')}</span>
+                    <span className="tab-label-short">{t('general')}</span>
                 </button>
                 <button className={`settings-tab ${activeTab === 'finance' ? 'active' : ''}`} onClick={() => setActiveTab('finance')}>
                     <CreditCard size={18} />
-                    {t('bankDetails')}
+                    <span className="tab-label-full">{t('bankDetails')}</span>
+                    <span className="tab-label-short">{{ tr: 'Banka', en: 'Bank', de: 'Bank', fr: 'Banque', es: 'Banco', pt: 'Banco' }[appLanguage] || 'Bank'}</span>
                 </button>
                 <button className={`settings-tab ${activeTab === 'premium' ? 'active' : ''}`} onClick={() => setActiveTab('premium')}>
                     <Crown size={18} />
-                    {t('subscription_management')}
+                    <span className="tab-label-full">{t('subscription_management')}</span>
+                    <span className="tab-label-short">{{ tr: 'Plan', en: 'Plan', de: 'Plan', fr: 'Plan', es: 'Plan', pt: 'Plano' }[appLanguage] || 'Plan'}</span>
                     {!isPro && <Lock size={12} className="tab-lock-icon" />}
                 </button>
             </div>
@@ -405,7 +442,10 @@ const Settings = () => {
                                          </span>
                                          <button
                                              type="button"
-                                             onClick={() => setCustomizationData(prev => ({ ...prev, primaryColor: '#374151', accentColor: '#f1f5f9' }))}
+                                             onClick={() => {
+                                                 setHasUnsavedChanges(true);
+                                                 setCustomizationData(prev => ({ ...prev, primaryColor: '#374151', accentColor: '#f1f5f9' }));
+                                             }}
                                              className="reset-btn"
                                          >
                                              <RotateCcw size={12} />
@@ -417,7 +457,10 @@ const Settings = () => {
                                              <button
                                                  key={idx}
                                                  type="button"
-                                                 onClick={() => setCustomizationData(prev => ({ ...prev, primaryColor: color, accentColor: `${color}15` }))}
+                                                 onClick={() => {
+                                                     setHasUnsavedChanges(true);
+                                                     setCustomizationData(prev => ({ ...prev, primaryColor: color, accentColor: `${color}15` }));
+                                                 }}
                                                  className={`palette-color-btn${customizationData.primaryColor === color ? ' active' : ''}`}
                                                  style={{ background: color }}
                                              >
@@ -445,7 +488,7 @@ const Settings = () => {
                                               alt="Signature"
                                               className={`signature-img${!isPro ? ' signature-img-pro' : ''}`}
                                           />
-                                          <button className="signature-action-btn" type="button" onClick={(e) => { e.stopPropagation(); isPro ? (setManagedItem('signature'), handleDeleteItem()) : setShowPremiumModal(true); }}>
+                                          <button className="signature-action-btn" type="button" onClick={(e) => { e.stopPropagation(); isPro ? handleDeleteItem('signature') : setShowPremiumModal(true); }}>
                                               {!isPro ? <Lock size={18} color="#f59e0b" /> : <XCircle size={18} />}
                                           </button>
                                       </div>
@@ -476,7 +519,7 @@ const Settings = () => {
                                               alt="Stamp"
                                               className={`signature-img${!isPro ? ' signature-img-pro' : ''}`}
                                           />
-                                         <button className="signature-action-btn" type="button" onClick={(e) => { e.stopPropagation(); isPro ? (setManagedItem('stamp'), handleDeleteItem()) : setShowPremiumModal(true); }}>
+                                         <button className="signature-action-btn" type="button" onClick={(e) => { e.stopPropagation(); isPro ? handleDeleteItem('stamp') : setShowPremiumModal(true); }}>
                                              {!isPro ? <Lock size={18} color="#f59e0b" /> : <XCircle size={18} />}
                                          </button>
                                      </div>
@@ -603,6 +646,7 @@ const Settings = () => {
                                 <div
                                     onClick={() => {
                                         const newVal = !(formData.kleinunternehmer === true || formData.kleinunternehmer === 'true');
+                                        setHasUnsavedChanges(true);
                                         setFormData(prev => ({
                                             ...prev,
                                             kleinunternehmer: newVal,
@@ -866,7 +910,7 @@ const Settings = () => {
                              {/* Stripe Column */}
                              <div className="api-column">
                                  <label className="api-label">
-                                     <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg" height="15" alt="Stripe" />
+                                     <span className="api-brand-mark stripe-mark" aria-hidden="true">S</span>
                                      Stripe API
                                  </label>
                                  <div className="form-group">
@@ -898,7 +942,7 @@ const Settings = () => {
                              {/* PayPal Column */}
                              <div className="api-column">
                                  <label className="api-label">
-                                     <img src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg" height="15" alt="PayPal" />
+                                     <span className="api-brand-mark paypal-mark" aria-hidden="true">P</span>
                                      PayPal API
                                  </label>
                                  <div className="form-group">

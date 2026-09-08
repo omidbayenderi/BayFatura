@@ -395,7 +395,7 @@ const BankMatcher = () => {
                                         </div>
 
                                         {/* Match body: transaction ↔ invoice */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', padding: '16px 18px', alignItems: 'center' }}>
+                                        <div className="bank-match-body" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', padding: '16px 18px', alignItems: 'center' }}>
                                             {/* Bank transaction */}
                                             <div style={{ padding: '12px 14px', background: '#eff6ff', borderRadius: '12px' }}>
                                                 <div style={{ fontSize: '0.7rem', color: '#3b82f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>

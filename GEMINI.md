@@ -2,9 +2,9 @@
 
 Bu dosya, **BayFatura** projesinin yapay zeka tarafından yönetilen gelişim sürecini, tamamlanan modülleri ve "Gerçek Dünya" üretim aşamasına geçiş için gereken tüm optimizasyonları belgeler.
 
-## 🚀 MEVCUT STRATEJİK DURUM (25 Mayıs 2026)
+## 🚀 MEVCUT STRATEJİK DURUM (06 Haziran 2026)
 
-BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygulamasıdır; güncel odak artık **kontrollü staging doğrulaması, Android native beta smoke testleri, iOS/Apple dış panel ayarları ve production'a güvenli geçiş planı** üzerindedir. 25 Mayıs itibarıyla Android debug build emülatörde açılmış, native Google login doğrulanmış, mobil alt navigasyon/drawer UI iyileştirilmiş ve Firestore WebView bağlantı dayanıklılığı artırılmıştır.
+BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygulamasıdır; güncel odak artık **production SEO Growth Engine, kontrollü müşteri edinme hazırlığı, Android native beta smoke testleri ve production guardrail disiplini** üzerindedir. 05 Haziran itibarıyla SEO Agent DCC panelinden manuel çalıştırılabilir hale gelmiş, Gemini modeli güncellenmiş, programmatic SEO landing sayfaları indexlenebilir biçimde yayınlanmış ve public SEO sayfalarındaki console gürültüsü azaltılmıştır.
 
 ### ✅ Staging Hazır Bileşenler
 - `preview-test-staging` aktif geliştirme ve staging doğrulama dalıdır.
@@ -15,7 +15,14 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - Android native Google login emülatörde başarıyla test edilmiştir.
 - Android native kamera ve push opt-in entegrasyonları kod tarafında bağlanmıştır.
 - Android mobil shell UI alt menü ve açılır menü düzeyinde native app görünümüne yaklaştırılmıştır.
+- PWA install ikonları `#1A2436` arka planla normalize edilmiştir; iOS Safari "Ana Ekrana Ekle" önizlemesinde beyaz logo zemini görünmemelidir.
+- Mobil profil fotoğrafı akışı Firestore Base64 yerine Firebase Storage URL mimarisine taşınmıştır; kamera/galeri görselleri 512px JPEG'e normalize edilerek yüklenir.
 - Firestore `initializeFirestore` ayarında `experimentalAutoDetectLongPolling` aktiftir; WebView/Safari realtime listen kanalındaki access-control retry sorunlarına karşı daha toleranslıdır.
+- Production SEO Agent DCC üzerinden ülke ve modül bazlı manuel çalıştırılabilir.
+- SEO ve AI Cloud Functions çağrılarında varsayılan Gemini modeli `gemini-2.5-flash-lite` olarak güncellenmiştir.
+- `seo_content_queue` içindeki programmatic landing page içerikleri public route'larda temiz UI ile render edilir.
+- `public/sitemap.xml` programmatic SEO sayfalarını ve hreflang hedeflerini içerir; tarayıcıda ham XML görünmesi normaldir.
+- Public SEO route'larında App Check/reCAPTCHA başlatılmadığı için SEO sayfalarındaki gereksiz 401/access-control console gürültüsü azaltılmıştır.
 
 ### ⚠️ Lansman Öncesi Dış Bağımlılıklar
 - Apple/iCloud Sign-In için Apple Developer ve Firebase Console provider ayarı tamamlanmalıdır.
@@ -35,6 +42,8 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - Firebase Android config dosyası lokal olarak doğru yapıya getirildi: `com.bayfatura.app` ve `com.bayfatura.app.debug` için Android OAuth client kayıtları mevcut.
 - `google-services.json` repoya commit edilmez; lokal native build ve CI secret mimarisiyle yönetilmelidir.
 - Mobil alt navigasyon ve açılır menü tasarımı yuvarlatılmış, safe-area uyumlu ve daha native hissedilecek şekilde güncellendi.
+- iOS/PWA ana ekran ikonu için `public/apple-touch-icon.png` koyu `#1A2436` arka planla hazırlanır; install ikonları ile in-app `public/logo.png` ayrı düşünülmelidir.
+- Profil avatarı mobilde kamera/galeri kaynaklı büyük dosyalarda Firestore doküman limitine takılmaması için Storage'a yüklenir; kullanıcı belgesinde sadece avatar URL tutulur.
 
 ### Web App Durumu
 - Email/password ve Google giriş akışları test edildi.
@@ -48,11 +57,12 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - Hata veri okuyup yazmayı engellemiyorsa kritik kabul edilmez; tekrar eden realtime gecikmeler görülürse logcat + Firestore rules + network transport birlikte incelenmelidir.
 
 ### Öncelik Sırası
-1. Android gerçek cihaz smoke testleri: login, onboarding, fatura, PDF/share, kamera, push opt-in.
-2. Resend domain doğrulaması ve `from` adresinin domain tabanlı hale getirilmesi.
-3. Apple Developer + Firebase Apple provider + iOS signing/capability kurulumu.
-4. Android signed AAB/keystore ve GitHub Actions secret doğrulaması.
-5. Production reconciliation: `preview-test-staging` değişikliklerinin küçük PR'larla `main` tarafına taşınması.
+1. SEO Agent çıktılarının haftalık kalite kontrolü: indexlenebilirlik, sitemap, duplicate content, CTA ve conversion metriği.
+2. Android gerçek cihaz smoke testleri: login, onboarding, fatura, PDF/share, kamera, push opt-in.
+3. Resend domain doğrulaması ve `from` adresinin domain tabanlı hale getirilmesi.
+4. Apple Developer + Firebase Apple provider + iOS signing/capability kurulumu.
+5. Android signed AAB/keystore ve GitHub Actions secret doğrulaması.
+6. Production reconciliation: `preview-test-staging` değişikliklerinin küçük PR'larla `main` tarafına taşınması.
 
 ### Güncel Operasyon Dokümanları
 - Resend domain kurulumu: `docs/resend-domain-setup.md`
@@ -70,7 +80,7 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - **DACH Settings:** Almanya ve Avusturya kullanıcıları için birleştirilmiş, §19 öncelikli akıllı ayarlar paneli eklendi.
 
 ### 🤖 26. AI Elite Modules (Full Active)
-- **Gemini 1.5 Flash Vision:** Fiş ve makbuz tarama motoru %100 doğrulukla aktif.
+- **Gemini 2.5 Flash Lite:** Fiş/makbuz tarama, banka eşleştirme, finansal analiz ve SEO içerik üretimi Cloud Functions tarafında aktif.
 - **Magic Bank Matcher:** Banka CSV verilerini faturalarla saniyeler içinde eşleştiren AI Agent devreye alındı.
 - **Financial Oracle:** 3 aylık nakit akışı ve vergi öngörüsü (Gemini destekli) yayında.
 
@@ -85,7 +95,7 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - **GDPR & Security:** Stripe secret key'ler frontend'den temizlendi, Cookie Consent ve yasal sayfalar (Impressum, Privacy) eklendi.
 
 ### 🤖 16. AI Vision: Receipt Scanner (Full Active)
-- **Gemini 1.5 Flash Vision:** Elite kullanıcılar için makbuz tarama motoru %100 doğruluk ve KDV ayıklama özelliğiyle devreye alındı.
+- **Gemini Vision Flow:** Elite kullanıcılar için makbuz tarama motoru KDV ayıklama özelliğiyle devreye alındı; model varsayılanı `gemini-2.5-flash-lite`.
 - **Automated Accounting:** Giderlerin otomatik kategorizasyonu ve veritabanı eşleşmesi sağlandı.
 
 ### 📊 17. Deep Insights & Forecasting (Full Active)
@@ -418,5 +428,26 @@ BayFatura, kapsamlı özellik seti büyük ölçüde tamamlanmış bir SaaS uygu
 - `docs/android-device-runbook.md` cihaz kurulumu ve APK çalıştırma için ana rehberdir.
 
 ---
-*Son Güncelleme: 24 Mayıs 2026 (Android Native Readiness)*
+## 📈 35. SEO Growth Engine Activation (Completed — 05 Haziran 2026)
+
+### 🤖 35.1 Gemini Model & Agent Runtime
+- **Model migration:** Eski `gemini-1.5-flash` kullanımı bırakıldı; default SEO/AI modeli `gemini-2.5-flash-lite`.
+- **404 fix:** `models/gemini-1.5-flash is not found` hatası giderildi.
+- **DCC trigger:** `/dcc-portal` SEO Agent panelinden ülke (`DE`, `AT`, `PT`, `ES`, `FR`, `EN`) ve modül seçilerek manuel çalışma yapılabilir.
+- **Nightly job:** `seoAgent` scheduled function her gece 03:00 Berlin saatinde çalışacak şekilde tanımlıdır.
+
+### 🌍 35.2 Programmatic SEO Publishing
+- **Routes:** `/de/rechnung-erstellen/:slug`, `/pt/criar-fatura/:slug`, `/es/crear-factura/:slug`, `/fr/creer-facture/:slug`, `/en/invoice-template/:slug`.
+- **Firestore source:** SEO landing içerikleri `seo_content_queue` koleksiyonundan okunur.
+- **Public read boundary:** Sadece `type == 'programmatic_page'` ve `status in ['ready_to_publish', 'published']` olan dokümanlar public okunur; diğer SEO koleksiyonları super-admin alanıdır.
+- **Sitemap:** `public/sitemap.xml` indexlenebilir programmatic sayfaları içerir; XML'in tarayıcıda düz metin olarak görünmesi beklenen davranıştır.
+
+### 🎨 35.3 Content Quality & UI Guardrails
+- **JSON normalization:** Gemini'nin Markdown code fence, raw JSON veya gevşek JSON döndürmesi server/client tarafında normalize edilir.
+- **Landing polish:** SEO sayfaları raw AI çıktısı göstermez; hero, lead, CTA, feature, FAQ ve related link düzeni ile yayınlanır.
+- **Console cleanup:** Public SEO sayfalarında App Check/reCAPTCHA başlatılmaz; noisy CSP report-only header kaldırılmıştır.
+- **Next metric:** SEO Agent çıktıları yalnızca içerik üretmekle kalmamalı; haftalık index coverage, keyword impression/click ve dönüşüm metrikleriyle izlenmelidir.
+
+---
+*Son Güncelleme: 06 Haziran 2026 (PWA Icon & Mobile Profile Avatar Stabilized)*
 *Codex AI Agent*

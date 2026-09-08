@@ -502,7 +502,8 @@ const Archive = () => {
 
                 {/* ─── Table ─── */}
                 <div className="card card-no-padding">
-                    <div className="table-scroll">
+                    {/* Desktop table */}
+                    <div className="table-scroll list-desktop-table">
                     <table className="modern-table table-no-radius">
                         <thead>
                             <tr>
@@ -606,6 +607,54 @@ const Archive = () => {
                             )}
                         </tbody>
                     </table>
+                    </div>
+                    {/* Mobile cards */}
+                    <div className="list-mobile-cards">
+                        {filtered.length === 0 && (
+                            <div className="lmc-empty">{showTrash ? (appLanguage === 'tr' ? 'Çöp kutusu boş!' : 'Papierkorb leer!') : t('noInvoicesFound')}</div>
+                        )}
+                        {filtered.map(inv => {
+                            const overdue = isOverdue(inv);
+                            const stat = STATUSES[inv.status || 'draft'] || STATUSES.draft;
+                            return (
+                                <div key={inv.id} className={`lmc-row${overdue && inv.status !== 'paid' ? ' lmc-row-overdue' : ''}`}>
+                                    <div className="lmc-top">
+                                        <div>
+                                            <span className="lmc-chip">{inv.invoiceNumber}</span>
+                                            <span className="lmc-title">{inv.recipientName}</span>
+                                        </div>
+                                        <select className="status-select status-select-custom" value={inv.status || 'draft'}
+                                            onChange={(e) => updateInvoiceStatus(inv.id, e.target.value)}
+                                            style={{ backgroundColor: stat.color + '20', color: stat.color, borderColor: 'transparent', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', appearance: 'none', WebkitAppearance: 'none' }}>
+                                            <option value="draft">{t('draft')}</option>
+                                            <option value="sent">{t('sent')}</option>
+                                            <option value="paid">{t('paid')}</option>
+                                            <option value="partial">{t('partial')}</option>
+                                            <option value="overdue">{t('overdue')}</option>
+                                        </select>
+                                    </div>
+                                    <div className="lmc-bottom">
+                                        <span className="lmc-date">{new Date(inv.date).toLocaleDateString(locale)}</span>
+                                        <span className="lmc-amount" style={{ color: overdue && inv.status !== 'paid' ? '#ef4444' : undefined }}>{formatMoney(inv.total, inv.currency)}</span>
+                                    </div>
+                                    <div className="lmc-actions lmc-actions-row">
+                                        {showTrash ? (
+                                            <>
+                                                <button className="icon-btn" style={{ color: '#10b981' }} onClick={() => { restoreInvoice(inv.id); showToast(appLanguage === 'tr' ? 'Fatura geri yüklendi' : 'Rechnung wiederhergestellt', 'success'); }}><RotateCcw size={18} /></button>
+                                                <button className="icon-btn delete" onClick={() => setDeletePermanentConfirm(inv)}><Trash2 size={18} /></button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                {overdue && inv.status !== 'paid' && <button className="icon-btn icon-btn-reminder" onClick={() => setReminderInvoice(inv)}><Bell size={16} /></button>}
+                                                <button className="icon-btn" onClick={() => navigate(`/invoice/${inv.id}/edit`)}><Edit size={18} /></button>
+                                                <button className="icon-btn" onClick={() => navigate(`/invoice/${inv.id}`)}><Eye size={18} /></button>
+                                                <button className="icon-btn delete" onClick={() => setDeleteConfirm(inv)}><Trash2 size={18} /></button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

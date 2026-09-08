@@ -264,6 +264,38 @@ service cloud.firestore {
     }
 
     // =============================
+    // SEO Agent Data (server-managed, SuperAdmin read)
+    // =============================
+
+    match /seo_content_queue/{docId} {
+      allow read: if isSuperAdmin() || (
+        resource.data.type == 'programmatic_page' &&
+        resource.data.status in ['ready_to_publish', 'published']
+      );
+      allow create, update, delete: if false;
+    }
+
+    match /seo_opportunities/{docId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /seo_reports/{docId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /seo_rankings/{docId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /seo_tasks/{docId} {
+      allow read: if isSuperAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // =============================
     // Notifications (Subcollection of Users)
     // =============================
 

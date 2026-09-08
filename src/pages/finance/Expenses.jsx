@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useInvoice } from '../../context/InvoiceContext';
 import { useAuth } from '../../context/AuthContext';
-import { Plus, Trash2, Download, Receipt, Camera, Image as ImageIcon, X, Eye, FileSpreadsheet, Sparkles, Lock, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Download, Receipt, Camera, Image as ImageIcon, X, Eye, FileSpreadsheet, Sparkles, Lock, RotateCcw, Calendar } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { usePanel } from '../../context/PanelContext';
 import PremiumModal from '../../components/PremiumModal';
@@ -426,7 +426,8 @@ const Expenses = () => {
             )}
 
             <div className="card">
-                <div className="table-scroll">
+                {/* Desktop table */}
+                <div className="table-scroll list-desktop-table">
                 <table className="modern-table">
                     <thead>
                         <tr>
@@ -448,17 +449,10 @@ const Expenses = () => {
                                 <td style={{ textAlign: 'right' }}>{exp.quantity ?? 1} {exp.unit || 'Stück'}</td>
                                 <td style={{ textAlign: 'center' }}>
                                     {exp.receiptImage ? (
-                                        <button
-                                            className="icon-btn"
-                                            title={t('viewReceipt')}
-                                            onClick={() => setViewReceipt(exp.receiptImage)}
-                                            style={{ color: 'var(--primary)' }}
-                                        >
+                                        <button className="icon-btn" title={t('viewReceipt')} onClick={() => setViewReceipt(exp.receiptImage)} style={{ color: 'var(--primary)' }}>
                                             <Receipt size={18} />
                                         </button>
-                                    ) : (
-                                        <span style={{ color: '#cbd5e1' }}>-</span>
-                                    )}
+                                    ) : <span style={{ color: '#cbd5e1' }}>-</span>}
                                 </td>
                                 <td style={{ textAlign: 'right', fontWeight: '600', color: 'var(--danger)' }}>
                                     - {new Intl.NumberFormat(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE', { style: 'currency', currency: exp.currency || 'EUR' }).format(exp.amount)}
@@ -467,17 +461,11 @@ const Expenses = () => {
                                     <div className="table-actions" style={{ justifyContent: 'flex-end' }}>
                                         {showTrash ? (
                                             <>
-                                                <button className="icon-btn" style={{ color: '#10b981' }} title={appLanguage === 'tr' ? 'Geri Yükle' : 'Wiederherstellen'} onClick={() => { restoreExpense(exp.id); showToast(appLanguage === 'tr' ? 'Gider geri yüklendi' : 'Ausgabe wiederhergestellt', 'success'); }}>
-                                                    <RotateCcw size={18} />
-                                                </button>
-                                                <button className="icon-btn delete" title={appLanguage === 'tr' ? 'Kalıcı Olarak Sil' : 'Endgültig löschen'} onClick={() => setDeletePermanentConfirm(exp)}>
-                                                    <Trash2 size={18} />
-                                                </button>
+                                                <button className="icon-btn" style={{ color: '#10b981' }} onClick={() => { restoreExpense(exp.id); showToast(appLanguage === 'tr' ? 'Gider geri yüklendi' : 'Ausgabe wiederhergestellt', 'success'); }}><RotateCcw size={18} /></button>
+                                                <button className="icon-btn delete" onClick={() => setDeletePermanentConfirm(exp)}><Trash2 size={18} /></button>
                                             </>
                                         ) : (
-                                            <button className="icon-btn delete" onClick={() => setDeleteConfirm(exp)}>
-                                                <Trash2 size={18} />
-                                            </button>
+                                            <button className="icon-btn delete" onClick={() => setDeleteConfirm(exp)}><Trash2 size={18} /></button>
                                         )}
                                     </div>
                                 </td>
@@ -493,6 +481,41 @@ const Expenses = () => {
                         )}
                     </tbody>
                 </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="list-mobile-cards">
+                    {activeExpenses.length === 0 && (
+                        <div className="lmc-empty">{showTrash ? (appLanguage === 'tr' ? 'Çöp kutusu boş!' : 'Papierkorb leer!') : t('noData')}</div>
+                    )}
+                    {activeExpenses.map(exp => (
+                        <div key={exp.id} className="lmc-row">
+                            <div className="lmc-top">
+                                <div>
+                                    <span className="lmc-title">{exp.title}</span>
+                                    <span className="badge lmc-badge" style={{ background: '#f1f5f9', color: '#475569' }}>{t(exp.category)}</span>
+                                </div>
+                                <div className="lmc-actions">
+                                    {exp.receiptImage && (
+                                        <button className="icon-btn" onClick={() => setViewReceipt(exp.receiptImage)} style={{ color: 'var(--primary)' }}><Receipt size={18} /></button>
+                                    )}
+                                    {showTrash ? (
+                                        <>
+                                            <button className="icon-btn" style={{ color: '#10b981' }} onClick={() => { restoreExpense(exp.id); showToast(appLanguage === 'tr' ? 'Gider geri yüklendi' : 'Ausgabe wiederhergestellt', 'success'); }}><RotateCcw size={18} /></button>
+                                            <button className="icon-btn delete" onClick={() => setDeletePermanentConfirm(exp)}><Trash2 size={18} /></button>
+                                        </>
+                                    ) : (
+                                        <button className="icon-btn delete" onClick={() => setDeleteConfirm(exp)}><Trash2 size={18} /></button>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="lmc-bottom">
+                                <span className="lmc-date"><Calendar size={12} /> {new Date(exp.date).toLocaleDateString(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE')}</span>
+                                <span className="lmc-amount" style={{ color: 'var(--danger)' }}>
+                                    - {new Intl.NumberFormat(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE', { style: 'currency', currency: exp.currency || 'EUR' }).format(exp.amount)}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 

@@ -148,6 +148,19 @@ const getStoredCookieConsent = () => {
 
 const hasAnalyticsConsent = () => getStoredCookieConsent()?.analytics === true;
 
+const PUBLIC_SEO_PAGE_PATTERNS = [
+    /^\/[a-z]{2}\/rechnung-erstellen\/[^/]+\/?$/,
+    /^\/[a-z]{2}\/criar-fatura\/[^/]+\/?$/,
+    /^\/[a-z]{2}\/crear-factura\/[^/]+\/?$/,
+    /^\/[a-z]{2}\/creer-facture\/[^/]+\/?$/,
+    /^\/[a-z]{2}\/invoice-template\/[^/]+\/?$/,
+];
+
+const isPublicSeoPage = () => {
+    if (typeof window === 'undefined') return false;
+    return PUBLIC_SEO_PAGE_PATTERNS.some((pattern) => pattern.test(window.location.pathname));
+};
+
 // Analytics - only in production, when measurementId exists, and after consent.
 export let analytics = null;
 export const enableAnalytics = async () => {

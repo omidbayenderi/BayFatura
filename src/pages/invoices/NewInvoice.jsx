@@ -694,6 +694,7 @@ const NewInvoice = () => {
 
         // Invoice Specifics
         ...invoiceData,
+        language: invoiceLanguage,
         // Flatten industryData for paper
         ...invoiceData.industryData
     };

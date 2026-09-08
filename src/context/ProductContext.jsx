@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
+import { getDb } from '../lib/firebase';
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, where, updateDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
@@ -7,6 +7,7 @@ const ProductContext = createContext();
 
 export const ProductProvider = ({ children }) => {
     const { currentUser } = useAuth();
+    const db = getDb(currentUser?._db);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -30,7 +31,7 @@ export const ProductProvider = ({ children }) => {
         });
 
         return unsub;
-    }, [currentUser]);
+    }, [currentUser, db]);
 
     const saveProduct = async (data) => {
         if (!currentUser) return;

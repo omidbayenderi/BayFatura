@@ -207,7 +207,7 @@ const Forecasting = () => {
                             </div>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr', gap: '32px' }}>
+                        <div className="forecast-main-grid" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr', gap: '32px' }}>
                             <div className="card glass-card" style={{ padding: '32px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                                     <h3 style={{ fontSize: '1.3rem', fontWeight: '700' }}>{t('cashFlowForecast')}</h3>

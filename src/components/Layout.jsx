@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { usePanel } from '../context/PanelContext';
 import { useInvoice } from '../context/InvoiceContext';
-import { db } from '../lib/firebase';
+import { getDb } from '../lib/firebase';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import Toast from './Toast';
 import { AnimatePresence } from 'framer-motion';
@@ -41,6 +41,7 @@ const Layout = () => {
             return;
         }
 
+        const db = getDb(currentUser._db);
         const notifsRef = collection(db, 'users', currentUser.uid, 'notifications');
         const q = query(notifsRef, where('read', '==', false));
 

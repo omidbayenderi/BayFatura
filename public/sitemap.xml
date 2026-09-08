@@ -49,6 +49,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://bayfatura.com/de/rechnung-erstellen/arzt</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://bayfatura.com/de/rechnung-erstellen/arzt" />
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://bayfatura.com/de/rechnung-erstellen/it-dienstleister</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://bayfatura.com/de/rechnung-erstellen/it-dienstleister" />
     <changefreq>monthly</changefreq>

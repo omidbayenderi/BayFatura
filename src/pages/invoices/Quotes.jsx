@@ -127,7 +127,8 @@ const Quotes = () => {
                 </header>
 
                 <div className="card">
-                    <div className="table-scroll">
+                    {/* Desktop table */}
+                    <div className="table-scroll list-desktop-table">
                     <table className="modern-table">
                         <thead>
                             <tr>
@@ -237,6 +238,53 @@ const Quotes = () => {
                             )}
                         </tbody>
                     </table>
+                    </div>
+                    {/* Mobile cards */}
+                    <div className="list-mobile-cards">
+                        {activeQuotes.length === 0 && (
+                            <div className="lmc-empty">{showTrash ? (appLanguage === 'tr' ? 'Çöp kutusu boş!' : 'Papierkorb leer!') : t('noOffers')}</div>
+                        )}
+                        {activeQuotes.map(quote => (
+                            <div key={quote.id} className="lmc-row">
+                                <div className="lmc-top">
+                                    <div>
+                                        <span className="lmc-chip">{quote.invoiceNumber}</span>
+                                        <span className="lmc-title">{quote.recipientName}</span>
+                                    </div>
+                                    <select
+                                        className="status-select"
+                                        value={quote.status || 'draft'}
+                                        onChange={(e) => handleStatusChange(quote.id, e.target.value)}
+                                        disabled={showTrash}
+                                        style={{ backgroundColor: (STATUSES && STATUSES[quote.status || 'draft'] ? STATUSES[quote.status || 'draft'].color : '#94a3b8') + '20', color: (STATUSES && STATUSES[quote.status || 'draft'] ? STATUSES[quote.status || 'draft'].color : '#94a3b8'), borderColor: 'transparent', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', appearance: 'none', WebkitAppearance: 'none' }}
+                                    >
+                                        <option value="draft">{t('draft')}</option>
+                                        <option value="sent">{t('sent')}</option>
+                                        <option value="accepted">{t('accepted')}</option>
+                                        <option value="rejected">{t('rejected')}</option>
+                                    </select>
+                                </div>
+                                <div className="lmc-bottom">
+                                    <span className="lmc-date">{new Date(quote.date).toLocaleDateString(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE')}</span>
+                                    <span className="lmc-amount">{new Intl.NumberFormat(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE', { style: 'currency', currency: quote.currency || 'EUR' }).format(quote.total)}</span>
+                                </div>
+                                <div className="lmc-actions lmc-actions-row">
+                                    {showTrash ? (
+                                        <>
+                                            <button className="icon-btn" style={{ color: '#10b981' }} onClick={() => { restoreQuote(quote.id); showToast(appLanguage === 'tr' ? 'Teklif geri yüklendi' : 'Angebot wiederhergestellt', 'success'); }}><RotateCcw size={18} /></button>
+                                            <button className="icon-btn delete" onClick={() => setDeletePermanentConfirm(quote)}><Trash2 size={18} /></button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button className="icon-btn" style={{ color: '#10b981' }} title={t('convertToInvoice')} onClick={() => handleConvert(quote)}><FileInput size={18} /></button>
+                                            <button className="icon-btn" onClick={() => navigate(`/quote/${quote.id}/edit`)}><Edit size={18} /></button>
+                                            <button className="icon-btn" onClick={() => navigate(`/quote/${quote.id}`)}><Eye size={18} /></button>
+                                            <button className="icon-btn delete" onClick={() => handleDelete(quote)}><Trash2 size={18} /></button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

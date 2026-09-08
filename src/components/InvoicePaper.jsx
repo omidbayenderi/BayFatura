@@ -31,10 +31,56 @@ const handleImageError = (e, fallbackText = 'Logo') => {
     }
 };
 
+const LEGAL_TEXTS = {
+    de: {
+        kleinunternehmer: 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.',
+        reverseCharge: 'Steuerschuldnerschaft des Leistungsempfängers gemäß §13b UStG (Reverse Charge)',
+        recipientVat: 'USt-IdNr. des Empfängers',
+        serviceDate: 'Leistungsdatum',
+        recipientVatLabel: 'USt-IdNr. Empf.',
+    },
+    en: {
+        kleinunternehmer: 'No VAT is charged according to §19 UStG.',
+        reverseCharge: 'Reverse charge: tax liability transfers to the recipient according to §13b UStG.',
+        recipientVat: 'Recipient VAT ID',
+        serviceDate: 'Service date',
+        recipientVatLabel: 'Recipient VAT ID',
+    },
+    tr: {
+        kleinunternehmer: '§19 UStG uyarınca KDV hesaplanmamıştır.',
+        reverseCharge: 'Reverse charge: §13b UStG uyarınca vergi yükümlülüğü alıcıya aittir.',
+        recipientVat: 'Alıcı KDV numarası',
+        serviceDate: 'Hizmet tarihi',
+        recipientVatLabel: 'Alıcı KDV No',
+    },
+    pt: {
+        kleinunternehmer: 'Não é cobrado IVA ao abrigo do §19 UStG.',
+        reverseCharge: 'Reverse charge: a responsabilidade fiscal é transferida para o destinatário nos termos do §13b UStG.',
+        recipientVat: 'NIF/IVA do destinatário',
+        serviceDate: 'Data do serviço',
+        recipientVatLabel: 'IVA destinatário',
+    },
+    fr: {
+        kleinunternehmer: 'Aucune TVA n’est facturée conformément au §19 UStG.',
+        reverseCharge: 'Autoliquidation : la responsabilité fiscale incombe au destinataire selon le §13b UStG.',
+        recipientVat: 'Numéro TVA du destinataire',
+        serviceDate: 'Date de prestation',
+        recipientVatLabel: 'TVA destinataire',
+    },
+    es: {
+        kleinunternehmer: 'No se cobra IVA conforme al §19 UStG.',
+        reverseCharge: 'Inversión del sujeto pasivo: la obligación fiscal se transfiere al destinatario según el §13b UStG.',
+        recipientVat: 'NIF/IVA del destinatario',
+        serviceDate: 'Fecha del servicio',
+        recipientVatLabel: 'IVA destinatario',
+    },
+};
+
 const InvoicePaper = forwardRef(({ data, totals }, ref) => {
     const { tInvoice, invoiceLanguage: globalInvoiceLanguage } = useLanguage();
     const docLang = data.language || globalInvoiceLanguage;
     const T = (key) => tInvoice(key, docLang);
+    const legalText = LEGAL_TEXTS[docLang] || LEGAL_TEXTS.de;
 
     const { invoiceCustomization } = useInvoice();
     const { isPro } = useAuth();
@@ -252,14 +298,14 @@ const InvoicePaper = forwardRef(({ data, totals }, ref) => {
                                     {/* Leistungsdatum — §14 UStG */}
                                     {data.leistungsdatum && (
                                         <tr>
-                                            <td>Leistungsdatum:</td>
+                                            <td>{legalText.serviceDate}:</td>
                                             <td>{new Date(data.leistungsdatum).toLocaleDateString(docLang === 'de' ? 'de-DE' : docLang === 'en' ? 'en-US' : 'pt-PT', { day: '2-digit', month: 'numeric', year: 'numeric' })}</td>
                                         </tr>
                                     )}
                                     {/* Recipient VAT ID (for Reverse Charge) */}
                                     {data.recipientVatId && (
                                         <tr>
-                                            <td style={{ fontSize: '0.75rem' }}>USt-IdNr. Empf.:</td>
+                                            <td style={{ fontSize: '0.75rem' }}>{legalText.recipientVatLabel}:</td>
                                             <td style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>{data.recipientVatId}</td>
                                         </tr>
                                     )}
@@ -376,7 +422,7 @@ const InvoicePaper = forwardRef(({ data, totals }, ref) => {
                     {pageIndex === totalPages - 1 && (data.kleinunternehmer === true || data.kleinunternehmer === 'true') && (
                         <div style={{ marginTop: '16px', padding: '10px 14px', background: '#eff6ff', borderLeft: '3px solid #3b82f6', borderRadius: '4px' }}>
                             <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e40af', fontWeight: '600' }}>
-                                {data.kleinunternehmerText || 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.'}
+                                {data.kleinunternehmerText || legalText.kleinunternehmer}
                             </p>
                         </div>
                     )}
@@ -385,8 +431,8 @@ const InvoicePaper = forwardRef(({ data, totals }, ref) => {
                     {pageIndex === totalPages - 1 && data.reverseCharge && (
                         <div style={{ marginTop: '16px', padding: '10px 14px', background: '#faf5ff', borderLeft: '3px solid #8b5cf6', borderRadius: '4px' }}>
                             <p style={{ margin: 0, fontSize: '0.78rem', color: '#6d28d9', fontWeight: '600' }}>
-                                Steuerschuldnerschaft des Leistungsempfängers gemäß §13b UStG (Reverse Charge)
-                                {data.recipientVatId && ` — USt-IdNr. des Empfängers: ${data.recipientVatId}`}
+                                {legalText.reverseCharge}
+                                {data.recipientVatId && ` — ${legalText.recipientVat}: ${data.recipientVatId}`}
                             </p>
                         </div>
                     )}

@@ -189,8 +189,8 @@ const Impressum = () => {
                 </div>
             </header>
 
-            <div style={{ maxWidth: '900px', margin: '0 auto', padding: '48px 24px' }}>
-                <h1 style={{ fontSize: '2.5rem', fontWeight: '800', marginBottom: '8px', color: '#f1f5f9' }}>
+            <div style={{ maxWidth: '900px', margin: '0 auto', padding: '32px 16px' }}>
+                <h1 style={{ fontSize: 'clamp(1.6rem, 5vw, 2.5rem)', fontWeight: '800', marginBottom: '8px', color: '#f1f5f9' }}>
                     {TI.title}
                 </h1>
                 <p style={{ color: '#64748b', marginBottom: '48px', fontSize: '1rem' }}>
@@ -199,7 +199,7 @@ const Impressum = () => {
 
                 {/* Bayenderi Group Prestige Section */}
                 <div style={{
-                    padding: '32px',
+                    padding: 'clamp(16px, 4vw, 32px)',
                     background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.08) 100%)',
                     borderRadius: '20px',
                     border: '2px solid rgba(99,102,241,0.3)',
@@ -222,18 +222,20 @@ const Impressum = () => {
                             <div style={{
                                 width: '48px', height: '48px', borderRadius: '12px',
                                 background: 'linear-gradient(135deg, #f59e0b, #f97316)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0
                             }}>
                                 <Building2 size={24} color="white" />
                             </div>
-                            <div>
-                                <h2 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#fbbf24', margin: 0 }}>
+                            <div style={{ minWidth: 0 }}>
+                                <h2 style={{ fontSize: '1.2rem', fontWeight: '800', color: '#fbbf24', margin: 0 }}>
                                     {TI.bayenderiGroup}
                                 </h2>
-                                <p style={{ fontSize: '0.85rem', color: '#a5b4fc', margin: '4px 0 0 0' }}>
+                                <p style={{ fontSize: '0.82rem', color: '#a5b4fc', margin: '4px 0 0 0' }}>
                                     {TI.bayenderiDesc}
                                 </p>
                             </div>
+                        </div>
 
                         <div style={{
                             padding: '20px',
@@ -244,7 +246,7 @@ const Impressum = () => {
                         }}>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                                 <Award size={20} style={{ color: '#fbbf24', marginTop: '2px', flexShrink: 0 }} />
-                                <div>
+                                <div style={{ minWidth: 0 }}>
                                     <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#fbbf24', margin: '0 0 8px 0' }}>
                                         {TI.bayenderiGmbH}
                                     </h3>
@@ -256,9 +258,6 @@ const Impressum = () => {
                                 </div>
                             </div>
                         </div>
-                        </div>
-
-
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                             <div style={{

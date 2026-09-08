@@ -113,6 +113,64 @@ const Landing = () => {
                 </div>
             </section>
 
+            {/* --- Positioning --- */}
+            <section className="landing-positioning-section">
+                <div className="container">
+                    <div className="positioning-layout">
+                        <motion.div
+                            initial={{ opacity: 0, y: 24 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-80px" }}
+                            transition={{ duration: 0.7 }}
+                            className="positioning-copy"
+                        >
+                            <span className="section-eyebrow">{t('positioningEyebrow')}</span>
+                            <h2 className="section-title positioning-title">{t('positioningTitle')}</h2>
+                            <p className="positioning-description">{t('positioningDesc')}</p>
+                            <div className="positioning-actions">
+                                <Link to="/login" className="positioning-primary-btn">
+                                    {t('getStartedFree')} <ArrowRight size={18} />
+                                </Link>
+                                <button onClick={handleLiveDemo} disabled={isDemoLoading} className="positioning-secondary-btn">
+                                    {t('tryInteractiveDemo')}
+                                </button>
+                            </div>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 24 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-80px" }}
+                            transition={{ duration: 0.7, delay: 0.1 }}
+                            className="positioning-card"
+                        >
+                            <div className="positioning-card-header">
+                                <div>
+                                    <span>{t('positioningCardLabel')}</span>
+                                    <strong>{t('positioningCardTitle')}</strong>
+                                </div>
+                                <Shield size={22} />
+                            </div>
+                            <div className="positioning-points">
+                                {[
+                                    ['positioningPoint1', Zap],
+                                    ['positioningPoint2', CheckCircle],
+                                    ['positioningPoint3', Globe],
+                                    ['positioningPoint4', Smartphone],
+                                ].map(([key, Icon]) => (
+                                    <div className="positioning-point" key={key}>
+                                        <div className="positioning-point-icon">
+                                            <Icon size={16} />
+                                        </div>
+                                        <span>{t(key)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
+            </section>
+
             {/* --- Bento Features --- */}
             <section id="features" className="landing-features-grid">
                 <div className="container">
@@ -218,7 +276,7 @@ const Landing = () => {
                         >Cookie Einstellungen</button>
                     </div>
                     <div className="footer-copyright">
-                        © 2026 BayFatura. All rights reserved. | Made in PT
+                        © 2026 BayFatura. All rights reserved.
                     </div>
                 </div>
             </footer>

@@ -13,7 +13,7 @@ import QuickAddExpenseModal from '../components/QuickAddExpenseModal';
 import PremiumModal from '../components/PremiumModal';
 import LoadingPage from '../components/LoadingPage';
 import { generateDemoData } from '../lib/demoDataGenerator';
-import { db } from '../lib/firebase';
+import { getDb } from '../lib/firebase';
 
 const FREE_PLAN_LIMIT = 5;
 
@@ -196,6 +196,7 @@ const Dashboard = () => {
 
         setIsMatching(true);
         try {
+            const db = getDb(currentUser?._db);
             // Match up to 3 for demo/speed or all of them
             const toMatch = unpaidInvoices.slice(0, 3);
             
@@ -422,7 +423,9 @@ const Dashboard = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="table-scroll">
+                        <>
+                        {/* Desktop table */}
+                        <div className="table-scroll dashboard-desktop-table">
                         <table className="modern-table">
                             <thead>
                                 <tr>
@@ -450,6 +453,27 @@ const Dashboard = () => {
                             </tbody>
                         </table>
                         </div>
+                        {/* Mobile card list */}
+                        <div className="dashboard-mobile-cards">
+                            {invoices.slice(0, 5).map(inv => (
+                                <Link to={`/invoice/${inv.id}`} key={inv.id} className="mobile-invoice-card">
+                                    <div className="mic-top">
+                                        <span className="mic-number">{inv.invoiceNumber}</span>
+                                        <span className={`badge ${inv.status === 'overdue' ? 'danger' : inv.status === 'sent' ? 'info' : 'success'}`}>
+                                            {t(inv.status || 'paid')}
+                                        </span>
+                                    </div>
+                                    <div className="mic-customer">{inv.recipientName}</div>
+                                    <div className="mic-bottom">
+                                        <span className="mic-date">{new Date(inv.date).toLocaleDateString(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE')}</span>
+                                        <span className="mic-amount tabular-nums">
+                                            {new Intl.NumberFormat(appLanguage === 'tr' ? 'tr-TR' : appLanguage === 'en' ? 'en-US' : 'de-DE', { style: 'currency', currency: inv.currency || 'EUR' }).format(inv.total)}
+                                        </span>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                        </>
                     )}
                 </div>
             </div>

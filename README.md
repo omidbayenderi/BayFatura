@@ -2,9 +2,9 @@
 
 BayFatura, KOBİ'ler ve büyüyen ekipler için tasarlanmış; fatura, müşteri, ürün, ödeme, ekip yönetimi ve finansal içgörü akışlarını tek yerde toplayan React/Firebase tabanlı bir SaaS uygulamasıdır. Uygulama; Gemini destekli AI modülleri, Almanya/Portekiz odaklı e-fatura ve vergi uyumluluğu, native mobil hazırlığı ve staging odaklı CI/CD altyapısıyla geliştirilmektedir.
 
-## 🚀 Mevcut Durum (26 Mayıs 2026)
+## 🚀 Mevcut Durum (06 Haziran 2026)
 
-BayFatura aktif olarak **Web staging smoke test tamamlandıktan sonra Android gerçek cihaz beta hazırlığı** aşamasındadır. Web App kritik kullanıcı akışları staging üzerinde Safari/Chrome manuel smoke testinden geçmiştir; Android debug build emülatörde çalışır, Google native giriş doğrulanmıştır ve mobil shell UX'i native uygulama hissine yaklaştırılmıştır. Production'a geçiş hâlâ kontrollü, manuel ve ayrı bir onay süreciyle yapılmalıdır.
+BayFatura aktif olarak **production SEO Growth Engine ve kontrollü müşteri edinme hazırlığı** aşamasındadır. Web App kritik kullanıcı akışları staging üzerinde Safari/Chrome manuel smoke testinden geçmiştir; Android debug build emülatörde çalışır, Google native giriş doğrulanmıştır ve mobil shell UX'i native uygulama hissine yaklaştırılmıştır. Production tarafında SEO Agent artık DCC panelinden manuel çalıştırılabilir, Gemini ile içerik/programmatik landing page üretebilir ve public SEO sayfaları sitemap üzerinden indexlenebilir hale gelmiştir. Production'a yönelik büyük değişiklikler hâlâ kontrollü, manuel ve ayrı onay süreciyle yapılmalıdır.
 
 ### 🎯 Operasyonel Durum
 - ✅ **Aktif geliştirme dalı:** `preview-test-staging`
@@ -22,7 +22,17 @@ BayFatura aktif olarak **Web staging smoke test tamamlandıktan sonra Android ge
 - ✅ **Android native kamera:** Gider/fiş ekranında Capacitor Camera entegrasyonu aktif, web dosya seçici fallback korunur
 - ✅ **Android native push opt-in:** Bildirimler ekranından kullanıcı kontrollü FCM token kaydı bağlanmış
 - ✅ **Android mobile shell UX:** Alt navigasyon ve açılır menü yuvarlatılmış, güvenli alanlara uyumlu ve native app hissine uygun hale getirilmiş
+- ✅ **Mobile bottom navigation polish:** Alt menü arka planı `rgb(26, 36, 54)` tonuna taşındı; aktif ikon çentiği seçili ikonun gerçek merkezine göre hizalanır, ikon çevresinde yaklaşık `1.5px` boşluk bırakır ve menü öğeleri role göre accent renklere sahiptir
+- ✅ **Mobile "Daha Fazla" drawer behavior:** Mobil drawer kapalıyken tamamen ekran dışına alınır, görünmez ve tıklanamaz kalır; yalnızca "Daha Fazla" ikonuna basıldığında açılır
+- ✅ **PWA / Ana Ekran ikonu:** iOS Safari "Ana Ekrana Ekle" önizlemesinde kullanılan Apple touch icon dahil app ikonları `#1A2436` (`rgb(26, 36, 54)`) arka planla flatten edildi
+- ✅ **Mobil profil fotoğrafı:** Profil avatarı artık Firestore içine Base64 olarak yazılmaz; mobil/kamera görselleri 512px JPEG'e normalize edilip Firebase Storage'a yüklenir ve kullanıcı profilindeki `avatar` alanına download URL kaydedilir
 - ✅ **Firestore WebView uyumu:** Realtime listen bağlantıları için `experimentalAutoDetectLongPolling` aktif edilerek Android/iOS WebView ve Safari varyantlarına karşı daha dayanıklı yapı kurulmuş
+- ✅ **Production SEO Agent:** `/dcc-portal` üzerinden ülke ve modül seçilerek manuel tetiklenebilir; nightly `seoAgent` cron'u 03:00 Berlin saatinde çalışacak şekilde tanımlıdır
+- ✅ **Gemini model güncellemesi:** SEO ve AI Cloud Function çağrıları `gemini-2.5-flash-lite` varsayılanına taşındı; eski `gemini-1.5-flash` kaynaklı 404 hatası giderildi
+- ✅ **Programmatic SEO pages:** `seo_content_queue` içindeki `programmatic_page` içerikleri public Firestore rules ile okunabilir ve SEO landing route'larında render edilir
+- ✅ **SEO UI polish:** AI'dan gelen JSON/code-fence formatlı yanıtlar normalize edilir; SEO landing sayfalarında raw JSON yerine temiz hero, CTA, feature, FAQ ve related layout gösterilir
+- ✅ **Sitemap & indexability:** `public/sitemap.xml` programmatik SEO sayfalarını içerir; sitemap'in tarayıcıda ham XML görünmesi normaldir
+- ✅ **Public SEO console cleanup:** Public SEO rotalarında App Check/reCAPTCHA başlatılmaz; noisy `Content-Security-Policy-Report-Only` header'ı kaldırıldı
 - ✅ **Deploy edilen staging functions:** `stripeWebhook`, `proxyImage`, `scanReceipt`, `sendInvoiceEmail`, `sendInvitationEmail`, `syncUserPlan`, `syncAllAuthUsers`, `analyzeFinancials`, `analyzeBankStatement`, `acceptTeamInvitation`, `checkOverdueInvoices`, `processRecurringTemplates`
 - ⚠️ **Microsoft Sign-In config:** Azure/Entra App Registration ve Firebase Microsoft provider ayarları tamamlandıktan sonra staging üzerinde canlı test edilmelidir
 - ⚠️ **Resend:** Test modunda sadece doğrulanmış/test alıcılara mail gider; genel ekip daveti için Resend domain doğrulaması ve domain tabanlı `from` adresi gerekir. Domain doğrulanana kadar manuel davet linki fallback'i kullanılabilir
@@ -61,8 +71,9 @@ BayFatura aktif olarak **Web staging smoke test tamamlandıktan sonra Android ge
 
 ### 🤖 AI & Akıllı Özellikler
 - **Magic Bank Matcher:** CSV/MT940 ekstreleri Google Genkit AI ile faturalarla saniyeler içinde eşleştirir.
-- **AI Vision Agent:** Gemini 1.5 Flash Vision ile fiş/makbuz otomatik okuma, vergi ve kategori analizi.
+- **AI Vision Agent:** Gemini 2.5 Flash Lite destekli fiş/makbuz otomatik okuma, vergi ve kategori analizi.
 - **AI Financial Oracle:** 3 aylık nakit akışı ve vergi yükü tahmini.
+- **SEO Growth Engine:** DCC üzerinden çalışan SEO Agent; ülke bazlı keyword gap, blog taslakları, programmatik landing page üretimi, rank tracking, backlink scout ve teknik audit modülleri.
 - **Real-Time Notifications:** Firestore `onSnapshot` tabanlı tüm cihazlarda anlık bildirim sistemi.
 - **Real-Time Auth-Firestore Senkronizasyonu:** `onUserCreated` ve `onUserDeleted` sunucu tarafı Cloud Function tetikleyicileri ile gerçek zamanlı profil yönetimi.
 - **DCC 'Sync Auth Profiles' Entegrasyonu:** Super Adminler için tek tıkla çalışan ve eksik profil belgelerini üreten Callable Cloud Function.
@@ -91,6 +102,10 @@ BayFatura aktif olarak **Web staging smoke test tamamlandıktan sonra Android ge
 - **Android Receipt Capture:** Android native shell içinde gider/fiş ekranı Capacitor Camera ile çalışır; web ortamında mevcut dosya seçici korunur.
 - **Android Push Opt-In:** Bildirimler sayfasında kullanıcı aksiyonuyla push izni istenir ve FCM token kullanıcı belgesine kaydedilir.
 - **Mobile Shell Polish:** Alt navigasyon ve mobil drawer, güvenli alanlara uyumlu yuvarlatılmış app bar/drawer düzenine taşındı.
+- **Mobile Bottom Nav Notch:** Aktif menü ikonu 52px dairesel buton olarak yükselir; alt menü yüzeyi ikon çevresinden yaklaşık `1.5px` boşlukla maskelenir ve çentik her aktif route için DOM ölçümüyle hizalanır.
+- **Mobile Drawer Visibility:** "Daha Fazla" drawer'ı kapalı durumdayken `transform`, `opacity`, `visibility` ve `pointer-events` ile tamamen gizlenir; kullanıcı yalnızca ilgili alt menü ikonuna bastığında drawer etkileşime açılır.
+- **PWA Icon Background:** `public/apple-touch-icon.png` ve install ikonları koyu `#1A2436` arka planla hazırlanır; Safari ana ekran ekleme önizlemesinde beyaz logo zemini görünmemelidir.
+- **Profile Avatar Upload:** Mobil kamera/galeri avatarları önce 512px JPEG'e sıkıştırılır, `users/{uid}/assets/` altında Storage'a yüklenir ve Firestore kullanıcı dokümanında yalnızca URL saklanır.
 - **Generated Native Strategy:** `android/` ve `ios/` klasörleri üretilebilir native çıktılar olarak ele alınır; kalıcı Android patchleri `scripts/patch-android-capacitor.mjs` ile sync sonrası uygulanır.
 
 
@@ -102,7 +117,7 @@ BayFatura aktif olarak **Web staging smoke test tamamlandıktan sonra Android ge
 | Mobile Native | Capacitor 8 + iOS (SPM) + Android (Gradle) |
 | Backend | Firebase Auth, Cloud Functions, Firestore, Storage |
 | Cloud Functions Runtime | Node.js 22 |
-| AI Engine | Google Genkit + Gemini (server-side functions) |
+| AI Engine | Google Genkit + Gemini 2.5 Flash Lite (server-side functions) |
 | Emailing | Resend API (Automated HTML Templates) |
 | Testing | Vitest + Testing Library (Unit/Integration) |
 | Security Rules Testing | Firebase Emulator + `@firebase/rules-unit-testing` |
@@ -168,12 +183,17 @@ src/lib/
 ## 🔧 Bilinen Mimari Notlar
 
 - **Firebase Storage CORS:** `proxyImage` Cloud Function ile sunucu tarafında çözüldü.
+- **Profil avatar Storage akışı:** Kullanıcı profil fotoğrafı için Firestore'da Base64 saklanmaz. `src/pages/settings/ProfileSettings.jsx` mobil/kamera dosyasını normalize eder, `uploadToStorage` ile Storage'a yollar ve eski Storage avatarını arka planda temizler.
 - **Staging kaynak dalı:** `preview-test-staging`, aktif geliştirme ve test dalıdır.
 - **Firebase CLI kullanımı:** CI ve lokal komutlarda `npx -y firebase-tools@latest` tercih edilir.
 - **Android native klasör stratejisi:** `android/` klasörü repoda takip edilmez; temiz ortamda `npx cap add android`, `npx cap sync android` ve `node scripts/patch-android-capacitor.mjs` sırası kullanılmalıdır.
 - **Android cihaz testi:** Runbook `docs/android-device-runbook.md`, smoke test matrisi `docs/android-smoke-test.md`.
 - **Android Firebase config:** Lokal `android/app/google-services.json` repoya commit edilmez; debug ve release package client'larını içeren dosya Firebase Console'dan indirilir.
 - **Firestore WebView transport:** `initializeFirestore` içinde `experimentalAutoDetectLongPolling: true` aktiftir; WebView/Safari realtime listen kanalında görülen access-control retry gürültüsünü azaltmak içindir.
+- **Public SEO App Check opt-out:** `src/lib/firebase.js` içinde programmatik SEO route'ları App Check/reCAPTCHA başlatmaz; bu sayfalar public indexlenebilir içerik sunduğu için console 401/access-control gürültüsü azaltılır.
+- **SEO Gemini modeli:** Functions tarafında varsayılan model `gemini-2.5-flash-lite`; eski `gemini-1.5-flash` kullanılmamalıdır.
+- **SEO JSON normalization:** Gemini cevapları code fence veya gevşek JSON döndürürse `functions/index.js` ve `src/pages/seo/SeoLandingPage.jsx` normalize eder; raw JSON kullanıcıya gösterilmemelidir.
+- **CSP report-only:** Hosting header'larında `Content-Security-Policy-Report-Only` kaldırıldı. Gerçek enforcement istenirse endpoint ve `report-to` stratejisiyle ayrı ele alınmalıdır.
 - **Microsoft Sign-In:** Azure/Entra redirect URI staging için `https://bayfatura-staging.firebaseapp.com/__/auth/handler`; production için production Firebase auth handler kullanılmalıdır.
 - **Resend domain:** Genel ekip daveti ve fatura e-postaları için doğrulanmış domain gerekir; detaylar `docs/resend-domain-setup.md`.
 - **Team invite manual fallback:** Resend e-postası test/domain kısıtı nedeniyle başarısız olursa `/accept-invite` linki uygulama origin'i üzerinden oluşturulur. Staging'de `bayfatura-staging.web.app`, production'da `bayfatura.com` üretir.
@@ -322,5 +342,23 @@ src/lib/
 - Production reconciliation: `preview-test-staging` değişiklikleri `main` ile kontrollü PR'lar üzerinden birleştirilmelidir.
 
 ---
+## 📈 36. SEO Growth Engine Activation (Completed — 05 Haziran 2026)
+
+### 🤖 36.1 Gemini SEO Agent Stabilization
+- **Model migration:** SEO Agent ve AI çağrıları `gemini-2.5-flash-lite` varsayılanına taşındı; `gemini-1.5-flash` API 404 problemi çözüldü.
+- **DCC manual trigger:** Developer Control Center içinden ülke (`DE`, `AT`, `PT`, `ES`, `FR`, `EN`) ve modül (`all` dahil) seçilerek SEO Agent manuel çalıştırılabilir.
+- **Structured parsing:** Gemini yanıtlarındaki Markdown code fence, raw JSON ve gevşek JSON varyantları server/client tarafında temizlenir.
+
+### 🌍 36.2 Programmatic SEO Publishing
+- **Public landing routes:** `/de/rechnung-erstellen/:slug`, `/pt/criar-fatura/:slug`, `/es/crear-factura/:slug`, `/fr/creer-facture/:slug`, `/en/invoice-template/:slug`.
+- **Firestore publishing rules:** `seo_content_queue` içinde sadece `type == 'programmatic_page'` ve `status in ['ready_to_publish', 'published']` olan dokümanlar public okunur; diğer SEO koleksiyonları super-admin kapsamındadır.
+- **Sitemap:** `public/sitemap.xml` programmatik sayfaları ve hreflang hedeflerini içerir. XML'in tarayıcıda düz yazı gibi görünmesi normaldir.
+
+### 🎨 36.3 SEO Landing UX & Console Cleanup
+- **Landing UI:** SEO sayfalarında temiz hero, CTA, feature kartları, FAQ ve related links düzeni uygulanır; raw AI JSON gösterilmez.
+- **App Check:** Public SEO route'larında reCAPTCHA/App Check başlatılmaz; indexlenebilir sayfalarda gereksiz 401 ve access-control console gürültüsü azaltılır.
+- **Hosting headers:** Noisy CSP report-only header kaldırıldı; HSTS, frame, content-type, referrer ve permission policy header'ları korunur.
+
+---
 © 2026 BayFatura Cloud — Innovation in Finance.
-*Last Updated: 26 Mayıs 2026 (Web Final Smoke Test Completed)*
+*Last Updated: 06 Haziran 2026 (PWA Icon & Mobile Profile Avatar Stabilized)*

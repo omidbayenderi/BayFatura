@@ -216,6 +216,20 @@ const ai = genkit({
     plugins: [googleAI()],
 });
 
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const getGeminiModelName = () => process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+const getSeoGeminiModelName = () => process.env.SEO_GEMINI_MODEL || getGeminiModelName();
+const geminiModel = () => googleAI.model(getGeminiModelName());
+const seoGeminiModel = () => googleAI.model(getSeoGeminiModelName());
+
+const summarizeAiError = (error) => {
+    const message = error?.message || String(error);
+    if (message.includes('RESOURCE_EXHAUSTED') || message.includes('429 Too Many Requests') || message.toLowerCase().includes('quota')) {
+        return `Gemini quota exhausted for ${getSeoGeminiModelName()}. Try again later or configure SEO_GEMINI_MODEL / billing quota.`;
+    }
+    return message;
+};
+
 // ─── 1. Stripe Webhook Handler ────────────────────────────────────────────────────
 export const stripeWebhook = euFunctions.https.onRequest(async (req, res) => {
     if (!getStripeSecret()) {
@@ -495,7 +509,7 @@ export const analyzeBankStatement = runWith({ enforceAppCheck: true }).https.onC
         `;
 
         const response = await ai.generate({
-            model: googleAI.model('gemini-1.5-flash'),
+            model: geminiModel(),
             prompt: prompt,
             output: {
                 format: 'json',
@@ -530,7 +544,7 @@ export const scanReceipt = runWith({ enforceAppCheck: true }).https.onCall(async
 
     try {
         const response = await ai.generate({
-            model: googleAI.model('gemini-1.5-flash'),
+            model: geminiModel(),
             messages: [
                 {
                     role: 'user',
@@ -598,7 +612,7 @@ export const analyzeFinancials = runWith({ enforceAppCheck: true }).https.onCall
         `;
 
         const response = await ai.generate({
-            model: googleAI.model('gemini-1.5-flash'),
+            model: geminiModel(),
             prompt: prompt,
             output: {
                 format: 'json',
@@ -1684,7 +1698,7 @@ Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
 
     const aiInstance = genkit({ plugins: [googleAI()] });
     const response = await aiInstance.generate({
-        model: googleAI.model('gemini-1.5-flash'),
+        model: geminiModel(),
         prompt: prompts[agentType],
     });
 
@@ -2223,10 +2237,9 @@ const SEO_KEYWORD_MAP = {
 const SEO_COUNTRY_PRIORITY = ['DE', 'AT', 'PT', 'ES', 'FR', 'EN'];
 
 // ─── Yardımcı: Gemini ile içerik analizi ──────────────────────────────────────
-const getSeoAI = () => genkit({ plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })] });
+// SEO Agent global ai instance'ını kullanır (index.js başındaki 'ai' değişkeni)
 
 async function generateSeoContent({ country, keyword, contentType, existingTitle = '' }) {
-    const ai = getSeoAI();
     const config = SEO_KEYWORD_MAP[country];
 
     const prompts = {
@@ -2267,13 +2280,57 @@ Output as JSON array: [{keyword, difficulty: low|medium|high, intent: informatio
     };
 
     const response = await ai.generate({
-        model: 'googleai/gemini-1.5-flash',
+        model: seoGeminiModel(),
         prompt: prompts[contentType],
         config: { temperature: 0.3 },
     });
 
     return response.text;
 }
+
+const stripJsonCodeFence = (value = '') => String(value)
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+const parseJsonResponse = (value, fallback) => {
+    const cleaned = stripJsonCodeFence(value);
+    try {
+        return JSON.parse(cleaned);
+    } catch {
+        const start = cleaned.indexOf('{');
+        const end = cleaned.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+            try {
+                return JSON.parse(cleaned.slice(start, end + 1));
+            } catch {
+                return fallback;
+            }
+        }
+
+        return fallback;
+    }
+};
+
+const parseJsonArrayResponse = (value, fallback = []) => {
+    const cleaned = stripJsonCodeFence(value);
+    try {
+        return JSON.parse(cleaned);
+    } catch {
+        const start = cleaned.indexOf('[');
+        const end = cleaned.lastIndexOf(']');
+        if (start !== -1 && end !== -1 && end > start) {
+            try {
+                return JSON.parse(cleaned.slice(start, end + 1));
+            } catch {
+                return fallback;
+            }
+        }
+
+        return fallback;
+    }
+};
 
 // ─── Modül 1: Technical SEO Audit ─────────────────────────────────────────────
 async function runTechnicalAudit() {
@@ -2324,6 +2381,8 @@ async function runContentIntelligence(country) {
     const config = SEO_KEYWORD_MAP[country];
     const now = new Date().toISOString();
     const queued = [];
+    const skipped = [];
+    const errors = [];
 
     // Keyword gap analizi — her ülke için haftada 1
     const gapKey = `keyword_gap_${country}_${new Date().toISOString().slice(0, 7)}`;
@@ -2337,8 +2396,7 @@ async function runContentIntelligence(country) {
                 contentType: 'keyword_gap',
             });
 
-            let gaps = [];
-            try { gaps = JSON.parse(gapAnalysis); } catch { gaps = []; }
+            const gaps = parseJsonArrayResponse(gapAnalysis);
 
             await db.collection('seo_content_queue').doc(gapKey).set({
                 type: 'keyword_gap',
@@ -2351,8 +2409,12 @@ async function runContentIntelligence(country) {
             queued.push({ type: 'keyword_gap', country });
             console.log(`📊 Keyword gap analizi tamamlandı: ${country} (${gaps.length} fırsat)`);
         } catch (err) {
-            console.error(`Keyword gap hatası (${country}):`, err.message);
+            const message = summarizeAiError(err);
+            console.error(`Keyword gap hatası (${country}):`, message);
+            errors.push({ type: 'keyword_gap', country, message });
         }
+    } else {
+        skipped.push({ type: 'keyword_gap', country, reason: 'already_exists' });
     }
 
     // En yüksek öncelikli long-tail keyword için blog taslağı
@@ -2381,11 +2443,15 @@ async function runContentIntelligence(country) {
             queued.push({ type: 'blog_post', country, keyword: targetKeyword });
             console.log(`✍️ Blog taslağı oluşturuldu: "${targetKeyword}" (${country})`);
         } catch (err) {
-            console.error(`Blog taslağı hatası (${country}):`, err.message);
+            const message = summarizeAiError(err);
+            console.error(`Blog taslağı hatası (${country}):`, message);
+            errors.push({ type: 'blog_post', country, keyword: targetKeyword, message });
         }
+    } else {
+        skipped.push({ type: 'blog_post', country, keyword: targetKeyword, reason: 'already_exists' });
     }
 
-    return queued;
+    return { items: queued, created: queued.length, skipped, errors };
 }
 
 // ─── Modül 3: Programmatic SEO Generator ──────────────────────────────────────
@@ -2393,13 +2459,21 @@ async function generateProgrammaticPages(country) {
     const config = SEO_KEYWORD_MAP[country];
     const now = new Date().toISOString();
     const generated = [];
+    const skipped = [];
+    const errors = [];
 
     for (const template of config.programmaticTemplates) {
         const pageId = `prog_${country.toLowerCase()}_${template.slug}`;
         const existing = await db.collection('seo_content_queue').doc(pageId).get();
 
-        if (existing.exists && existing.data()?.status === 'published') continue;
-        if (existing.exists && existing.data()?.contentGeneratedAt) continue;
+        if (existing.exists && existing.data()?.status === 'published') {
+            skipped.push({ country, slug: template.slug, reason: 'already_published' });
+            continue;
+        }
+        if (existing.exists && existing.data()?.contentGeneratedAt) {
+            skipped.push({ country, slug: template.slug, reason: 'already_generated' });
+            continue;
+        }
 
         try {
             const pageContent = await generateSeoContent({
@@ -2409,10 +2483,13 @@ async function generateProgrammaticPages(country) {
                 existingTitle: template.title,
             });
 
-            let content = {};
-            try { content = JSON.parse(pageContent); } catch {
-                content = { h1: template.title, hero: pageContent.slice(0, 200), features: [], cta: 'Kostenlos starten', faq: [] };
-            }
+            const content = parseJsonResponse(pageContent, {
+                h1: template.title,
+                hero: stripJsonCodeFence(pageContent).slice(0, 200),
+                features: [],
+                cta: 'Kostenlos starten',
+                faq: [],
+            });
 
             const metaDesc = await generateSeoContent({
                 country,
@@ -2429,7 +2506,7 @@ async function generateProgrammaticPages(country) {
                 urlPath: `/${config.lang}/rechnung-erstellen/${template.slug}`,
                 title: template.title,
                 content,
-                metaDescription: metaDesc.trim().slice(0, 155),
+                metaDescription: stripJsonCodeFence(metaDesc).slice(0, 155),
                 status: 'ready_to_publish',
                 contentGeneratedAt: now,
                 createdAt: now,
@@ -2438,11 +2515,13 @@ async function generateProgrammaticPages(country) {
             generated.push({ country, slug: template.slug, title: template.title });
             console.log(`🚀 Programmatik sayfa hazır: ${country}/${template.slug}`);
         } catch (err) {
-            console.error(`Programmatik sayfa hatası (${country}/${template.slug}):`, err.message);
+            const message = summarizeAiError(err);
+            console.error(`Programmatik sayfa hatası (${country}/${template.slug}):`, message);
+            errors.push({ country, slug: template.slug, message });
         }
     }
 
-    return generated;
+    return { items: generated, created: generated.length, skipped, errors };
 }
 
 // ─── Modül 4: Rank Tracker ─────────────────────────────────────────────────────
@@ -2552,12 +2631,14 @@ export const seoAgent = euFunctions
             try {
                 // Content Intelligence — her gün
                 const content = await runContentIntelligence(country);
-                report.results[country].content = content.length;
+                report.results[country].content = content.created;
+                if (content.errors.length) report.results[country].contentErrors = content.errors.length;
 
                 // Programmatik sayfalar — pazartesi ve perşembe
                 if (isWeekly || dayOfWeek === 4) {
                     const pages = await generateProgrammaticPages(country);
-                    report.results[country].programmaticPages = pages.length;
+                    report.results[country].programmaticPages = pages.created;
+                    if (pages.errors.length) report.results[country].programmaticPageErrors = pages.errors.length;
                 }
 
                 // Rank tracking — her gün
@@ -2601,8 +2682,8 @@ export const triggerSeoAgent = euFunctions.runWith({ timeoutSeconds: 540, memory
         console.log(`🔍 SEO Agent manuel tetikleme: ${country}/${module}`);
 
         let result = {};
-        if (module === 'content') result = await runContentIntelligence(country);
-        if (module === 'programmatic') result = await generateProgrammaticPages(country);
+        if (module === 'content') result.content = await runContentIntelligence(country);
+        if (module === 'programmatic') result.pages = await generateProgrammaticPages(country);
         if (module === 'backlinks') result.opps = await scoutBacklinkOpportunities(country);
         if (module === 'audit') result.issues = await runTechnicalAudit();
         if (module === 'all') {

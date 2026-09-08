@@ -3,7 +3,49 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { usePanel } from '../../context/PanelContext';
+import { uploadToStorage, deleteFromStorage } from '../../context/InvoiceContext';
 import { ArrowLeft, Camera, User, Mail, Shield, Key, Save, Check, Globe, CreditCard, AlertTriangle, Trash2 } from 'lucide-react';
+
+const AVATAR_MAX_DIMENSION = 512;
+const AVATAR_JPEG_QUALITY = 0.88;
+
+const normalizeAvatarFile = async (file) => {
+    const canUseOriginal = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size < 4.5 * 1024 * 1024;
+    if (canUseOriginal && file.size < 512 * 1024) return file;
+
+    const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+
+    const image = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = dataUrl;
+    });
+
+    const scale = Math.min(1, AVATAR_MAX_DIMENSION / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((nextBlob) => {
+            if (nextBlob) resolve(nextBlob);
+            else reject(new Error('Avatar image conversion failed'));
+        }, 'image/jpeg', AVATAR_JPEG_QUALITY);
+    });
+
+    return new File([blob], 'profile-avatar.jpg', { type: 'image/jpeg' });
+};
 
 const ProfileSettings = () => {
     const navigate = useNavigate();
@@ -62,17 +104,32 @@ const ProfileSettings = () => {
     };
 
     const handleAvatarChange = async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                if (updateUser) {
-                    setIsLoading(true);
-                    await updateUser({ ...currentUser, avatar: reader.result });
-                    setIsLoading(false);
+        const file = e.target.files?.[0];
+        e.target.value = '';
+
+        if (file && updateUser && currentUser?.uid) {
+            setIsLoading(true);
+            showToast(t('uploading'), 'info');
+
+            try {
+                const avatarFile = await normalizeAvatarFile(file);
+                const filename = `profile-avatar-${Date.now()}.jpg`;
+                const downloadUrl = await uploadToStorage(currentUser.uid, avatarFile, filename);
+
+                const result = await updateUser({ ...currentUser, avatar: downloadUrl });
+                if (!result.success) throw new Error(result.error || t('uploadFailed'));
+
+                if (currentUser.avatar?.startsWith('https://firebasestorage')) {
+                    deleteFromStorage(currentUser.avatar);
                 }
-            };
-            reader.readAsDataURL(file);
+
+                showToast(t('uploadSuccess'), 'success');
+            } catch (error) {
+                console.error('Avatar upload failed:', error);
+                showToast(error.message || t('uploadFailed'), 'error');
+            } finally {
+                setIsLoading(false);
+            }
         }
     };
 

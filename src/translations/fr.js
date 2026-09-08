@@ -128,6 +128,7 @@ export default {
     noData: 'Aucune donnée disponible',
     export: 'Exporter',
     amount: 'Montant',
+    recurringInvoices: 'Factures récurrentes',
     recurringDesc: 'Modèles pour la facturation régulière.',
     companySettings: 'Paramètres de l\'entreprise',
     generalInfo: 'Informations générales',

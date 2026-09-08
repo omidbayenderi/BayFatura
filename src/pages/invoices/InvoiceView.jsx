@@ -36,7 +36,7 @@ const InvoiceView = ({ type = 'invoice' }) => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { invoices, quotes, deleteInvoice, deleteQuote, saveInvoice, companyProfile, loading } = useInvoice();
-    const { t } = useLanguage();
+    const { t, invoiceLanguage } = useLanguage();
     const invoiceRef = useRef();
     const [searchParams] = useSearchParams();
     const [isLoading, setIsLoading] = useState(true);
@@ -282,7 +282,7 @@ const InvoiceView = ({ type = 'invoice' }) => {
         leistungsdatum: invoice.leistungsdatum || '',
         currency: invoice.currency || 'EUR',
         taxRate: invoice.taxRate || (isPortugal ? 23 : 19),
-        language: invoice.language,
+        language: invoiceLanguage || invoice.language,
 
         // Compliance fields
         senderCountry: companyProfile.country || 'PT',

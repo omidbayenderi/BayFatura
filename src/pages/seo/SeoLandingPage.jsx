@@ -30,6 +30,178 @@ const COUNTRY_SLUG_MAP = {
     en: { path: 'invoice-template', country: 'EN' },
 };
 
+const stripCodeFence = (value = '') => String(value)
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+const tryParseJson = (value) => {
+    if (!value || typeof value !== 'string') return null;
+
+    const cleaned = stripCodeFence(value);
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start === -1 || end === -1 || end <= start) return null;
+
+    try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+        return null;
+    }
+};
+
+const extractLooseJsonField = (value, field) => {
+    const cleaned = stripCodeFence(value);
+    const regex = new RegExp(`"${field}"\\s*:\\s*"([^"]*)`, 'i');
+    const match = cleaned.match(regex);
+    return match ? match[1] : '';
+};
+
+const tryParseLooseSeoJson = (value) => {
+    if (!value || typeof value !== 'string') return null;
+    const h1 = extractLooseJsonField(value, 'h1');
+    const hero = extractLooseJsonField(value, 'hero');
+    if (!h1 && !hero) return null;
+    return { h1, hero };
+};
+
+const cleanText = (value = '') => stripCodeFence(value)
+    .replace(/^\s*json\s*/i, '')
+    .replace(/^\{\s*/g, '')
+    .replace(/^"?(h1|hero|cta)"?\s*:\s*/i, '')
+    .replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeFaq = (items) => {
+    if (!Array.isArray(items)) return [];
+    return items
+        .map(item => ({
+            q: cleanText(item?.q || item?.question || ''),
+            a: cleanText(item?.a || item?.answer || ''),
+        }))
+        .filter(item => item.q && item.a);
+};
+
+const normalizeFeatures = (items) => {
+    if (!Array.isArray(items)) return [];
+    return items
+        .map(item => cleanText(typeof item === 'string' ? item : item?.text || item?.title || ''))
+        .filter(Boolean)
+        .slice(0, 6);
+};
+
+const normalizeSeoPage = (data) => {
+    const baseContent = data?.content || {};
+    const parsedFromContent = typeof baseContent === 'string' ? tryParseJson(baseContent) : null;
+    const parsedFromHero = typeof baseContent?.hero === 'string' ? tryParseJson(baseContent.hero) : null;
+    const looseFromHero = typeof baseContent?.hero === 'string' ? tryParseLooseSeoJson(baseContent.hero) : null;
+    const looseFromContent = typeof baseContent === 'string' ? tryParseLooseSeoJson(baseContent) : null;
+    const content = parsedFromHero || parsedFromContent || looseFromHero || looseFromContent || baseContent;
+
+    return {
+        ...data,
+        title: cleanText(data?.title || content?.h1 || ''),
+        metaDescription: cleanText(data?.metaDescription || content?.hero || data?.title || ''),
+        content: {
+            h1: cleanText(content?.h1 || data?.title || ''),
+            hero: cleanText(content?.hero || data?.metaDescription || ''),
+            features: normalizeFeatures(content?.features),
+            cta: cleanText(content?.cta || ''),
+            faq: normalizeFaq(content?.faq),
+        },
+    };
+};
+
+const styles = {
+    page: {
+        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        background: '#ffffff',
+        color: '#0f172a',
+    },
+    nav: {
+        padding: '14px clamp(18px, 4vw, 40px)',
+        borderBottom: '1px solid #e5e7eb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        position: 'sticky',
+        top: 0,
+        background: 'rgba(255,255,255,0.96)',
+        zIndex: 100,
+    },
+    hero: {
+        maxWidth: 960,
+        margin: '0 auto',
+        padding: 'clamp(54px, 8vw, 92px) 24px clamp(42px, 6vw, 72px)',
+        textAlign: 'center',
+    },
+    eyebrow: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '7px 12px',
+        borderRadius: 999,
+        background: '#ecfdf5',
+        color: '#047857',
+        fontSize: '0.82rem',
+        fontWeight: 700,
+        marginBottom: 18,
+    },
+    h1: {
+        fontSize: 'clamp(2rem, 5vw, 3.4rem)',
+        fontWeight: 800,
+        lineHeight: 1.08,
+        margin: '0 auto 20px',
+        maxWidth: 880,
+        color: '#0f172a',
+    },
+    lead: {
+        fontSize: 'clamp(1rem, 2vw, 1.18rem)',
+        color: '#475569',
+        lineHeight: 1.75,
+        maxWidth: 720,
+        margin: '0 auto 32px',
+    },
+    primaryButton: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 48,
+        background: '#2563eb',
+        color: '#fff',
+        padding: '13px 24px',
+        borderRadius: 10,
+        textDecoration: 'none',
+        fontWeight: 750,
+        fontSize: '1rem',
+        boxShadow: '0 10px 22px rgba(37,99,235,0.22)',
+    },
+    section: {
+        maxWidth: 1080,
+        margin: '0 auto',
+        padding: '56px 24px',
+    },
+    featureGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: 18,
+    },
+    card: {
+        padding: 22,
+        background: '#f8fafc',
+        borderRadius: 8,
+        border: '1px solid #e2e8f0',
+    },
+    ctaBand: {
+        background: '#0f172a',
+        color: '#fff',
+        padding: '52px 24px',
+        textAlign: 'center',
+    },
+};
+
 const SeoLandingPage = () => {
     const { lang, slug } = useParams();
     const navigate = useNavigate();
@@ -53,10 +225,11 @@ const SeoLandingPage = () => {
                     return;
                 }
 
-                setPage(snap.data());
+                const normalizedPage = normalizeSeoPage(snap.data());
+                setPage(normalizedPage);
 
                 // Meta tags
-                const data = snap.data();
+                const data = normalizedPage;
                 document.title = `${data.title} | BayFatura`;
                 let metaDesc = document.querySelector('meta[name="description"]');
                 if (!metaDesc) { metaDesc = document.createElement('meta'); metaDesc.name = 'description'; document.head.appendChild(metaDesc); }
@@ -101,44 +274,46 @@ const SeoLandingPage = () => {
     const content = page.content || {};
     const features = Array.isArray(content.features) ? content.features : [];
     const faq = Array.isArray(content.faq) ? content.faq : [];
+    const hasFeatures = features.length > 0;
 
     return (
-        <div style={{ fontFamily: 'Inter, sans-serif', background: '#fff', color: '#1e293b' }}>
+        <div style={styles.page}>
             {/* Nav */}
-            <nav style={{ padding: '16px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: '#fff', zIndex: 100 }}>
+            <nav style={styles.nav}>
                 <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
                     <img src="/logo.png" alt="BayFatura" style={{ height: 32 }} />
                     <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b' }}>BayFatura</span>
                 </Link>
-                <Link to={langCfg.ctaUrl} style={{ background: '#2563eb', color: '#fff', padding: '10px 20px', borderRadius: 10, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+                <Link to={langCfg.ctaUrl} style={{ ...styles.primaryButton, minHeight: 44, padding: '10px 18px', fontSize: '0.92rem', boxShadow: 'none' }}>
                     {langCfg.cta}
                 </Link>
             </nav>
 
             {/* Hero */}
-            <section style={{ maxWidth: 800, margin: '0 auto', padding: '64px 24px 48px', textAlign: 'center' }}>
-                <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', fontWeight: 800, lineHeight: 1.15, marginBottom: 20, color: '#0f172a' }}>
+            <section style={styles.hero}>
+                <div style={styles.eyebrow}>BayFatura SEO Guide</div>
+                <h1 style={styles.h1}>
                     {content.h1 || page.title}
                 </h1>
-                <p style={{ fontSize: '1.1rem', color: '#475569', lineHeight: 1.7, marginBottom: 32, maxWidth: 600, margin: '0 auto 32px' }}>
+                <p style={styles.lead}>
                     {content.hero || page.metaDescription}
                 </p>
-                <Link to={langCfg.ctaUrl} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#2563eb', color: '#fff', padding: '14px 32px', borderRadius: 12, textDecoration: 'none', fontWeight: 700, fontSize: '1rem', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
-                    {langCfg.cta} →
+                <Link to={langCfg.ctaUrl} style={styles.primaryButton}>
+                    {langCfg.cta}
                 </Link>
-                <p style={{ marginTop: 16, fontSize: '0.85rem', color: '#94a3b8' }}>{langCfg.trustText}</p>
+                <p style={{ marginTop: 18, fontSize: '0.92rem', color: '#64748b', lineHeight: 1.6 }}>{langCfg.trustText}</p>
             </section>
 
             {/* Features */}
-            {features.length > 0 && (
-                <section style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
+            {hasFeatures && (
+                <section style={{ ...styles.section, paddingTop: 18 }}>
+                    <div style={styles.featureGrid}>
                         {features.map((feat, i) => (
-                            <div key={i} style={{ padding: 24, background: '#f8fafc', borderRadius: 16, border: '1px solid #e2e8f0' }}>
-                                <div style={{ width: 40, height: 40, background: '#eff6ff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, fontSize: '1.2rem' }}>
-                                    {['✅', '⚡', '🌍', '🔒', '📊', '💼'][i] || '✅'}
+                            <div key={i} style={styles.card}>
+                                <div style={{ width: 34, height: 34, background: '#dbeafe', color: '#1d4ed8', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, fontWeight: 800, fontSize: '0.92rem' }}>
+                                    {String(i + 1).padStart(2, '0')}
                                 </div>
-                                <p style={{ margin: 0, color: '#334155', lineHeight: 1.6, fontSize: '0.95rem' }}>{feat}</p>
+                                <p style={{ margin: 0, color: '#334155', lineHeight: 1.65, fontSize: '0.98rem' }}>{feat}</p>
                             </div>
                         ))}
                     </div>
@@ -146,26 +321,26 @@ const SeoLandingPage = () => {
             )}
 
             {/* CTA Banner */}
-            <section style={{ background: 'linear-gradient(135deg, #1e40af, #2563eb)', padding: '48px 24px', textAlign: 'center' }}>
-                <h2 style={{ color: '#fff', fontSize: '1.8rem', fontWeight: 800, marginBottom: 16 }}>
+            <section style={styles.ctaBand}>
+                <h2 style={{ color: '#fff', fontSize: 'clamp(1.45rem, 3vw, 2rem)', fontWeight: 800, margin: '0 0 16px', lineHeight: 1.2 }}>
                     {content.cta || langCfg.cta}
                 </h2>
-                <Link to={langCfg.ctaUrl} style={{ display: 'inline-flex', background: '#fff', color: '#2563eb', padding: '14px 32px', borderRadius: 12, textDecoration: 'none', fontWeight: 700, fontSize: '1rem' }}>
+                <Link to={langCfg.ctaUrl} style={{ ...styles.primaryButton, background: '#fff', color: '#1d4ed8', boxShadow: 'none' }}>
                     {langCfg.cta}
                 </Link>
             </section>
 
             {/* FAQ */}
             {faq.length > 0 && (
-                <section style={{ maxWidth: 700, margin: '0 auto', padding: '64px 24px' }}>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 32, textAlign: 'center' }}>FAQ</h2>
+                <section style={{ maxWidth: 760, margin: '0 auto', padding: '64px 24px' }}>
+                    <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '0 0 28px', textAlign: 'center' }}>FAQ</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {faq.map((item, i) => (
-                            <details key={i} style={{ background: '#f8fafc', borderRadius: 12, padding: '16px 20px', border: '1px solid #e2e8f0' }}>
-                                <summary style={{ fontWeight: 600, cursor: 'pointer', color: '#1e293b', fontSize: '0.95rem' }}>
+                            <details key={i} style={{ background: '#f8fafc', borderRadius: 8, padding: '18px 20px', border: '1px solid #e2e8f0' }}>
+                                <summary style={{ fontWeight: 750, cursor: 'pointer', color: '#1e293b', fontSize: '1rem', lineHeight: 1.45 }}>
                                     {item.q}
                                 </summary>
-                                <p style={{ margin: '12px 0 0', color: '#475569', lineHeight: 1.7, fontSize: '0.9rem' }}>{item.a}</p>
+                                <p style={{ margin: '12px 0 0', color: '#475569', lineHeight: 1.75, fontSize: '0.96rem' }}>{item.a}</p>
                             </details>
                         ))}
                     </div>
@@ -175,14 +350,14 @@ const SeoLandingPage = () => {
             {/* Related Pages */}
             {relatedPages.length > 0 && (
                 <section style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px 64px' }}>
-                    <h2 style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 20, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <h2 style={{ fontSize: '0.86rem', fontWeight: 800, marginBottom: 18, color: '#64748b', textTransform: 'uppercase' }}>
                         Weitere Themen / Related
                     </h2>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                         {relatedPages.map(p => (
                             <Link key={p.id} to={`/${lang}/${COUNTRY_SLUG_MAP[lang]?.path}/${p.slug}`}
-                                style={{ padding: '8px 16px', background: '#f1f5f9', borderRadius: 8, textDecoration: 'none', color: '#475569', fontSize: '0.85rem', fontWeight: 500 }}>
-                                {p.title}
+                                style={{ padding: '10px 16px', background: '#f1f5f9', borderRadius: 8, textDecoration: 'none', color: '#334155', fontSize: '0.92rem', fontWeight: 650, lineHeight: 1.35 }}>
+                                {cleanText(p.title)}
                             </Link>
                         ))}
                     </div>

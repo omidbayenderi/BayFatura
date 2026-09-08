@@ -14,7 +14,7 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { invoices, quotes, companyProfile, updateInvoice } = useInvoice();
-    const { t, appLanguage, invoiceLanguage } = useLanguage();
+    const { t, invoiceLanguage } = useLanguage();
     const invoiceRef = useRef();
 
     const industryConfig = getIndustryFields(companyProfile.industry || 'general');
@@ -37,6 +37,7 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
         items: [{ description: '', quantity: 1, price: 0 }],
         footerNote: '',
         paymentTerms: '',
+        language: invoiceLanguage,
         industryData: {} // Dynamic fields based on industry
     });
 
@@ -56,6 +57,7 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
                 items: existingInvoice.items || [{ description: '', quantity: 1, price: 0 }],
                 footerNote: existingInvoice.footerNote !== undefined ? existingInvoice.footerNote : '',
                 paymentTerms: existingInvoice.paymentTerms || companyProfile.paymentTerms || '',
+                language: existingInvoice.language || invoiceLanguage,
                 industryData: existingInvoice.industryData || {}
             });
         }
@@ -123,7 +125,7 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
                 ...invoiceData,
                 ...totals,
                 senderSnapshot: companyProfile,
-                language: invoiceData.language || invoiceLanguage
+                language: invoiceLanguage
             });
             navigate(`/${type}/${existingInvoice.id}?autoprint=true`);
         } catch (err) {
@@ -154,6 +156,7 @@ const InvoiceEdit = ({ type = 'invoice' }) => {
         paymentTerms: invoiceData.paymentTerms,
         footerPayment: `Bank: ${companyProfile.bankName}\nIBAN: ${companyProfile.iban}\n${invoiceData.paymentTerms}`,
         ...invoiceData,
+        language: invoiceData.language || invoiceLanguage,
         ...invoiceData.industryData
     };
 

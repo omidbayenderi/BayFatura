@@ -14,15 +14,15 @@ const config: CapacitorConfig = {
       launchAutoHide: true,
       launchShowDuration: 2000,
       launchFadeOutDuration: 400,
-      backgroundColor: '#6366f1',
+      backgroundColor: '#1A2436',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
     },
 
     // ─── Status Bar ───────────────────────────────────────
     StatusBar: {
-      style: 'Dark',                // Açık arka plan → koyu ikonlar
-      backgroundColor: '#6366f1',
+      style: 'Light',               // Koyu arka plan → açık ikonlar
+      backgroundColor: '#1A2436',
       overlaysWebView: false,
     },
 

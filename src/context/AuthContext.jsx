@@ -19,7 +19,7 @@ import {
     reauthenticateWithCredential,
     deleteUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { isNativePlatform } from '../lib/platform';
 import { nativeSignInWithGoogle, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
 import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
@@ -28,6 +28,16 @@ import { getSocialAuthErrorMessage, isExpectedSocialAuthSetupError } from '../li
 import { shouldUseRedirectForWebAuth } from '../lib/webAuthFlow';
 
 const AuthContext = createContext();
+
+const getCachedUserDb = (uid) => {
+    if (typeof window === 'undefined' || !uid) return null;
+    return localStorage.getItem(`bayfatura_user_db_${uid}`);
+};
+
+const cacheUserDb = (uid, dbId) => {
+    if (typeof window === 'undefined' || !uid || !dbId) return;
+    localStorage.setItem(`bayfatura_user_db_${uid}`, dbId);
+};
 
 const shouldFallbackToRedirect = (err) => {
     const code = err?.code || '';
@@ -82,7 +92,10 @@ export const AuthProvider = ({ children }) => {
             const globalUserDoc = await getDoc(globalUserRef);
             const assignedDbId = globalUserDoc.exists()
                 ? globalUserDoc.data()?._db || null
-                : null;
+                : getCachedUserDb(user.uid);
+            if (assignedDbId) {
+                cacheUserDb(user.uid, assignedDbId);
+            }
             const userDb = getDb(assignedDbId);
             const userRef = assignedDbId ? doc(userDb, 'users', user.uid) : globalUserRef;
             const userDoc = assignedDbId ? await getDoc(userRef) : globalUserDoc;
@@ -125,9 +138,11 @@ export const AuthProvider = ({ children }) => {
                 plan: 'standard',
                 role: user.email === 'omidbayenderi@gmail.com' ? 'admin' : 'owner',
                 tenantId: user.uid,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                _db: '(default)'
             };
             await setDoc(userRef, initialData);
+            cacheUserDb(user.uid, initialData._db);
             const appUser = { uid: user.uid, ...initialData };
             setCurrentUser(appUser);
             return appUser;
@@ -136,9 +151,12 @@ export const AuthProvider = ({ children }) => {
             const fallbackUser = {
                 uid: user.uid,
                 email: user.email || 'guest@bayfatura.com',
+                name: user.displayName || 'User',
+                photoURL: user.photoURL || '',
                 role: user.email === 'omidbayenderi@gmail.com' ? 'admin' : 'owner',
                 tenantId: user.uid,
-                plan: 'standard'
+                plan: 'standard',
+                _db: getCachedUserDb(user.uid) || '(default)'
             };
             setCurrentUser(fallbackUser);
             return fallbackUser;
@@ -268,6 +286,7 @@ export const AuthProvider = ({ children }) => {
 
             // Write to assigned DB (eu or global)
             await setDoc(doc(userDb, 'users', user.uid), initialData);
+            cacheUserDb(user.uid, assignedDbId);
             // Also write a routing pointer in global DB if user is EU
             if (assignedDbId !== '(default)') {
                 await setDoc(doc(db, 'users', user.uid), { _db: assignedDbId, _routingOnly: true });
@@ -377,8 +396,10 @@ export const AuthProvider = ({ children }) => {
                 plan: 'standard',
                 role: 'admin',
                 tenantId: user.uid,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                _db: '(default)'
             });
+            cacheUserDb(user.uid, '(default)');
             return { success: true };
         } catch (err) {
             console.error("Demo login failed:", err.code, err.message);
@@ -389,7 +410,8 @@ export const AuthProvider = ({ children }) => {
     const updateUser = async (newData) => {
         if (!currentUser) return { success: false, error: 'No user' };
         try {
-            const userRef = doc(db, 'users', currentUser.uid);
+            const userDb = getDb(currentUser._db);
+            const userRef = doc(userDb, 'users', currentUser.uid);
             const allowedData = {
                 name: newData.name || '',
                 companyName: newData.companyName || currentUser.companyName || '',
@@ -404,7 +426,7 @@ export const AuthProvider = ({ children }) => {
                 paypalClientId: newData.paypalClientId || ''
             };
 
-            await updateDoc(userRef, allowedData);
+            await setDoc(userRef, allowedData, { merge: true });
             
             if (allowedData.name) {
                 await firebaseUpdateProfile(auth.currentUser, { displayName: allowedData.name });
@@ -440,7 +462,11 @@ export const AuthProvider = ({ children }) => {
         try {
             // Delete user doc first (while still authenticated — rules require auth.uid == userId)
             // onUserDeleted Cloud Function handles cascade deletion of all other collections
-            await deleteDoc(doc(db, 'users', user.uid));
+            const userDb = getDb(currentUser?._db);
+            await deleteDoc(doc(userDb, 'users', user.uid));
+            if (currentUser?._db && currentUser._db !== '(default)') {
+                await deleteDoc(doc(db, 'users', user.uid));
+            }
             
             await deleteUser(user);
             return { success: true };

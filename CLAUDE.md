@@ -34,8 +34,8 @@ firebase emulators:start --only functions   # Local functions emulator
 firebase deploy --only functions            # Deploy all functions
 firebase deploy --only functions:fnName     # Deploy single function
 
-# SEO Agent manuel tetikleme (DCC portal'dan da yapılabilir)
-firebase deploy --only functions:seoAgent,functions:triggerSeoAgent
+# SEO Agent deploy / manuel tetikleme DCC portal'dan yapılır
+npx -y firebase-tools@latest deploy --only functions:seoAgent,functions:triggerSeoAgent
 ```
 
 **EU veri migration (tek seferlik):**
@@ -49,7 +49,7 @@ node functions/migrate-to-eu.js            # Çalıştır
 
 ### Stack
 - **Frontend:** React 19 + Vite, React Router v7, Framer Motion, Lucide icons, Recharts
-- **Backend:** Firebase Cloud Functions v1 (Node 22, ES modules), Genkit + Gemini 1.5 Flash for AI
+- **Backend:** Firebase Cloud Functions v1 (Node 22, ES modules), Genkit + Gemini 2.5 Flash Lite for AI
 - **Database:** Firestore multi-region — `bayfatura-eu` (eur3 Frankfurt, AB kullanıcıları) + `(default)` (nam5 ABD, global)
 - **Auth:** Firebase Auth — Email/Password, Google (popup → redirect fallback), Microsoft, Anonymous demo
 - **Payments:** Stripe (server-side webhook in `functions/index.js`, no secret keys in frontend)
@@ -60,7 +60,7 @@ node functions/migrate-to-eu.js            # Çalıştır
 - `VITE_APP_ENV` controls environment. Two Firebase projects: production (`bayfatura-b283c`) and staging.
 - `vite.config.js` inlines env vars only in `preview` mode; production reads from hosting environment.
 - Auth domain resolution in `src/lib/firebase.js → resolveFirebaseAuthDomain()` handles Safari/WebKit cookie restrictions.
-- **App Check:** `VITE_FIREBASE_APP_CHECK_KEY` gerekli. Dev'de kasıtlı kapalı (HMR bozulmasın). Staging için `.env.preview`'e Firebase Console'dan reCAPTCHA v3 key ekle.
+- **App Check:** `VITE_FIREBASE_APP_CHECK_KEY` gerekli. Dev'de kasıtlı kapalı (HMR bozulmasın). Staging için `.env.preview`'e Firebase Console'dan reCAPTCHA v3 key ekle. Public SEO landing route'larında App Check bilerek başlatılmaz; bu sayfalar indexlenebilir public içeriktir.
 
 ### Multi-region Firestore
 - **EU kullanıcılar** (DE, AT, CH, FR, ES, PT, NL, BE, IT vb.) → `bayfatura-eu` DB (eur3, Frankfurt) — GDPR Art. 46
@@ -117,6 +117,7 @@ Single file, ES module exports. ~2550 satır. Key functions:
 **SEO:**
 - `seoAgent` — pubsub nightly 03:00, 6 ülke için içerik + programmatik sayfa üretimi
 - `triggerSeoAgent` — callable, admin-only manuel tetikleme
+- SEO/Gemini model default: `gemini-2.5-flash-lite`. `gemini-1.5-flash` kullanma; mevcut API'da 404 dönebilir.
 
 Rate limiting: Firestore `rate_limits/{uid}_{scope}` sliding window.
 
@@ -125,6 +126,23 @@ Rate limiting: Firestore `rate_limits/{uid}_{scope}` sliding window.
 - `InvoiceContext` — CRUD. `getDb(currentUser._db)` ile doğru DB'ye yazar.
 - `LanguageContext` — i18n. 6 dil: TR, EN, DE, FR, ES, PT. `src/translations/`.
 - `PanelContext` — toast, global UI.
+
+### Mobile shell / bottom navigation
+- `src/components/MobileBottomNav.jsx` renders the mobile bottom bar and opens the mobile drawer via `onOpenMenu`.
+- The active nav item is route-derived, not driven by click state: dashboard → home, archive/invoice/quotes → invoices, `/new` → new invoice, `/expenses` → expenses. The "More/Daha Fazla" button stays plain and only opens the drawer.
+- The active notch position is measured from the real DOM item center and passed as CSS variable `--notch-x`; avoid replacing this with hard-coded percentages.
+- `src/index.css` `.mobile-bottom-nav::before` is the dark nav surface (`rgb(26, 36, 54)`) and uses a radial mask to cut around the lifted 52px active icon button with about `1.5px` visual gap.
+- Each bottom-nav item defines its own `--nav-accent` / `--nav-accent-rgb` token via `nth-child` so active/passive icon colors match the item role.
+- Mobile drawer/sidebar must remain completely hidden unless "Daha Fazla" is tapped. In the `max-width: 1024px` sidebar rules, the closed state uses off-screen `transform`, `opacity: 0`, `visibility: hidden`, and `pointer-events: none`; keep these together to prevent a visible/tappable sidebar edge.
+
+### PWA install icons / splash
+- The app install icon background is intentionally `#1A2436` (`rgb(26, 36, 54)`). `public/apple-touch-icon.png` is the iOS Safari "Add to Home Screen" source; keep it opaque/dark so the preview does not show a white logo tile.
+- `public/logo-192.png`, `public/logo-512.png`, `public/app-icon-1024.png`, `public/play-store-icon-512.png`, and `public/favicon.png` are flattened install assets. Do not change `public/logo.png` just to alter PWA/install appearance because it is also used as an in-app brand asset.
+
+### Profile avatar upload
+- `src/pages/settings/ProfileSettings.jsx` must not store avatar images as Firestore Base64 strings. Mobile camera photos can exceed document limits and behave inconsistently across Safari/WebView.
+- Avatar changes should normalize the selected file to a small JPEG (currently 512px max dimension), upload it through `uploadToStorage(currentUser.uid, file, filename)`, then persist only the Firebase Storage download URL in `users/{uid}.avatar`.
+- Storage rules allow owner-only `users/{uid}/assets/{filename}` uploads for PNG/JPEG/WebP under 5MB. If mobile avatar display fails, check Storage permission/image load errors before changing Firestore profile logic.
 
 ### Firestore collections
 ```
@@ -162,6 +180,8 @@ seo_tasks/{id}             → technical audit durumu
 ```
 İçerik Firestore `seo_content_queue`'dan çekilir. `src/pages/seo/SeoLandingPage.jsx`
 
+Public SEO Firestore kuralı yalnızca `seo_content_queue` dokümanlarında `type == 'programmatic_page'` ve `status in ['ready_to_publish', 'published']` için read izni verir. Blog taslakları, keyword gap, rankings, opportunities, reports ve tasks super-admin kapsamındadır.
+
 **Modüller:**
 1. Content Intelligence — keyword gap + blog taslağı (Gemini, her gece)
 2. Programmatic Page Generator — landing page içeriği (Pzt + Perş)
@@ -173,6 +193,12 @@ seo_tasks/{id}             → technical audit durumu
 
 **Sitemap:** `public/sitemap.xml` — hreflang ile tüm programmatik sayfalar dahil
 **Robots:** `public/robots.txt` — app route'ları noindex, SEO sayfaları allow
+
+**Rendering guardrails:**
+- Gemini cevabı Markdown code fence veya JSON string olarak gelebilir; `functions/index.js` ve `SeoLandingPage.jsx` normalization helper'ları korunmalı.
+- Kullanıcıya raw JSON/code fence gösterme. SEO landing UI hero, lead, feature, CTA, FAQ ve related link düzenini korumalı.
+- Sitemap XML'in tarayıcıda düz metin/XML olarak görünmesi normaldir.
+- Public SEO sayfalarında reCAPTCHA/App Check tetiklenmemeli; aksi halde console'da `recaptcha/api2/pat 401` ve Firestore listen access-control gürültüsü oluşabilir.
 
 ### Native / Capacitor
 - Platform detection: `src/lib/platform.js → isNativePlatform()`
@@ -196,6 +222,7 @@ seo_tasks/{id}             → technical audit durumu
 - Super-admin: `['support@bayfatura.com', 'omidbayenderi@gmail.com']`
 - `firestore.indexes.json` — composite indexes (userId + isDeleted + createdAt)
 - Fonts: self-hosted in `public/fonts/` (Inter + Outfit woff2) — Google Fonts kaldırıldı
+- Hosting `Content-Security-Policy-Report-Only` header'ı kaldırıldı. Yeni CSP eklenecekse report endpoint/`report-to` stratejisiyle birlikte tasarlanmalı.
 - `overflow-x: clip` on `.content-wrapper` (hidden yerine) — child table scroll'ların çalışması için
 - Tables: her `<table className="modern-table">` → `<div className="table-scroll">` ile sarılmalı
 - `items-editor-table`: 480px'te CSS grid stacked layout (no JS needed)

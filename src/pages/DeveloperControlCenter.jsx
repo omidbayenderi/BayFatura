@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Cpu, Users, Zap, Shield, Activity, Database, Globe,
@@ -26,47 +26,83 @@ const SeoDashboard = () => {
 
     const triggerSeo = httpsCallable(functions, 'triggerSeoAgent');
 
-    useEffect(() => {
-        const loadData = async () => {
-            setLoading(true);
-            try {
-                // Son içerik kuyruğu
-                const qSnap = await getDocs(query(
-                    collection(db, 'seo_content_queue'),
-                    orderBy('createdAt', 'desc'),
-                    limit(10)
-                ));
-                setContentQueue(qSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const loadData = useCallback(async () => {
+        setLoading(true);
+        try {
+            // Son içerik kuyruğu
+            const qSnap = await getDocs(query(
+                collection(db, 'seo_content_queue'),
+                orderBy('createdAt', 'desc'),
+                limit(10)
+            ));
+            setContentQueue(qSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-                // Backlink fırsatları
-                const oSnap = await getDocs(query(
-                    collection(db, 'seo_opportunities'),
-                    where('status', '==', 'identified'),
-                    limit(10)
-                ));
-                setOpportunities(oSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            // Backlink fırsatları
+            const oSnap = await getDocs(query(
+                collection(db, 'seo_opportunities'),
+                where('status', '==', 'identified'),
+                limit(10)
+            ));
+            setOpportunities(oSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-                // Son rapor
-                const rSnap = await getDocs(query(
-                    collection(db, 'seo_reports'),
-                    orderBy('startedAt', 'desc'),
-                    limit(1)
-                ));
-                if (!rSnap.empty) setReport(rSnap.docs[0].data());
-            } catch (err) {
-                console.error('SEO dashboard load error:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadData();
+            // Son rapor
+            const rSnap = await getDocs(query(
+                collection(db, 'seo_reports'),
+                orderBy('startedAt', 'desc'),
+                limit(1)
+            ));
+            setReport(rSnap.empty ? null : rSnap.docs[0].data());
+        } catch (err) {
+            console.error('SEO dashboard load error:', err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    const formatSeoResult = (payload) => {
+        const result = payload?.result || {};
+        const lines = [
+            `Ülke: ${payload?.country || selectedCountry}`,
+            `Modül: ${payload?.module || selectedModule}`,
+        ];
+
+        const addResult = (label, value) => {
+            if (Array.isArray(value)) {
+                lines.push(`${label}: ${value.length} yeni kayıt`);
+                return;
+            }
+            if (value && typeof value === 'object') {
+                lines.push(`${label}: ${value.created ?? value.items?.length ?? 0} yeni kayıt`);
+                if (value.skipped?.length) lines.push(`Atlanan: ${value.skipped.length}`);
+                if (value.errors?.length) {
+                    lines.push(`Hata: ${value.errors.length}`);
+                    const firstError = value.errors[0]?.message;
+                    if (firstError) lines.push(`İlk hata: ${firstError.slice(0, 180)}`);
+                }
+                return;
+            }
+            if (typeof value === 'number') lines.push(`${label}: ${value}`);
+        };
+
+        if ('content' in result) addResult('Content', result.content);
+        if ('pages' in result) addResult('Programmatic pages', result.pages);
+        if ('opps' in result) addResult('Backlink opportunities', result.opps);
+        if ('issues' in result) addResult('Technical issues', result.issues);
+        if (!Object.keys(result).length) addResult('Sonuç', result);
+
+        return lines.join('\n');
+    };
 
     const handleRun = async () => {
         setRunning(true);
         try {
             const res = await triggerSeo({ country: selectedCountry, module: selectedModule });
-            alert(`✅ SEO Agent tamamlandı!\n${JSON.stringify(res.data?.result || {}, null, 2)}`);
+            await loadData();
+            alert(`✅ SEO Agent tamamlandı!\n${formatSeoResult(res.data)}`);
         } catch (err) {
             alert('❌ Hata: ' + err.message);
         } finally {
