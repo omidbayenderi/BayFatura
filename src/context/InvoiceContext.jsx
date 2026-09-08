@@ -79,12 +79,20 @@ export const InvoiceProvider = ({ children }) => {
         'spareParts', 'rent', 'marketing', 'software', 'insurance', 'materials', 'fuel', 'food', 'office', 'other'
     ]);
     const [loading, setLoading] = useState(true);
+    // True once the users/{uid} profile snapshot has actually delivered a result
+    // (document exists OR confirmed empty). Stays false while loading and when the
+    // read fails, so callers can tell a real "brand new profile" apart from a
+    // broken/unreachable data connection.
+    const [profileReady, setProfileReady] = useState(false);
+    const [profileError, setProfileError] = useState(false);
 
     useEffect(() => {
         if (!currentUser) {
             setInvoices([]); setQuotes([]); setExpenses([]); setRecurringTemplates([]);
             setDeletedInvoices([]); setDeletedQuotes([]); setDeletedExpenses([]);
             setCompanyProfile(INITIAL_COMPANY_PROFILE);
+            setProfileReady(false);
+            setProfileError(false);
             setLoading(false);
             return;
         }
@@ -98,11 +106,20 @@ export const InvoiceProvider = ({ children }) => {
             notes: '', quoteValidityDays: 30
         });
         setLoading(true);
+        setProfileReady(false);
+        setProfileError(false);
 
         // Defensive Listener Wrapper
         const safeListen = (refOrQuery, callback, contextName) => {
             return onSnapshot(refOrQuery, callback, (err) => {
                 console.warn(`${contextName} listener error:`, err.code);
+                if (contextName === 'Profile') {
+                    // Profile could not be read. Do not treat this as a brand-new
+                    // account — otherwise the onboarding wizard would auto-open and
+                    // trap the user while their data connection is broken.
+                    setProfileReady(false);
+                    setProfileError(true);
+                }
                 // Silently handle permission-denied during auth transition
                 if (err.code === 'permission-denied') setLoading(false);
             });
@@ -121,6 +138,8 @@ export const InvoiceProvider = ({ children }) => {
                 // If profile doesn't exist, at least set the email from auth
                 setCompanyProfile(prev => ({ ...prev, companyEmail: currentUser.email || prev.companyEmail }));
             }
+            setProfileReady(true);
+            setProfileError(false);
             setLoading(false);
         }, "Profile");
 
@@ -297,7 +316,8 @@ export const InvoiceProvider = ({ children }) => {
 
     return (
         <InvoiceContext.Provider value={{ 
-            invoices, quotes, expenses, recurringTemplates, companyProfile, invoiceCustomization, loading, 
+            invoices, quotes, expenses, recurringTemplates, companyProfile, invoiceCustomization, loading,
+            profileReady, profileError,
             deletedInvoices, deletedQuotes, deletedExpenses,
             saveInvoice, deleteInvoice, restoreInvoice, deleteInvoicePermanently, updateInvoice, updateInvoiceStatus,
             saveQuote, deleteQuote, restoreQuote, deleteQuotePermanently, saveExpense, deleteExpense, restoreExpense, deleteExpensePermanently, saveRecurringTemplate, updateRecurringTemplate, deleteRecurringTemplate,

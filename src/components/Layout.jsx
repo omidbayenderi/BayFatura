@@ -18,20 +18,37 @@ const Layout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const navigate = useNavigate();
     const { currentUser } = useAuth();
-    const { companyProfile, loading: invoiceLoading } = useInvoice();
+    const { companyProfile, loading: invoiceLoading, profileReady, profileError } = useInvoice();
     const { t } = useLanguage();
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [hasClosedOnboarding, setHasClosedOnboarding] = useState(false);
 
     React.useEffect(() => {
-        // Show onboarding if the user has no company name and onboarding is not marked complete
-        // and they haven't already closed it in this session.
-        if (!invoiceLoading && currentUser && !companyProfile?.companyName && companyProfile?.onboardingCompleted !== true && !hasClosedOnboarding) {
-            setShowOnboarding(true);
-        } else {
+        // Show onboarding only for a *confirmed* brand-new profile:
+        //  - profile snapshot must have loaded (profileReady) without an error,
+        //  - the user must not have skipped setup on this device/account.
+        // If the profile cannot be read at all (rules/App Check/offline), we must
+        // NOT open the wizard — otherwise the user is trapped in a form that can
+        // never save while their data connection is broken.
+        if (!currentUser || invoiceLoading || !profileReady || profileError || hasClosedOnboarding) {
             setShowOnboarding(false);
+            return;
         }
-    }, [invoiceLoading, currentUser, companyProfile, hasClosedOnboarding]);
+
+        let skipped = false;
+        try {
+            skipped = localStorage.getItem(`bayfatura_onboarding_skipped_${currentUser.uid}`) === '1';
+        } catch (e) { /* storage unavailable */ }
+
+        if (skipped) {
+            setShowOnboarding(false);
+            return;
+        }
+
+        setShowOnboarding(
+            !companyProfile?.companyName && companyProfile?.onboardingCompleted !== true
+        );
+    }, [invoiceLoading, currentUser, companyProfile, hasClosedOnboarding, profileReady, profileError]);
 
     const [unreadCount, setUnreadCount] = useState(0);
 
@@ -67,10 +84,24 @@ const Layout = () => {
             </AnimatePresence>
 
             {showOnboarding && (
-                <OnboardingWizard onComplete={() => {
-                    setHasClosedOnboarding(true);
-                    setShowOnboarding(false);
-                }} />
+                <OnboardingWizard
+                    onComplete={() => {
+                        // Setup finished — clear any earlier "skip" flag so the
+                        // wizard can re-appear if the account is ever reset.
+                        try {
+                            localStorage.removeItem(`bayfatura_onboarding_skipped_${currentUser.uid}`);
+                        } catch (e) { /* storage unavailable */ }
+                        setHasClosedOnboarding(true);
+                        setShowOnboarding(false);
+                    }}
+                    onSkip={() => {
+                        try {
+                            localStorage.setItem(`bayfatura_onboarding_skipped_${currentUser.uid}`, '1');
+                        } catch (e) { /* storage unavailable */ }
+                        setHasClosedOnboarding(true);
+                        setShowOnboarding(false);
+                    }}
+                />
             )}
 
             <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={() => setSidebarOpen(false)}></div>

@@ -6,7 +6,7 @@ import { Building, Globe, CheckCircle2, ArrowRight, Phone, MapPin } from 'lucide
 import { useAuth } from '../context/AuthContext';
 import { usePanel } from '../context/PanelContext';
 
-const OnboardingWizard = ({ onComplete }) => {
+const OnboardingWizard = ({ onComplete, onSkip }) => {
     const { companyProfile, updateProfile } = useInvoice();
     const { currentUser } = useAuth();
     const { setToast } = usePanel();
@@ -282,6 +282,31 @@ const OnboardingWizard = ({ onComplete }) => {
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {typeof onSkip === 'function' && (
+                    <div style={{ textAlign: 'center', marginTop: '0.6rem' }}>
+                        <button
+                            type="button"
+                            onClick={onSkip}
+                            disabled={isSaving}
+                            aria-label={getLocalText('Şimdi değil — kurulumu atla', 'Jetzt nicht — Einrichtung überspringen', 'Not now — skip setup')}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: '8px 12px',
+                                cursor: isSaving ? 'not-allowed' : 'pointer',
+                                color: '#94a3b8',
+                                fontSize: '0.85rem',
+                                fontWeight: 500,
+                                textDecoration: 'underline',
+                                textUnderlineOffset: '3px',
+                                opacity: isSaving ? 0.6 : 1
+                            }}
+                        >
+                            {getLocalText('Şimdi değil — daha sonra tamamlayın', 'Jetzt nicht — später einrichten', "Not now — I'll complete this later")}
+                        </button>
+                    </div>
+                )}
             </motion.div>
         </div>
     );
