@@ -40,7 +40,7 @@ const DCC = () => {
             alert(`Sync complete! Checked ${totalAuthUsers} accounts in Firebase Auth. Created ${createdMissingProfiles} missing Firestore profiles and normalized ${normalizedRoles} account roles.`);
         } catch (error) {
             console.error("Sync Auth Users Error:", error);
-            alert("Sync failed: " + error.message);
+            alert("Sync failed: " + (error.message || error.code || 'unknown error'));
         } finally {
             setIsSyncing(false);
         }

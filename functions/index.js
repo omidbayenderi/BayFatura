@@ -320,7 +320,10 @@ export const createBillingPortalSession = runWith({ enforceAppCheck: true }).htt
     }
 });
 
-export const syncAllAuthUsers = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+// This maintenance endpoint is already locked to an authenticated Firebase
+// token from the two platform administrators.  Do not make recovery of
+// missing user profiles depend on a browser App Check token being available.
+export const syncAllAuthUsers = https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     const adminEmail = context.auth.token.email;
     if (!['support@bayfatura.com', 'omidbayenderi@gmail.com'].includes(adminEmail)) {
@@ -379,7 +382,7 @@ export const syncAllAuthUsers = runWith({ enforceAppCheck: true }).https.onCall(
         return { success: true, totalAuthUsers: count, createdMissingProfiles: created, normalizedRoles };
     } catch (error) {
         console.error('Error syncing auth users:', error);
-        throw new https.HttpsError('internal', error.message);
+        throw new https.HttpsError('internal', `Profile sync failed: ${error.message || 'unknown server error'}`);
     }
 });
 
