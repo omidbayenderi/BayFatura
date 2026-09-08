@@ -12,6 +12,9 @@ import { Resend } from 'resend';
 
 admin.initializeApp();
 const db = admin.firestore();
+const FUNCTION_REGION = 'europe-west3';
+const euFunctions = region(FUNCTION_REGION);
+const euCallable = () => euFunctions.runWith({ enforceAppCheck: true }).https;
 
 // --- Services Initialization ---
 const getStripeSecret = () => process.env.STRIPE_SECRET_KEY || '';
@@ -85,11 +88,26 @@ const toCallableError = (scope, error, fallbackMessage = 'The operation could no
     return new https.HttpsError('internal', fallbackMessage);
 };
 
-// ─── Rate Limiter (Firestore-backed) ──────────────────────────────────────────
-const AI_RATE_LIMIT_MAX = 10;       // max calls
-const AI_RATE_LIMIT_WINDOW_MS = 60_000; // per 1 minute
+// ─── Plan Definitions ─────────────────────────────────────────────────────────
+const PLANS = {
+    standard: {
+        invoicesPerMonth: 5,
+        aiCallsPerDay: 0,
+    },
+    elite: {
+        invoicesPerMonth: Infinity,
+        aiCallsPerDay: 50,
+    },
+    premium: {
+        invoicesPerMonth: Infinity,
+        aiCallsPerDay: 50,
+    },
+};
 
-const checkRateLimit = async (uid, scope) => {
+const isElitePlan = (plan) => ['elite', 'premium'].includes(plan);
+
+// ─── Rate Limiter (Firestore-backed) ──────────────────────────────────────────
+const checkRateLimit = async (uid, scope, maxCalls, windowMs) => {
     const key = `rate_limits/${uid}_${scope}`;
     const ref = db.doc(key);
     const snap = await ref.get();
@@ -100,8 +118,8 @@ const checkRateLimit = async (uid, scope) => {
         const windowStart = data.windowStart || 0;
         const count = data.count || 0;
 
-        if (now - windowStart < AI_RATE_LIMIT_WINDOW_MS) {
-            if (count >= AI_RATE_LIMIT_MAX) {
+        if (now - windowStart < windowMs) {
+            if (count >= maxCalls) {
                 throw new https.HttpsError(
                     'resource-exhausted',
                     'Too many requests. Please wait a moment and try again.',
@@ -119,10 +137,46 @@ const checkRateLimit = async (uid, scope) => {
 const requireElitePlan = async (uid) => {
     const userDoc = await db.collection('users').doc(uid).get();
     const plan = userDoc.exists ? userDoc.data()?.plan : 'standard';
-    if (!['elite', 'premium', 'lifetime'].includes(plan)) {
+    if (!isElitePlan(plan)) {
         throw new https.HttpsError(
             'permission-denied',
             'This feature requires an Elite plan. Please upgrade to access AI tools.',
+        );
+    }
+    // Elite AI daily limit: 50 calls/day to protect against abuse
+    await checkRateLimit(uid, 'ai_daily', PLANS.elite.aiCallsPerDay, 24 * 60 * 60_000);
+};
+
+// ─── Free Plan Invoice Limit ───────────────────────────────────────────────────
+const checkFreeInvoiceLimit = async (uid) => {
+    const userDoc = await db.collection('users').doc(uid).get();
+    const plan = userDoc.exists ? userDoc.data()?.plan : 'standard';
+    if (isElitePlan(plan)) return;
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+
+    const [invoicesSnap, quotesSnap] = await Promise.all([
+        db.collection('invoices')
+            .where('userId', '==', uid)
+            .where('isDeleted', '!=', true)
+            .where('createdAt', '>=', monthStart)
+            .where('createdAt', '<', monthEnd)
+            .get(),
+        db.collection('quotes')
+            .where('userId', '==', uid)
+            .where('isDeleted', '!=', true)
+            .where('createdAt', '>=', monthStart)
+            .where('createdAt', '<', monthEnd)
+            .get(),
+    ]);
+
+    const totalThisMonth = invoicesSnap.size + quotesSnap.size;
+    if (totalThisMonth >= PLANS.standard.invoicesPerMonth) {
+        throw new https.HttpsError(
+            'resource-exhausted',
+            `Free plan limit reached: ${PLANS.standard.invoicesPerMonth} invoices/quotes per month. Please upgrade to Elite.`,
         );
     }
 };
@@ -163,7 +217,7 @@ const ai = genkit({
 });
 
 // ─── 1. Stripe Webhook Handler ────────────────────────────────────────────────────
-export const stripeWebhook = https.onRequest(async (req, res) => {
+export const stripeWebhook = euFunctions.https.onRequest(async (req, res) => {
     if (!getStripeSecret()) {
         console.error('Stripe secret key is missing from environment');
         return res.status(500).send('Stripe secret key not configured');
@@ -185,9 +239,7 @@ export const stripeWebhook = https.onRequest(async (req, res) => {
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    const getPlanFromSession = (session) => {
-        const amount = session?.amount_total;
-        if (amount >= 29900) return { plan: 'elite', subscriptionType: 'lifetime' };
+    const getPlanFromSession = () => {
         return { plan: 'elite', subscriptionType: 'subscription' };
     };
 
@@ -202,7 +254,7 @@ export const stripeWebhook = https.onRequest(async (req, res) => {
                     break;
                 }
 
-                const planData = getPlanFromSession(session);
+                const planData = getPlanFromSession();
                 await db.collection('users').doc(userId).update({
                     ...planData,
                     stripeCustomerId: session.customer,
@@ -272,9 +324,7 @@ export const syncUserPlan = runWith({ enforceAppCheck: true }).https.onCall(asyn
         const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
         if (session.payment_status === 'paid') {
             const userId = context.auth.uid;
-            const planData = session.amount_total >= 29900
-                ? { plan: 'elite', subscriptionType: 'lifetime' }
-                : { plan: 'elite', subscriptionType: 'subscription' };
+            const planData = { plan: 'elite', subscriptionType: 'subscription' };
 
             await db.collection('users').doc(userId).update({
                 ...planData,
@@ -427,7 +477,6 @@ export const generateAdminBlogPost = region('europe-west3').https.onCall(async (
 export const analyzeBankStatement = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
-    await checkRateLimit(context.auth.uid, 'ai_bank');
     const { csvData, existingInvoices } = data;
 
     if (!csvData) throw new https.HttpsError('invalid-argument', 'Missing csvData');
@@ -475,7 +524,6 @@ export const analyzeBankStatement = runWith({ enforceAppCheck: true }).https.onC
 export const scanReceipt = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
-    await checkRateLimit(context.auth.uid, 'ai_receipt');
     const { base64Image, mimeType } = data;
 
     if (!base64Image) throw new https.HttpsError('invalid-argument', 'Missing base64Image');
@@ -519,7 +567,6 @@ export const scanReceipt = runWith({ enforceAppCheck: true }).https.onCall(async
 export const analyzeFinancials = runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
     if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
     await requireElitePlan(context.auth.uid);
-    await checkRateLimit(context.auth.uid, 'ai_finance');
     const { historyData } = data;
 
     if (!historyData) throw new https.HttpsError('invalid-argument', 'Missing historyData');
@@ -749,7 +796,7 @@ export const sendInvoiceEmail = runWith({ enforceAppCheck: true }).https.onCall(
     const collectionName = type === 'quote' ? 'quotes' : 'invoices';
 
     try {
-        await checkRateLimit(context.auth.uid, 'email_invoice');
+        await checkRateLimit(context.auth.uid, 'email_invoice', 20, 60 * 60_000);
 
         const invoiceRef = db.collection(collectionName).doc(invoiceId);
         const invoiceSnap = await invoiceRef.get();
@@ -934,7 +981,7 @@ export const sendInvitationEmail = runWith({ enforceAppCheck: true }).https.onCa
     const acceptLink = `${appBaseUrl}/accept-invite?token=${invitationId}&tenant=${invitedBy}&email=${encodeURIComponent(inviteeEmail)}`;
 
     try {
-        await checkRateLimit(context.auth.uid, 'email_invite');
+        await checkRateLimit(context.auth.uid, 'email_invite', 10, 60 * 60_000);
 
         const memberRef = db.collection('users').doc(context.auth.uid).collection('team').doc(invitationId);
         const memberSnap = await memberRef.get();
@@ -1068,7 +1115,7 @@ export const acceptTeamInvitation = runWith({ enforceAppCheck: true }).https.onC
 
 // ─── 5. Recurring Invoice Automation ──────────────────────────────────────────
 // Runs every day at 02:00 AM - generates invoices from due recurring templates
-export const processRecurringTemplates = pubsub.schedule('0 2 * * *').timeZone('Europe/Berlin').onRun(async () => {
+export const processRecurringTemplates = euFunctions.pubsub.schedule('0 2 * * *').timeZone('Europe/Berlin').onRun(async () => {
     const now = new Date();
     let processed = 0;
 
@@ -1137,9 +1184,98 @@ export const processRecurringTemplates = pubsub.schedule('0 2 * * *').timeZone('
     }
 });
 
-// ─── 6. Cloud Operations: Notifications (Overdue Invoices) ───────────────────────
+// ─── 6. Admin: Grant Elite Plan ──────────────────────────────────────────────
+export const grantElitePlan = euCallable().onCall(async (data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    const adminEmail = context.auth.token.email;
+    if (!['support@bayfatura.com', 'omidbayenderi@gmail.com'].includes(adminEmail)) {
+        throw new https.HttpsError('permission-denied', 'Only admins can grant plans');
+    }
+
+    const { targetUserId, durationDays, reason } = data;
+    if (!targetUserId) throw new https.HttpsError('invalid-argument', 'targetUserId required');
+    if (!Number.isInteger(durationDays) || durationDays < 0) throw new https.HttpsError('invalid-argument', 'durationDays must be 0 (unlimited) or a positive integer');
+
+    const userRef = db.collection('users').doc(targetUserId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) throw new https.HttpsError('not-found', 'User not found');
+
+    const expiresAt = durationDays === 0
+        ? null  // 0 = süresiz
+        : new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+
+    await userRef.update({
+        plan: 'elite',
+        subscriptionType: 'granted',
+        planGrantedBy: adminEmail,
+        planGrantReason: reason || 'admin_grant',
+        planActivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        planExpiresAt: expiresAt,
+    });
+
+    await db.collection('audit_logs').add({
+        action: 'grant_elite_plan',
+        targetUserId,
+        targetUserEmail: userSnap.data()?.email || 'unknown',
+        adminEmail,
+        durationDays: durationDays === 0 ? 'unlimited' : durationDays,
+        reason: reason || 'admin_grant',
+        planExpiresAt: expiresAt,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log(`✅ Elite granted to ${targetUserId} by ${adminEmail} — expires: ${expiresAt || 'never'}`);
+    return { success: true, planExpiresAt: expiresAt };
+});
+
+// ─── 6b. Scheduled: Downgrade expired granted plans ──────────────────────────
+// Her gün gece yarısı çalışır
+export const checkGrantedPlanExpiry = euFunctions.pubsub.schedule('0 0 * * *').timeZone('Europe/Berlin').onRun(async () => {
+    const nowIso = new Date().toISOString();
+    try {
+        const snapshot = await db.collection('users')
+            .where('subscriptionType', '==', 'granted')
+            .where('planExpiresAt', '<=', nowIso)
+            .get();
+
+        if (snapshot.empty) {
+            console.log('✅ No expired granted plans found');
+            return null;
+        }
+
+        const batch = db.batch();
+        snapshot.forEach(docSnap => {
+            batch.update(docSnap.ref, {
+                plan: 'standard',
+                subscriptionType: null,
+                planDowngradedAt: admin.firestore.FieldValue.serverTimestamp(),
+                planExpiresAt: null,
+            });
+
+            // Kullanıcıya bildirim gönder
+            const notifRef = db.collection('users').doc(docSnap.id).collection('notifications').doc();
+            batch.set(notifRef, {
+                title: 'Elite Plan Sona Erdi',
+                message: 'Ücretsiz Elite kullanım süreniz doldu. Devam etmek için Elite\'e abone olabilirsiniz.',
+                type: 'warning',
+                read: false,
+                link: '/billing',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        await batch.commit();
+        console.log(`⬇️ Downgraded ${snapshot.size} expired granted Elite plans`);
+        return null;
+    } catch (error) {
+        console.error('checkGrantedPlanExpiry failed:', error);
+        return null;
+    }
+});
+
+// ─── 7. Cloud Operations: Notifications (Overdue Invoices) ───────────────────────
 // Runs every day at 09:00 AM
-export const checkOverdueInvoices = pubsub.schedule('0 9 * * *').timeZone('Europe/Berlin').onRun(async () => {
+export const checkOverdueInvoices = euFunctions.pubsub.schedule('0 9 * * *').timeZone('Europe/Berlin').onRun(async () => {
     const nowIso = new Date().toISOString();
     const unpaidStatuses = new Set(['pending', 'sent', 'overdue']);
     try {
@@ -1197,7 +1333,7 @@ const getProxyCorsOrigin = (req) => {
     return '';
 };
 
-export const proxyImage = https.onRequest(async (req, res) => {
+export const proxyImage = euFunctions.https.onRequest(async (req, res) => {
     const corsOrigin = getProxyCorsOrigin(req);
     if (corsOrigin) {
         res.set('Access-Control-Allow-Origin', corsOrigin);
@@ -1266,7 +1402,7 @@ export const proxyImage = https.onRequest(async (req, res) => {
     }
 });
 // --- 🛡️ Auth Sync: Auto-create Firestore data when Auth user is created ---
-export const onUserCreated = auth.user().onCreate(async (user) => {
+export const onUserCreated = euFunctions.auth.user().onCreate(async (user) => {
     const uid = user.uid;
     console.log(`👤 User ${uid} created in Auth. Provisioning Firestore document...`);
     
@@ -1296,17 +1432,1183 @@ export const onUserCreated = auth.user().onCreate(async (user) => {
 });
 
 // --- 🛡️ Auth Sync: Auto-delete Firestore data when Auth user is deleted ---
-export const onUserDeleted = auth.user().onDelete(async (user) => {
+export const onUserDeleted = euFunctions.auth.user().onDelete(async (user) => {
     const uid = user.uid;
-    console.log(`🗑️ User ${uid} deleted from Auth. Cleaning up Firestore data...`);
-    
+    console.log(`🗑️ User ${uid} deleted from Auth. Purging all Firestore data...`);
+
+    // Delete all docs in a query in batches of 400 (safe under 500-op limit)
+    const deleteQuery = async (query) => {
+        const snap = await query.get();
+        if (snap.empty) return 0;
+        let count = 0;
+        const chunks = [];
+        for (let i = 0; i < snap.docs.length; i += 400) {
+            chunks.push(snap.docs.slice(i, i + 400));
+        }
+        for (const chunk of chunks) {
+            const batch = db.batch();
+            chunk.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            count += chunk.length;
+        }
+        return count;
+    };
+
+    // Delete all docs in a subcollection
+    const deleteSubcollection = async (parentRef, subcollection) => {
+        return deleteQuery(parentRef.collection(subcollection));
+    };
+
     try {
-        // Delete the main user document
-        await db.collection('users').doc(uid).delete();
-        console.log(`✅ User ${uid} data successfully purged from Firestore.`);
+        const userRef = db.collection('users').doc(uid);
+        const topCollections = [
+            'invoices', 'quotes', 'expenses', 'recurring_templates',
+            'customers', 'products', 'rate_limits', 'audit_logs', 'agent_logs',
+        ];
+
+        const results = await Promise.allSettled([
+            // Top-level collections scoped by userId
+            ...topCollections.map(col =>
+                deleteQuery(db.collection(col).where('userId', '==', uid))
+            ),
+            // rate_limits keyed as uid_scope — also catch with startsWith pattern
+            deleteQuery(db.collection('rate_limits').where('__name__', '>=', `${uid}_`).where('__name__', '<', `${uid}_￿`)),
+            // customizations single doc
+            db.collection('customizations').doc(uid).delete().catch(() => null),
+            // Subcollections under users/{uid}
+            deleteSubcollection(userRef, 'notifications'),
+            deleteSubcollection(userRef, 'team'),
+            // Finally the user doc itself
+            userRef.delete(),
+        ]);
+
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+            failed.forEach(f => console.error('❌ Partial delete error:', f.reason));
+        }
+        console.log(`✅ User ${uid} fully purged. ${failed.length} partial errors.`);
         return null;
     } catch (error) {
         console.error(`❌ Failed to purge data for user ${uid}:`, error);
         return null;
     }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🤖 BAYFATURA AGENT TEAM
+// Amaç: Müşteri edinme, aktivasyon, elde tutma ve gelir büyümesini otomatize et.
+//
+// Agents:
+//   1. Conversion Agent  — Free limit dolunca kişisel ikna emaili
+//   2. Churn Agent       — 7+ gün sessiz Elite kullanıcıya uyarı
+//   3. Onboarding Agent  — 24s kayıt, hiç fatura oluşturmamış
+//   4. Win-back Agent    — Elite'ten düşen kullanıcıyı geri kazan
+//
+// Koordinasyon: Her agent önce cooldown kontrolü yapar, sonra aksiyon alır,
+// sonra agent_logs'a yazar. Böylece kullanıcılar spam almaz ve her agent
+// diğerinin ne yaptığını bilir.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Agent Konfigürasyonu ─────────────────────────────────────────────────────
+const AGENT_CONFIG = {
+    conversion:  { cooldownDays: 7,  name: 'Conversion Agent',  emoji: '💰' },
+    churn:       { cooldownDays: 5,  name: 'Churn Agent',       emoji: '🛡️' },
+    onboarding:  { cooldownDays: 3,  name: 'Onboarding Agent',  emoji: '🚀' },
+    winback:     { cooldownDays: 14, name: 'Win-back Agent',    emoji: '🔄' },
+};
+
+const ADMIN_EMAILS = ['omidbayenderi@gmail.com', 'support@bayfatura.com'];
+
+// ─── Shared Agent Helpers ─────────────────────────────────────────────────────
+
+const getAgentResend = () => new Resend(getResendKey());
+
+/** Kullanıcının bu agent tarafından son ne zaman kontakt edildiğini kontrol eder */
+const checkAgentCooldown = async (uid, agentType) => {
+    const cfg = AGENT_CONFIG[agentType];
+    const logRef = db.collection('agent_logs')
+        .where('uid', '==', uid)
+        .where('agentType', '==', agentType)
+        .orderBy('sentAt', 'desc')
+        .limit(1);
+
+    const snap = await logRef.get();
+    if (snap.empty) return true; // hiç kontakt edilmemiş, devam et
+
+    const lastLog = snap.docs[0].data();
+    const lastSentMs = lastLog.sentAt?.toMillis?.() || 0;
+    const cooldownMs = cfg.cooldownDays * 24 * 60 * 60 * 1000;
+    return (Date.now() - lastSentMs) > cooldownMs;
+};
+
+/** Agent aksiyonunu loglar */
+const logAgentAction = async (uid, agentType, { email, subject, status, reason }) => {
+    await db.collection('agent_logs').add({
+        uid,
+        agentType,
+        agentName: AGENT_CONFIG[agentType]?.name || agentType,
+        email,
+        subject,
+        status, // 'sent' | 'skipped' | 'error'
+        reason,
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+};
+
+/** Kullanıcının bu ayki fatura + teklif sayısını ve toplam gelirini hesaplar */
+const getUserMonthlyStats = async (uid) => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [invSnap, quoteSnap, expSnap, customerSnap] = await Promise.all([
+        db.collection('invoices').where('userId', '==', uid).where('createdAt', '>=', monthStart).get(),
+        db.collection('quotes').where('userId', '==', uid).where('createdAt', '>=', monthStart).get(),
+        db.collection('expenses').where('userId', '==', uid).where('createdAt', '>=', monthStart).get(),
+        db.collection('customers').where('userId', '==', uid).get(),
+    ]);
+
+    const invoices = invSnap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+    const quotes   = quoteSnap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+    const expenses = expSnap.docs.map(d => d.data()).filter(d => !d.isDeleted);
+
+    const totalRevenue  = invoices.reduce((s, i) => s + (i.total || 0), 0);
+    const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+    const avgInvoice    = invoices.length ? totalRevenue / invoices.length : 0;
+    const currency      = invoices[0]?.currency || 'EUR';
+
+    return {
+        invoiceCount:    invoices.length,
+        quoteCount:      quotes.length,
+        expenseCount:    expenses.length,
+        customerCount:   customerSnap.size,
+        totalRevenue,
+        totalExpenses,
+        avgInvoice,
+        currency,
+        hasExpenses:     expenses.length > 0,
+        hasQuotes:       quotes.length > 0,
+        hasCustomers:    customerSnap.size > 0,
+    };
+};
+
+/** Gemini ile kişiselleştirilmiş email yazar */
+const generatePersonalizedEmail = async ({ user, stats, agentType, extraContext = '' }) => {
+    const lang = user.appLanguage || user.language || 'en';
+    const langMap = { tr: 'Turkish', en: 'English', de: 'German', fr: 'French', es: 'Spanish', pt: 'Portuguese' };
+    const langName = langMap[lang] || 'English';
+
+    const fmt = (n) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: stats.currency || 'EUR' }).format(n);
+
+    const prompts = {
+        conversion: `You are Maya, a growth specialist at BayFatura — a professional invoicing SaaS.
+Write a SHORT, personal, data-driven sales email to convince ${user.name || 'this user'} to upgrade from FREE to Elite (€9/month).
+
+Their real account data this month:
+- Invoices created: ${stats.invoiceCount}/5 (FREE LIMIT REACHED)
+- Total invoiced: ${fmt(stats.totalRevenue)}
+- Customers in CRM: ${stats.customerCount}
+- Quotes sent: ${stats.quoteCount}
+- Tracks expenses: ${stats.hasExpenses ? 'Yes' : 'No'}
+- Industry: ${user.industry || 'general'}
+- Company: ${user.companyName || user.name}
+
+Elite benefits relevant to THEIR situation:
+- Unlimited invoices (they hit the limit — this is the #1 pain)
+- AI Receipt Scanner (auto-reads expense receipts)
+- Bank Statement Matcher (auto-matches payments)
+- Financial Forecasting
+- No ads
+
+Rules:
+- Write in ${langName}
+- Sound like a real human, not a robot
+- Reference their SPECIFIC numbers (revenue, customer count etc.)
+- Max 180 words in the body
+- Warm, professional tone — not pushy
+- End with a single CTA button text
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+
+        churn: `You are Maya, a retention specialist at BayFatura.
+Write a short, warm re-engagement email to ${user.name || 'this user'} who is an Elite subscriber but hasn't logged in for 7+ days.
+
+Their account:
+- Plan: Elite
+- Company: ${user.companyName || user.name}
+- Industry: ${user.industry || 'general'}
+- Invoices this month: ${stats.invoiceCount}
+- Total revenue tracked: ${fmt(stats.totalRevenue)}
+${extraContext}
+
+Goal: Remind them of value, offer help, bring them back.
+- Write in ${langName}
+- Max 150 words
+- Friendly, concerned tone — not salesy
+- Mention 1-2 specific Elite features they might not be using
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+
+        onboarding: `You are Maya, an onboarding specialist at BayFatura.
+Write a warm activation email to ${user.name || 'this user'} who signed up but hasn't created their first invoice yet.
+
+Their account:
+- Company: ${user.companyName || user.name}
+- Industry: ${user.industry || 'general'}
+- Signed up: recently
+
+Goal: Get them to create their first invoice. Make it feel easy and valuable.
+- Write in ${langName}
+- Max 150 words
+- Encouraging, helpful tone
+- Include a specific tip for their industry
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+
+        winback: `You are Maya, a win-back specialist at BayFatura.
+Write a compelling re-activation email to ${user.name || 'this user'} whose Elite plan recently ended.
+
+Their account:
+- Company: ${user.companyName || user.name}
+- Industry: ${user.industry || 'general'}
+- Revenue tracked while Elite: ${fmt(stats.totalRevenue)}
+${extraContext}
+
+Goal: Get them back to Elite. Offer empathy + reminder of what they're missing.
+- Write in ${langName}
+- Max 160 words
+- Empathetic, not desperate
+- Mention the specific value they had
+
+Return ONLY valid JSON: { "subject": "...", "body": "...", "cta": "..." }`,
+    };
+
+    const aiInstance = genkit({ plugins: [googleAI()] });
+    const response = await aiInstance.generate({
+        model: googleAI.model('gemini-1.5-flash'),
+        prompt: prompts[agentType],
+    });
+
+    const text = response.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    return JSON.parse(text);
+};
+
+/** Email HTML şablonu — BayFatura branded */
+const buildAgentEmailHtml = ({ name, body, cta, ctaUrl, agentType }) => {
+    const colors = {
+        conversion: { bg: '#6366f1', light: '#eef2ff' },
+        churn:      { bg: '#f59e0b', light: '#fffbeb' },
+        onboarding: { bg: '#10b981', light: '#ecfdf5' },
+        winback:    { bg: '#8b5cf6', light: '#f5f3ff' },
+    };
+    const c = colors[agentType] || colors.conversion;
+    const bodyHtml = body.replace(/\n/g, '<br/>');
+
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.07);">
+        <!-- Header -->
+        <tr>
+          <td style="background:${c.bg};padding:28px 40px;text-align:center;">
+            <span style="color:white;font-size:22px;font-weight:800;letter-spacing:-0.5px;">⚡ BayFatura</span>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px;">
+            <p style="margin:0 0 20px;font-size:16px;color:#1e293b;line-height:1.7;">${bodyHtml}</p>
+            <!-- CTA -->
+            <div style="text-align:center;margin:32px 0 24px;">
+              <a href="${ctaUrl}" style="display:inline-block;background:${c.bg};color:white;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px;">${cta}</a>
+            </div>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background:${c.light};padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              BayFatura · <a href="https://bayfatura.com/billing" style="color:#6366f1;text-decoration:none;">Planları Gör</a> ·
+              <a href="https://bayfatura.com" style="color:#6366f1;text-decoration:none;">Uygulamayı Aç</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+};
+
+// ─── 1. Conversion Agent ──────────────────────────────────────────────────────
+const runConversionAgent = async () => {
+    console.log('💰 [ConversionAgent] Starting...');
+    const resend = getAgentResend();
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    // Bu ay 5 fatura dolan free kullanıcıları bul
+    const freeUsers = await db.collection('users')
+        .where('plan', '==', 'standard')
+        .get();
+
+    for (const userDoc of freeUsers.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+        if (user.isAnonymous) { skipped++; continue; }
+
+        try {
+            // Cooldown kontrolü
+            const canContact = await checkAgentCooldown(user.uid, 'conversion');
+            if (!canContact) { skipped++; continue; }
+
+            // Bu ayki fatura sayısını kontrol et
+            const [invSnap, quoteSnap] = await Promise.all([
+                db.collection('invoices').where('userId', '==', user.uid).where('createdAt', '>=', monthStart).get(),
+                db.collection('quotes').where('userId', '==', user.uid).where('createdAt', '>=', monthStart).get(),
+            ]);
+            const totalDocs = invSnap.docs.filter(d => !d.data().isDeleted).length +
+                              quoteSnap.docs.filter(d => !d.data().isDeleted).length;
+
+            // Sadece limite ulaşan veya 1 adım öncesinde olanları hedefle
+            if (totalDocs < 4) { skipped++; continue; }
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'conversion' });
+
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/billing',
+                agentType: 'conversion',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'conversion', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: `${totalDocs}/5 invoices this month, revenue: ${stats.totalRevenue}`,
+            });
+
+            contacted++;
+            console.log(`💰 [ConversionAgent] Sent to ${redactEmail(user.email)}`);
+        } catch (err) {
+            errors++;
+            console.error(`💰 [ConversionAgent] Error for ${user.uid}:`, err.message);
+            await logAgentAction(user.uid, 'conversion', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`💰 [ConversionAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── 2. Churn Agent ───────────────────────────────────────────────────────────
+const runChurnAgent = async () => {
+    console.log('🛡️ [ChurnAgent] Starting...');
+    const resend = getAgentResend();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Elite kullanıcılar arasında son 7 günde hiç fatura oluşturmamış olanları bul
+    const eliteUsers = await db.collection('users')
+        .where('plan', 'in', ['elite', 'premium'])
+        .get();
+
+    for (const userDoc of eliteUsers.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+
+        try {
+            const canContact = await checkAgentCooldown(user.uid, 'churn');
+            if (!canContact) { skipped++; continue; }
+
+            // Son 7 gün aktivite var mı?
+            const recentSnap = await db.collection('invoices')
+                .where('userId', '==', user.uid)
+                .where('createdAt', '>=', sevenDaysAgo)
+                .limit(1)
+                .get();
+
+            if (!recentSnap.empty) { skipped++; continue; } // aktif, geç
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const planActivated = user.planActivatedAt?.toDate?.()?.toISOString() || '';
+            const extraContext = planActivated ? `- Elite since: ${planActivated.split('T')[0]}` : '';
+
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'churn', extraContext });
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/dashboard',
+                agentType: 'churn',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'churn', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: 'No activity in 7+ days',
+            });
+
+            contacted++;
+        } catch (err) {
+            errors++;
+            console.error(`🛡️ [ChurnAgent] Error for ${user.uid}:`, err.message);
+            await logAgentAction(user.uid, 'churn', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`🛡️ [ChurnAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── 3. Onboarding Agent ─────────────────────────────────────────────────────
+const runOnboardingAgent = async () => {
+    console.log('🚀 [OnboardingAgent] Starting...');
+    const resend = getAgentResend();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    const oneDayAgo   = new Date(Date.now() - 1  * 24 * 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    // 1-3 gün önce kaydolmuş ve hiç fatura oluşturmamış kullanıcılar
+    const newUsers = await db.collection('users')
+        .where('createdAt', '>=', threeDaysAgo)
+        .where('createdAt', '<=', oneDayAgo)
+        .where('plan', '==', 'standard')
+        .get();
+
+    for (const userDoc of newUsers.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+        if (user.isAnonymous) { skipped++; continue; }
+
+        try {
+            const canContact = await checkAgentCooldown(user.uid, 'onboarding');
+            if (!canContact) { skipped++; continue; }
+
+            const invoiceSnap = await db.collection('invoices')
+                .where('userId', '==', user.uid)
+                .limit(1)
+                .get();
+
+            if (!invoiceSnap.empty) { skipped++; continue; } // fatura var, geç
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'onboarding' });
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/new',
+                agentType: 'onboarding',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'onboarding', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: 'Registered 1-3 days ago, no invoice created',
+            });
+
+            contacted++;
+        } catch (err) {
+            errors++;
+            await logAgentAction(user.uid, 'onboarding', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`🚀 [OnboardingAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── 4. Win-back Agent ───────────────────────────────────────────────────────
+const runWinbackAgent = async () => {
+    console.log('🔄 [WinbackAgent] Starting...');
+    const resend = getAgentResend();
+    let contacted = 0, skipped = 0, errors = 0;
+
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Son 3 günde Elite'ten düşmüş kullanıcılar
+    const downgraded = await db.collection('users')
+        .where('plan', '==', 'standard')
+        .where('planDowngradedAt', '>=', threeDaysAgo)
+        .get();
+
+    for (const userDoc of downgraded.docs) {
+        const user = { uid: userDoc.id, ...userDoc.data() };
+        if (!user.email || !isValidEmail(user.email)) { skipped++; continue; }
+
+        try {
+            const canContact = await checkAgentCooldown(user.uid, 'winback');
+            if (!canContact) { skipped++; continue; }
+
+            const stats = await getUserMonthlyStats(user.uid);
+            const downgradedDate = user.planDowngradedAt?.toDate?.()?.toLocaleDateString?.('tr-TR') || '';
+            const extraContext = downgradedDate ? `- Plan ended: ${downgradedDate}` : '';
+
+            const emailContent = await generatePersonalizedEmail({ user, stats, agentType: 'winback', extraContext });
+            const html = buildAgentEmailHtml({
+                name: user.name,
+                body: emailContent.body,
+                cta: emailContent.cta,
+                ctaUrl: 'https://bayfatura.com/billing',
+                agentType: 'winback',
+            });
+
+            await resend.emails.send({
+                from: getResendFromEmail(),
+                to: user.email,
+                subject: emailContent.subject,
+                html,
+            });
+
+            await logAgentAction(user.uid, 'winback', {
+                email: redactEmail(user.email),
+                subject: emailContent.subject,
+                status: 'sent',
+                reason: `Downgraded from Elite on ${downgradedDate}`,
+            });
+
+            contacted++;
+        } catch (err) {
+            errors++;
+            await logAgentAction(user.uid, 'winback', {
+                email: redactEmail(user.email || ''),
+                subject: '',
+                status: 'error',
+                reason: err.message,
+            });
+        }
+    }
+
+    console.log(`🔄 [WinbackAgent] Done — contacted:${contacted} skipped:${skipped} errors:${errors}`);
+    return { contacted, skipped, errors };
+};
+
+// ─── Agent Orchestrator — Her gün 10:00 Berlin ───────────────────────────────
+export const agentOrchestrator = euFunctions.pubsub.schedule('0 10 * * *').timeZone('Europe/Berlin').onRun(async () => {
+    console.log('🤖 [AgentOrchestrator] Daily run starting...');
+
+    const results = {};
+    const agents = [
+        { type: 'onboarding', fn: runOnboardingAgent },
+        { type: 'conversion', fn: runConversionAgent },
+        { type: 'churn',      fn: runChurnAgent      },
+        { type: 'winback',    fn: runWinbackAgent     },
+    ];
+
+    for (const agent of agents) {
+        try {
+            results[agent.type] = await agent.fn();
+        } catch (err) {
+            console.error(`🤖 [AgentOrchestrator] ${agent.type} failed:`, err.message);
+            results[agent.type] = { error: err.message };
+        }
+    }
+
+    // Günlük özet log
+    await db.collection('agent_runs').add({
+        runAt: admin.firestore.FieldValue.serverTimestamp(),
+        results,
+    });
+
+    console.log('🤖 [AgentOrchestrator] Done:', JSON.stringify(results));
+    return null;
+});
+
+// ─── Manuel Agent Tetikleme (DCC'den) ────────────────────────────────────────
+export const triggerAgent = euCallable().onCall(async (data, context) => {
+    if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+    if (!ADMIN_EMAILS.includes(context.auth.token.email)) {
+        throw new https.HttpsError('permission-denied', 'Admin only');
+    }
+
+    const { agentType } = data;
+    const agentMap = {
+        conversion: runConversionAgent,
+        churn:      runChurnAgent,
+        onboarding: runOnboardingAgent,
+        winback:    runWinbackAgent,
+    };
+
+    if (!agentMap[agentType]) throw new https.HttpsError('invalid-argument', 'Unknown agent type');
+
+    const result = await agentMap[agentType]();
+    return { success: true, result };
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔍 SEO AGENT
+// Amaç: BayFatura'yı hedef ülkelerde Google'da üst sıralara taşımak.
+//
+// Modüller:
+//   1. Country Intelligence  — ülkeye özel keyword stratejisi
+//   2. Content Intelligence  — Gemini ile içerik fırsatı analizi
+//   3. Programmatic SEO      — otomatik landing page kuyruğu
+//   4. Technical Audit       — sitemap, meta, schema kontrolleri
+//   5. Rank Tracker          — keyword pozisyon takibi
+//   6. Backlink Scout        — fırsat ve dizin takibi
+//
+// Çalışma: Her gece 03:00 Berlin saati
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Keyword Haritası ─────────────────────────────────────────────────────────
+const SEO_KEYWORD_MAP = {
+    DE: {
+        locale: 'de-DE',
+        lang: 'de',
+        market: 'Deutschland / DACH',
+        primary: [
+            'Rechnungsprogramm kostenlos',
+            'Rechnung erstellen online',
+            'Buchhaltungssoftware Kleinunternehmer',
+            'Rechnung schreiben App',
+            'Online Rechnungstellung',
+        ],
+        longTail: [
+            'Kleinunternehmer Rechnung Vorlage §19 UStG',
+            'Rechnung erstellen kostenlos ohne Anmeldung',
+            'Rechnungsprogramm Freelancer Deutschland',
+            'XRechnung erstellen kostenlos',
+            'Buchhaltungssoftware Selbstständige kostenlos',
+            'Rechnung mit Mehrwertsteuer erstellen',
+            'Angebot erstellen Vorlage kostenlos',
+        ],
+        competitors: ['sevdesk.de', 'lexoffice.de', 'fastbill.com', 'invoicefetcher.com'],
+        programmaticTemplates: [
+            { slug: 'kleinunternehmer', title: 'Rechnung erstellen für Kleinunternehmer (§19 UStG)' },
+            { slug: 'freiberufler', title: 'Rechnung erstellen für Freiberufler' },
+            { slug: 'handwerker', title: 'Rechnung erstellen für Handwerker' },
+            { slug: 'arzt', title: 'Rechnung erstellen für Ärzte & Heilberufe' },
+            { slug: 'it-dienstleister', title: 'Rechnung erstellen für IT-Dienstleister' },
+            { slug: 'xrechnung', title: 'XRechnung erstellen — B2G Rechnungen kostenlos' },
+        ],
+    },
+    AT: {
+        locale: 'de-AT',
+        lang: 'de',
+        market: 'Österreich',
+        primary: ['Rechnung erstellen Österreich', 'Buchhaltungsprogramm Österreich'],
+        longTail: ['Rechnung schreiben kostenlos Österreich', 'Kleinunternehmer Rechnung AT'],
+        competitors: ['billomat.com', 'easybill.de'],
+        programmaticTemplates: [
+            { slug: 'oesterreich', title: 'Rechnung erstellen in Österreich — kostenlos & konform' },
+        ],
+    },
+    PT: {
+        locale: 'pt-PT',
+        lang: 'pt',
+        market: 'Portugal',
+        primary: [
+            'programa de faturação gratuito',
+            'criar fatura online',
+            'software de faturação',
+            'fatura eletrónica Portugal',
+        ],
+        longTail: [
+            'criar fatura online grátis sem registo',
+            'programa faturação certificado AT Portugal',
+            'fatura recibo verde online',
+            'faturação eletrónica PME Portugal',
+            'ATCUD fatura online',
+        ],
+        competitors: ['invoicexpress.com', 'moloni.pt', 'phc.pt'],
+        programmaticTemplates: [
+            { slug: 'freelancer', title: 'Criar Fatura Online para Freelancer — Grátis' },
+            { slug: 'pequena-empresa', title: 'Software de Faturação para Pequenas Empresas' },
+            { slug: 'recibo-verde', title: 'Fatura Recibo Verde Online — Gerador Gratuito' },
+            { slug: 'ue-b2g', title: 'Fatura UBL CIUS-PT para Entidades Públicas (eSPap)' },
+        ],
+    },
+    ES: {
+        locale: 'es-ES',
+        lang: 'es',
+        market: 'España',
+        primary: ['programa de facturación gratuito', 'crear factura online', 'factura electrónica'],
+        longTail: [
+            'crear factura online gratis sin registro',
+            'programa facturación autónomos gratis',
+            'factura electrónica pymes España',
+        ],
+        competitors: ['facturaplus.es', 'holded.com', 'anfix.com'],
+        programmaticTemplates: [
+            { slug: 'autonomos', title: 'Crear Factura para Autónomos — Gratis Online' },
+            { slug: 'pymes', title: 'Software de Facturación para PYMEs — Gratis' },
+        ],
+    },
+    FR: {
+        locale: 'fr-FR',
+        lang: 'fr',
+        market: 'France',
+        primary: ['logiciel de facturation gratuit', 'créer une facture en ligne', 'facture électronique'],
+        longTail: [
+            'créer facture gratuit sans inscription',
+            'logiciel facturation auto-entrepreneur gratuit',
+            'facture électronique entreprise France',
+        ],
+        competitors: ['debitoor.fr', 'facture.net', 'zervant.com'],
+        programmaticTemplates: [
+            { slug: 'auto-entrepreneur', title: 'Créer une Facture Auto-Entrepreneur — Gratuit' },
+            { slug: 'pme', title: 'Logiciel de Facturation PME — Gratuit en Ligne' },
+        ],
+    },
+    EN: {
+        locale: 'en-US',
+        lang: 'en',
+        market: 'Global / English',
+        primary: ['free invoicing software', 'online invoice generator', 'invoice maker free'],
+        longTail: [
+            'create invoice online free no sign up',
+            'free invoice generator for small business',
+            'invoice template freelancer download',
+            'best free invoicing app 2025',
+            'multi-language invoice software',
+        ],
+        competitors: ['invoiceninja.com', 'wave.com', 'zoho.com/invoice'],
+        programmaticTemplates: [
+            { slug: 'freelancer', title: 'Free Invoice Generator for Freelancers' },
+            { slug: 'small-business', title: 'Free Invoicing Software for Small Business' },
+            { slug: 'consultant', title: 'Invoice Template for Consultants — Free Download' },
+            { slug: 'germany-b2g', title: 'XRechnung Generator — Free B2G Invoicing for Germany' },
+        ],
+    },
+};
+
+// Öncelik sırası: DE > AT > PT > ES > FR > EN
+const SEO_COUNTRY_PRIORITY = ['DE', 'AT', 'PT', 'ES', 'FR', 'EN'];
+
+// ─── Yardımcı: Gemini ile içerik analizi ──────────────────────────────────────
+const getSeoAI = () => genkit({ plugins: [googleAI({ apiKey: process.env.GEMINI_API_KEY })] });
+
+async function generateSeoContent({ country, keyword, contentType, existingTitle = '' }) {
+    const ai = getSeoAI();
+    const config = SEO_KEYWORD_MAP[country];
+
+    const prompts = {
+        meta_description: `Write an SEO meta description (max 155 characters) in ${config.lang} for BayFatura invoicing software.
+Target keyword: "${keyword}"
+Market: ${config.market}
+Requirements: Include keyword naturally, highlight free/kostenlos/gratuito, end with a CTA.
+Output ONLY the meta description text, nothing else.`,
+
+        blog_outline: `You are an SEO expert writing for BayFatura, a free online invoicing SaaS targeting ${config.market}.
+Create a detailed blog post outline in ${config.lang} targeting the keyword: "${keyword}"
+Include:
+- SEO title (H1) with keyword
+- Meta description (155 chars)
+- 5-7 H2 sections with bullet sub-points
+- FAQ section (5 questions users actually search)
+- Internal link suggestions
+Output as structured JSON.`,
+
+        landing_page: `You are an SEO copywriter for BayFatura, free invoicing software.
+Write a landing page in ${config.lang} for the URL path targeting: "${keyword}"
+Market: ${config.market}
+${existingTitle ? `Page title: ${existingTitle}` : ''}
+Structure:
+- H1: keyword-optimized headline
+- Hero paragraph (2 sentences, include keyword)
+- 3 feature bullets (localized benefits)
+- CTA text
+- FAQ (3 questions)
+Output as JSON with keys: h1, hero, features (array), cta, faq (array of {q,a}).`,
+
+        keyword_gap: `You are an SEO strategist for BayFatura (${config.market} market).
+Competitors: ${config.competitors.join(', ')}
+Our primary keywords: ${config.primary.join(', ')}
+Identify 10 high-value keywords we are likely missing that competitors rank for.
+Focus on: free/kostenlos/gratuito, templates, specific industries, compliance terms.
+Output as JSON array: [{keyword, difficulty: low|medium|high, intent: informational|commercial|transactional, priority: 1-10}]`,
+    };
+
+    const response = await ai.generate({
+        model: 'googleai/gemini-1.5-flash',
+        prompt: prompts[contentType],
+        config: { temperature: 0.3 },
+    });
+
+    return response.text;
+}
+
+// ─── Modül 1: Technical SEO Audit ─────────────────────────────────────────────
+async function runTechnicalAudit() {
+    const issues = [];
+    const now = new Date().toISOString();
+
+    // Kontrol: sitemap.xml son güncelleme
+    const sitemapRef = db.collection('seo_tasks').doc('sitemap_status');
+    const sitemapDoc = await sitemapRef.get();
+    const lastSitemapUpdate = sitemapDoc.exists ? sitemapDoc.data().lastUpdated : null;
+    const daysSinceSitemap = lastSitemapUpdate
+        ? Math.floor((Date.now() - new Date(lastSitemapUpdate).getTime()) / 86400000)
+        : 999;
+
+    if (daysSinceSitemap > 7) {
+        issues.push({ type: 'sitemap_stale', severity: 'high', message: `Sitemap ${daysSinceSitemap} gündür güncellenmedi` });
+    }
+
+    // Kontrol: hreflang yapılandırması
+    const hreflangRef = db.collection('seo_tasks').doc('hreflang_status');
+    const hreflangDoc = await hreflangRef.get();
+    if (!hreflangDoc.exists || !hreflangDoc.data()?.configured) {
+        issues.push({ type: 'hreflang_missing', severity: 'critical', message: 'Hreflang tags yapılandırılmamış — çok dilli SEO için kritik' });
+    }
+
+    // Kontrol: programmatik sayfalar eksik mi?
+    const progPages = await db.collection('seo_content_queue')
+        .where('type', '==', 'programmatic_page')
+        .where('status', '==', 'published')
+        .get();
+    if (progPages.size < 5) {
+        issues.push({ type: 'low_programmatic_pages', severity: 'medium', message: `Sadece ${progPages.size} programmatik SEO sayfası yayında` });
+    }
+
+    await db.collection('seo_reports').add({
+        type: 'technical_audit',
+        issues,
+        issueCount: issues.length,
+        createdAt: now,
+    });
+
+    console.log(`🔍 Technical audit: ${issues.length} issue bulundu`);
+    return issues;
+}
+
+// ─── Modül 2: Content Intelligence ────────────────────────────────────────────
+async function runContentIntelligence(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const queued = [];
+
+    // Keyword gap analizi — her ülke için haftada 1
+    const gapKey = `keyword_gap_${country}_${new Date().toISOString().slice(0, 7)}`;
+    const gapExists = await db.collection('seo_content_queue').doc(gapKey).get();
+
+    if (!gapExists.exists) {
+        try {
+            const gapAnalysis = await generateSeoContent({
+                country,
+                keyword: config.primary[0],
+                contentType: 'keyword_gap',
+            });
+
+            let gaps = [];
+            try { gaps = JSON.parse(gapAnalysis); } catch { gaps = []; }
+
+            await db.collection('seo_content_queue').doc(gapKey).set({
+                type: 'keyword_gap',
+                country,
+                market: config.market,
+                data: gaps,
+                status: 'analysis_complete',
+                createdAt: now,
+            });
+            queued.push({ type: 'keyword_gap', country });
+            console.log(`📊 Keyword gap analizi tamamlandı: ${country} (${gaps.length} fırsat)`);
+        } catch (err) {
+            console.error(`Keyword gap hatası (${country}):`, err.message);
+        }
+    }
+
+    // En yüksek öncelikli long-tail keyword için blog taslağı
+    const targetKeyword = config.longTail[Math.floor(Math.random() * config.longTail.length)];
+    const blogKey = `blog_${country}_${targetKeyword.replace(/[^a-z0-9]/gi, '_').slice(0, 40)}`;
+    const blogExists = await db.collection('seo_content_queue').doc(blogKey).get();
+
+    if (!blogExists.exists) {
+        try {
+            const blogOutline = await generateSeoContent({
+                country,
+                keyword: targetKeyword,
+                contentType: 'blog_outline',
+            });
+
+            await db.collection('seo_content_queue').doc(blogKey).set({
+                type: 'blog_post',
+                country,
+                lang: config.lang,
+                market: config.market,
+                targetKeyword,
+                outline: blogOutline,
+                status: 'draft',
+                createdAt: now,
+            });
+            queued.push({ type: 'blog_post', country, keyword: targetKeyword });
+            console.log(`✍️ Blog taslağı oluşturuldu: "${targetKeyword}" (${country})`);
+        } catch (err) {
+            console.error(`Blog taslağı hatası (${country}):`, err.message);
+        }
+    }
+
+    return queued;
+}
+
+// ─── Modül 3: Programmatic SEO Generator ──────────────────────────────────────
+async function generateProgrammaticPages(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const generated = [];
+
+    for (const template of config.programmaticTemplates) {
+        const pageId = `prog_${country.toLowerCase()}_${template.slug}`;
+        const existing = await db.collection('seo_content_queue').doc(pageId).get();
+
+        if (existing.exists && existing.data()?.status === 'published') continue;
+        if (existing.exists && existing.data()?.contentGeneratedAt) continue;
+
+        try {
+            const pageContent = await generateSeoContent({
+                country,
+                keyword: template.title,
+                contentType: 'landing_page',
+                existingTitle: template.title,
+            });
+
+            let content = {};
+            try { content = JSON.parse(pageContent); } catch {
+                content = { h1: template.title, hero: pageContent.slice(0, 200), features: [], cta: 'Kostenlos starten', faq: [] };
+            }
+
+            const metaDesc = await generateSeoContent({
+                country,
+                keyword: template.title,
+                contentType: 'meta_description',
+            });
+
+            await db.collection('seo_content_queue').doc(pageId).set({
+                type: 'programmatic_page',
+                country,
+                lang: config.lang,
+                locale: config.locale,
+                slug: template.slug,
+                urlPath: `/${config.lang}/rechnung-erstellen/${template.slug}`,
+                title: template.title,
+                content,
+                metaDescription: metaDesc.trim().slice(0, 155),
+                status: 'ready_to_publish',
+                contentGeneratedAt: now,
+                createdAt: now,
+            });
+
+            generated.push({ country, slug: template.slug, title: template.title });
+            console.log(`🚀 Programmatik sayfa hazır: ${country}/${template.slug}`);
+        } catch (err) {
+            console.error(`Programmatik sayfa hatası (${country}/${template.slug}):`, err.message);
+        }
+    }
+
+    return generated;
+}
+
+// ─── Modül 4: Rank Tracker ─────────────────────────────────────────────────────
+async function trackRankings(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const weekKey = now.slice(0, 10);
+
+    // Simüle edilmiş ranking verisi (Google Search Console API entegre edilince gerçek veri)
+    // Production'da: googleapis.com/webmasters/v3/sites/{site}/searchAnalytics/query
+    const rankingData = config.primary.map(keyword => ({
+        keyword,
+        country,
+        lang: config.lang,
+        estimatedPosition: null, // GSC API bağlanınca dolacak
+        lastChecked: now,
+        status: 'pending_gsc_integration',
+        weekKey,
+    }));
+
+    const batch = db.batch();
+    rankingData.forEach(data => {
+        const docId = `${country}_${data.keyword.replace(/[^a-z0-9]/gi, '_').slice(0, 50)}_${weekKey}`;
+        batch.set(db.collection('seo_rankings').doc(docId), data);
+    });
+    await batch.commit();
+
+    console.log(`📈 Ranking tracker: ${rankingData.length} keyword izleniyor (${country})`);
+    return rankingData.length;
+}
+
+// ─── Modül 5: Backlink Scout ───────────────────────────────────────────────────
+async function scoutBacklinkOpportunities(country) {
+    const config = SEO_KEYWORD_MAP[country];
+    const now = new Date().toISOString();
+    const weekKey = now.slice(0, 7); // YYYY-MM
+
+    const opportunities = [
+        // Her ülke için bilinen yüksek DA dizin siteleri
+        ...(country === 'DE' ? [
+            { site: 'gruenderszene.de', type: 'startup_directory', da: 72, action: 'submit_listing' },
+            { site: 'capterra.de', type: 'software_review', da: 88, action: 'claim_listing' },
+            { site: 'trusted.de', type: 'review_platform', da: 65, action: 'request_review' },
+            { site: 'appvizer.de', type: 'software_directory', da: 58, action: 'submit_listing' },
+            { site: 'g2.com/de', type: 'b2b_review', da: 91, action: 'claim_listing' },
+        ] : []),
+        ...(country === 'PT' ? [
+            { site: 'capterra.pt', type: 'software_review', da: 88, action: 'claim_listing' },
+            { site: 'appvizer.pt', type: 'software_directory', da: 58, action: 'submit_listing' },
+            { site: 'sifted.eu', type: 'startup_media', da: 62, action: 'pitch_story' },
+        ] : []),
+        ...(country === 'EN' ? [
+            { site: 'producthunt.com', type: 'product_launch', da: 90, action: 'schedule_launch' },
+            { site: 'alternativeto.net', type: 'alternative_directory', da: 82, action: 'add_product' },
+            { site: 'capterra.com', type: 'software_review', da: 90, action: 'claim_listing' },
+            { site: 'getapp.com', type: 'software_directory', da: 85, action: 'claim_listing' },
+        ] : []),
+    ];
+
+    const batch = db.batch();
+    opportunities.forEach(opp => {
+        const docId = `${country}_${opp.site.replace(/[^a-z0-9]/gi, '_')}_${weekKey}`;
+        batch.set(db.collection('seo_opportunities').doc(docId), {
+            ...opp,
+            country,
+            lang: config.lang,
+            market: config.market,
+            status: 'identified',
+            createdAt: now,
+        }, { merge: true });
+    });
+    await batch.commit();
+
+    console.log(`🔗 Backlink fırsatları: ${opportunities.length} kayıt edildi (${country})`);
+    return opportunities.length;
+}
+
+// ─── Ana SEO Agent Scheduler ───────────────────────────────────────────────────
+export const seoAgent = euFunctions
+    .runWith({ timeoutSeconds: 540, memory: '1GB' })
+    .pubsub.schedule('0 3 * * *')
+    .timeZone('Europe/Berlin')
+    .onRun(async () => {
+        const now = new Date().toISOString();
+        const dayOfWeek = new Date().getDay(); // 0=Pazar, 1=Pazartesi...
+        const isWeekly = dayOfWeek === 1; // Pazartesi = haftalık görevler
+
+        console.log(`🔍 SEO Agent başlıyor — ${now} (weekly=${isWeekly})`);
+
+        const report = {
+            startedAt: now,
+            isWeekly,
+            countries: SEO_COUNTRY_PRIORITY,
+            results: {},
+        };
+
+        // Technical audit — sadece pazartesi
+        if (isWeekly) {
+            const auditIssues = await runTechnicalAudit();
+            report.results.technical_audit = { issueCount: auditIssues.length };
+        }
+
+        // Her ülke için modüller çalıştır
+        for (const country of SEO_COUNTRY_PRIORITY) {
+            report.results[country] = {};
+
+            try {
+                // Content Intelligence — her gün
+                const content = await runContentIntelligence(country);
+                report.results[country].content = content.length;
+
+                // Programmatik sayfalar — pazartesi ve perşembe
+                if (isWeekly || dayOfWeek === 4) {
+                    const pages = await generateProgrammaticPages(country);
+                    report.results[country].programmaticPages = pages.length;
+                }
+
+                // Rank tracking — her gün
+                const tracked = await trackRankings(country);
+                report.results[country].keywordsTracked = tracked;
+
+                // Backlink scout — sadece pazartesi
+                if (isWeekly) {
+                    const opps = await scoutBacklinkOpportunities(country);
+                    report.results[country].backlinkOpportunities = opps;
+                }
+
+            } catch (err) {
+                console.error(`SEO Agent hata (${country}):`, err.message);
+                report.results[country].error = err.message;
+            }
+        }
+
+        report.completedAt = new Date().toISOString();
+
+        await db.collection('seo_reports').add({
+            ...report,
+            type: 'weekly_seo_run',
+        });
+
+        console.log('✅ SEO Agent tamamlandı:', JSON.stringify(report.results));
+        return null;
+    });
+
+// ─── Manuel tetikleme (DCC'den test için) ─────────────────────────────────────
+export const triggerSeoAgent = euFunctions.runWith({ timeoutSeconds: 540, memory: '1GB' })
+    .https.onCall(async (data, context) => {
+        if (!context.auth) throw new https.HttpsError('unauthenticated', 'Login required');
+        const adminEmails = ['omidbayenderi@gmail.com', 'support@bayfatura.com'];
+        if (!adminEmails.includes(context.auth.token.email)) {
+            throw new https.HttpsError('permission-denied', 'Admin only');
+        }
+
+        const country = data.country || 'DE';
+        const module = data.module || 'content';
+        console.log(`🔍 SEO Agent manuel tetikleme: ${country}/${module}`);
+
+        let result = {};
+        if (module === 'content') result = await runContentIntelligence(country);
+        if (module === 'programmatic') result = await generateProgrammaticPages(country);
+        if (module === 'backlinks') result.opps = await scoutBacklinkOpportunities(country);
+        if (module === 'audit') result.issues = await runTechnicalAudit();
+        if (module === 'all') {
+            result.content = await runContentIntelligence(country);
+            result.pages = await generateProgrammaticPages(country);
+        }
+
+        return { success: true, country, module, result };
+    });

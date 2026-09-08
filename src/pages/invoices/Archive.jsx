@@ -502,6 +502,7 @@ const Archive = () => {
 
                 {/* ─── Table ─── */}
                 <div className="card card-no-padding">
+                    <div className="table-scroll">
                     <table className="modern-table table-no-radius">
                         <thead>
                             <tr>
@@ -605,6 +606,7 @@ const Archive = () => {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 

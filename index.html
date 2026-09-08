@@ -12,16 +12,16 @@
       https://www.gstatic.com/recaptcha/
       https://*.firebaseapp.com
       https://*.googleapis.com
-      https://pagead2.googlesyndication.com
+      https://www.google.com
+      https://www.gstatic.com
       https://www.googletagmanager.com;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    font-src 'self' https://fonts.gstatic.com;
+    style-src 'self' 'unsafe-inline';
+    font-src 'self';
     img-src 'self' data: blob:
       https://*.googleapis.com
       https://*.googleusercontent.com
       https://lh3.googleusercontent.com
       https://*.firebasestorage.app
-      https://pagead2.googlesyndication.com
       https://images.weserv.nl
       https://quickchart.io
       https://upload.wikimedia.org
@@ -35,15 +35,14 @@
       https://*.cloudfunctions.net
       https://identitytoolkit.googleapis.com
       https://securetoken.googleapis.com
-      https://pagead2.googlesyndication.com
       https://region1.google-analytics.com
       https://*.google-analytics.com
-      https://*.adtrafficquality.google
       https://bayfatura.com
       wss://*.firebaseio.com;
-    frame-src https://*.firebaseapp.com https://bayfatura.com https://js.stripe.com https://pagead2.googlesyndication.com https://*.google.com;
+    frame-src https://*.firebaseapp.com https://bayfatura.com https://js.stripe.com https://*.google.com https://recaptcha.google.com https://login.microsoftonline.com;
     worker-src 'self' blob:;
   " />
+  <meta name="google-site-verification" content="iugB-mdXD3Hp1UGIl6tYgl_v_HlWMEXj3Ln07T3FSds" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="Create, manage and send professional invoices with AI-powered expense tracking." />
   <title>BayFatura - Professional Invoice Management</title>
@@ -59,9 +58,57 @@
   <link rel="apple-touch-icon" sizes="167x167" href="/logo-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/logo-192.png" />
   
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2" as="font" type="font/woff2" crossorigin>
+
+  <!-- Canonical + hreflang (base — overridden by SeoLandingPage for programmatic routes) -->
+  <link rel="canonical" href="https://bayfatura.com/" />
+  <link rel="alternate" hreflang="de" href="https://bayfatura.com/" />
+  <link rel="alternate" hreflang="pt" href="https://bayfatura.com/" />
+  <link rel="alternate" hreflang="es" href="https://bayfatura.com/" />
+  <link rel="alternate" hreflang="fr" href="https://bayfatura.com/" />
+  <link rel="alternate" hreflang="en" href="https://bayfatura.com/" />
+  <link rel="alternate" hreflang="x-default" href="https://bayfatura.com/" />
+
+  <!-- Sitemap reference -->
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+  <!-- Open Graph (landing) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bayfatura.com/" />
+  <meta property="og:title" content="BayFatura — Kostenlose Rechnungssoftware Online" />
+  <meta property="og:description" content="Professionelle Rechnungen erstellen, verwalten und versenden. Kostenlos, mehrsprachig, DSGVO-konform." />
+  <meta property="og:image" content="https://bayfatura.com/og-image.png" />
+  <meta property="og:locale" content="de_DE" />
+  <meta property="og:locale:alternate" content="pt_PT" />
+  <meta property="og:locale:alternate" content="en_US" />
+
+  <!-- JSON-LD: SoftwareApplication Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "BayFatura",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web, iOS, Android",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "EUR"
+    },
+    "description": "Kostenlose Online-Rechnungssoftware mit KI-gestützter Buchhaltung. Mehrsprachig, DSGVO-konform, für Selbstständige und KMU.",
+    "url": "https://bayfatura.com",
+    "inLanguage": ["de", "pt", "es", "fr", "en", "tr"],
+    "availableOnDevice": ["Desktop", "Mobile", "Tablet"],
+    "featureList": [
+      "Rechnung erstellen",
+      "PDF-Rechnungen",
+      "XRechnung B2G",
+      "ATCUD Portugal",
+      "6 Sprachen",
+      "KI-Belegscanning"
+    ]
+  }
+  </script>
 </head>
 
 <body>

@@ -40,3 +40,4 @@ GoogleService-Info.plist
 *.njsproj
 *.sln
 *.sw?
+.gstack/

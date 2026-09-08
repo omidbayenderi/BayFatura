@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Globe, Mail, MapPin, Star, Award, Shield } from 'lucide-react';
+import { Building2, Globe, Mail, MapPin, Award, Shield } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
 /**
- * Impressum — Legally required in EU/DE for commercial websites (TMG §5)
+ * Impressum — legally required in DE for commercial digital services (DDG §5)
  * Also required in Portugal for commercial entities
  * Enhanced with BayEnderi partnership presentation
  * Language-sensitive content
@@ -16,7 +16,7 @@ const Impressum = () => {
         de: {
             title: 'Impressum & Unternehmensangaben',
             subtitle: 'Legal Notice · Aviso Legal · Informações Legais',
-            section1: 'Angaben gemäß §5 TMG / Informações Legais',
+            section1: 'Angaben gemäß §5 DDG / Informações Legais',
             company: 'Unternehmen / Empresa',
             representedBy: 'Vertreten durch / Representado por',
             address: 'Adresse / Endereço',
@@ -37,7 +37,7 @@ const Impressum = () => {
         en: {
             title: 'Impressum & Company Information',
             subtitle: 'Legal Notice · Aviso Legal · Informações Legais',
-            section1: 'Information pursuant to §5 TMG / Informações Legais',
+            section1: 'Information pursuant to §5 DDG / Informações Legais',
             company: 'Company / Empresa',
             representedBy: 'Represented by / Representado por',
             address: 'Address / Endereço',
@@ -58,7 +58,7 @@ const Impressum = () => {
         pt: {
             title: 'Impressum & Informações Empresariais',
             subtitle: 'Aviso Legal · Legal Notice · Informações Legais',
-            section1: 'Informações conforme o §5 TMG / Informações Legais',
+            section1: 'Informações conforme o §5 DDG / Informações Legais',
             company: 'Empresa / Unternehmen',
             representedBy: 'Representado por / Vertreten durch',
             address: 'Endereço / Adresse',
@@ -79,7 +79,7 @@ const Impressum = () => {
         tr: {
             title: 'Impressum & Şirket Bilgileri',
             subtitle: 'Legal Notice · Aviso Legal · Informações Legais',
-            section1: '§5 TMG uyarınca bilgiler / Informações Legais',
+            section1: '§5 DDG uyarınca bilgiler / Informações Legais',
             company: 'Şirket / Empresa',
             representedBy: 'Temsil eden / Representado por',
             address: 'Adres / Endereço',
@@ -100,7 +100,7 @@ const Impressum = () => {
         fr: {
             title: 'Impressum & Informations de l\'entreprise',
             subtitle: 'Aviso Legal · Legal Notice · Informações Legais',
-            section1: 'Informations conformes au §5 TMG / Informações Legais',
+            section1: 'Informations conformes au §5 DDG / Informações Legais',
             company: 'Entreprise / Empresa',
             representedBy: 'Représenté par / Representado por',
             address: 'Adresse / Endereço',
@@ -121,7 +121,7 @@ const Impressum = () => {
         es: {
             title: 'Impressum & Información de la empresa',
             subtitle: 'Aviso Legal · Legal Notice · Informações Legais',
-            section1: 'Información conforme al §5 TMG / Informações Legais',
+            section1: 'Información conforme al §5 DDG / Informações Legais',
             company: 'Empresa / Unternehmen',
             representedBy: 'Representado por / Vertreten durch',
             address: 'Dirección / Endereço',
@@ -273,29 +273,10 @@ const Impressum = () => {
                                 <Shield size={18} style={{ color: '#fbbf24' }} />
                                 <div>
                                     <div style={{ fontSize: '0.75rem', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Zertifizierung
+                                        Datenschutz
                                     </div>
                                     <div style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: '600', marginTop: '2px' }}>
-                                        ISO 27001 / GDPR
-                                    </div>
-                                </div>
-                            </div>
-                            <div style={{
-                                padding: '16px',
-                                background: 'rgba(245,158,11,0.08)',
-                                borderRadius: '10px',
-                                border: '1px solid rgba(245,158,11,0.15)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px'
-                            }}>
-                                <Star size={18} style={{ color: '#fbbf24' }} />
-                                <div>
-                                    <div style={{ fontSize: '0.75rem', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Bewertung
-                                    </div>
-                                    <div style={{ fontSize: '0.85rem', color: '#fbbf24', fontWeight: '600', marginTop: '2px' }}>
-                                        4.9/5.0 ★★★★★
+                                        GDPR konform
                                     </div>
                                 </div>
                             </div>
@@ -322,7 +303,7 @@ const Impressum = () => {
                     </div>
                 </div>
 
-                {/* Angaben gem. §5 TMG */}
+                {/* Angaben gem. §5 DDG */}
                 <div style={{
                     padding: '28px',
                     background: 'rgba(99,102,241,0.08)',

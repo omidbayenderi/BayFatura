@@ -1,0 +1,33 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://bayfatura.com/sitemap.xml
+
+# App routes — no indexing needed
+Disallow: /dashboard
+Disallow: /new
+Disallow: /quotes
+Disallow: /expenses
+Disallow: /settings
+Disallow: /billing
+Disallow: /customers
+Disallow: /products
+Disallow: /archive
+Disallow: /reports
+Disallow: /recurring
+Disallow: /bank-matcher
+Disallow: /forecasting
+Disallow: /notifications
+Disallow: /team
+Disallow: /dcc-portal
+Disallow: /accept-invite
+Disallow: /success
+Disallow: /p/
+
+# Allow SEO landing pages
+Allow: /de/
+Allow: /pt/
+Allow: /es/
+Allow: /fr/
+Allow: /en/

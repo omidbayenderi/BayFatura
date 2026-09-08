@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { auth, db, isFirebaseConfigured, googleProvider, microsoftProvider } from '../lib/firebase';
+import { auth, db, getDb, getDbIdForCountry, isFirebaseConfigured, googleProvider, microsoftProvider } from '../lib/firebase';
 import {
     onAuthStateChanged,
     signInWithEmailAndPassword,
@@ -77,8 +77,15 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const userRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userRef);
+            // First read from global DB to discover which DB this user belongs to
+            const globalUserRef = doc(db, 'users', user.uid);
+            const globalUserDoc = await getDoc(globalUserRef);
+            const assignedDbId = globalUserDoc.exists()
+                ? globalUserDoc.data()?._db || null
+                : null;
+            const userDb = getDb(assignedDbId);
+            const userRef = assignedDbId ? doc(userDb, 'users', user.uid) : globalUserRef;
+            const userDoc = assignedDbId ? await getDoc(userRef) : globalUserDoc;
 
             if (userDoc.exists()) {
                 const data = userDoc.data();
@@ -87,7 +94,22 @@ export const AuthProvider = ({ children }) => {
                     updates = { ...updates, email: user.email };
                 }
 
-                // Firebase Auth is the authority for the sign-in address.  A
+                // Süreli verilen Elite plan dolmuşsa otomatik düşür
+                if (
+                    data.subscriptionType === 'granted' &&
+                    data.planExpiresAt &&
+                    new Date(data.planExpiresAt) < new Date()
+                ) {
+                    updates = {
+                        ...updates,
+                        plan: 'standard',
+                        subscriptionType: null,
+                        planExpiresAt: null,
+                        planDowngradedAt: new Date().toISOString(),
+                    };
+                }
+
+                // Firebase Auth is the authority for the sign-in address. A
                 // stale profile document must never replace it in the UI.
                 const appUser = { uid: user.uid, ...data, ...updates, email: user.email || data.email };
                 if (Object.keys(updates).length > 0) {
@@ -227,17 +249,29 @@ export const AuthProvider = ({ children }) => {
         try {
             const { user } = await import('firebase/auth').then(m => m.createUserWithEmailAndPassword(auth, userData.email, userData.password));
             
+            const userCountry = userData.country || '';
+            const assignedDbId = getDbIdForCountry(userCountry);
+            const userDb = getDb(assignedDbId);
+
             const initialData = {
                 name: userData.name || 'User',
                 companyName: userData.companyName || '',
                 email: user.email,
+                country: userCountry,
                 plan: 'standard',
                 role: 'admin',
                 tenantId: user.uid,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                // DB assignment — never changes after registration
+                _db: assignedDbId,
             };
-            
-            await setDoc(doc(db, 'users', user.uid), initialData);
+
+            // Write to assigned DB (eu or global)
+            await setDoc(doc(userDb, 'users', user.uid), initialData);
+            // Also write a routing pointer in global DB if user is EU
+            if (assignedDbId !== '(default)') {
+                await setDoc(doc(db, 'users', user.uid), { _db: assignedDbId, _routingOnly: true });
+            }
             await firebaseUpdateProfile(user, { displayName: userData.name });
             
             return { success: true };
@@ -404,9 +438,9 @@ export const AuthProvider = ({ children }) => {
         if (!user) return { success: false, error: 'No user' };
 
         try {
-            // Delete Firestore data
+            // Delete user doc first (while still authenticated — rules require auth.uid == userId)
+            // onUserDeleted Cloud Function handles cascade deletion of all other collections
             await deleteDoc(doc(db, 'users', user.uid));
-            // In a real app, you'd delete all tenant data too, but here we just delete the user record
             
             await deleteUser(user);
             return { success: true };
@@ -421,7 +455,7 @@ export const AuthProvider = ({ children }) => {
             currentUser, loading, login, register, logout, signInWithGoogle, signInWithMicrosoft, signInAsDemo,
             resetPassword, updateUser, changePassword, deleteAccount,
             isAuthenticated: !!currentUser,
-            isPro: ['premium', 'elite', 'lifetime'].includes(currentUser?.plan)
+            isPro: ['premium', 'elite'].includes(currentUser?.plan)
         }}>
             {children}
         </AuthContext.Provider>

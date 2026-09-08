@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useInvoice } from '../../context/InvoiceContext';
 import InvoicePaper from '../../components/InvoicePaper';
+import InvoiceLimitModal from '../../components/InvoiceLimitModal';
 import { Save, Printer, Plus, Trash2, Car, HardHat, Utensils, HeartPulse, Monitor, ShoppingCart, Wrench, BarChart3, BookOpen, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
@@ -19,6 +20,7 @@ const NewQuote = () => {
     const navigate = useNavigate();
     const invoiceRef = useRef();
     const [isSaving, setIsSaving] = useState(false);
+    const [showLimitModal, setShowLimitModal] = useState(false);
 
     const industryConfig = getIndustryFields(companyProfile.industry || 'general');
     const IndustryIcon = INDUSTRY_ICONS[industryConfig.icon] || Briefcase;
@@ -136,13 +138,18 @@ const NewQuote = () => {
             }
         } catch (error) {
             console.error("Error saving quote:", error);
-            showToast(t('saveFailed') + " " + error.message, 'error');
+            if (error?.code === 'functions/resource-exhausted') {
+                setShowLimitModal(true);
+            } else {
+                showToast(t('saveFailed') + " " + error.message, 'error');
+            }
             setIsSaving(false);
         }
     };
 
     return (
         <div className="page-container">
+            <InvoiceLimitModal isOpen={showLimitModal} onClose={() => setShowLimitModal(false)} usedCount={5} limitCount={5} />
             <header className="page-header">
                 <h1>{t('newQuote')}</h1>
                 <div className="actions">

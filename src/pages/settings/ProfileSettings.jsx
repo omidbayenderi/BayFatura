@@ -382,6 +382,23 @@ const ProfileSettings = () => {
                     </button>
                 </div>
 
+                {/* Privacy / Cookie Settings */}
+                <div className="settings-card card">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0, fontSize: '1rem' }}>Datenschutz & Cookies</h3>
+                    </div>
+                    <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: '1.5' }}>
+                        Cookie-Einstellungen jederzeit anpassen oder Einwilligung widerrufen (GDPR Art. 7(3)).
+                    </p>
+                    <button
+                        className="secondary-btn"
+                        onClick={() => window.dispatchEvent(new Event('bayfatura:open-cookie-settings'))}
+                        style={{ fontSize: '0.875rem' }}
+                    >
+                        Cookie-Einstellungen verwalten
+                    </button>
+                </div>
+
                 {/* Account Deletion (Danger Zone) */}
                 <div className="settings-card card" style={{ border: '1px solid #fca5a5', background: '#fef2f2' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.5rem', color: '#ef4444' }}>

@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import {
     initializeFirestore,
+    getFirestore,
     persistentLocalCache,
     persistentSingleTabManager,
 } from 'firebase/firestore';
@@ -82,7 +83,30 @@ export const auth = (() => {
     });
 })();
 
-// Firestore - offline persistence aktif (mobil için kritik)
+// ── Multi-region Firestore ────────────────────────────────────────────────────
+// EU users (GDPR) → bayfatura-eu DB (eur3 Frankfurt)
+// All others       → (default) DB  (nam5 US/global)
+//
+// The user's DB assignment is determined at registration (users/{uid}._db)
+// and never changes. getDb() reads from localStorage for fast access.
+
+export const EU_COUNTRIES = new Set([
+    'DE','AT','CH','FR','ES','PT','NL','BE','IT','SE','NO','DK','FI',
+    'PL','CZ','SK','HU','RO','BG','HR','SI','EE','LV','LT','LU',
+    'IE','GR','CY','MT','IS','LI',
+]);
+
+export const DB_REGIONS = {
+    global: '(default)',   // nam5 — US / global
+    eu:     'bayfatura-eu', // eur3 — Frankfurt
+};
+
+export const getDbIdForCountry = (country) =>
+    EU_COUNTRIES.has((country || '').toUpperCase())
+        ? DB_REGIONS.eu
+        : DB_REGIONS.global;
+
+// Default DB (global) — used before user country is known
 export const db = initializeFirestore(app, {
     // Some corporate and mobile networks reset Firestore's streaming channel
     // (ERR_QUIC_PROTOCOL_ERROR).  Long polling is slower in ideal conditions,
@@ -94,14 +118,59 @@ export const db = initializeFirestore(app, {
     })
 });
 
+// EU DB — lazily initialized on first EU user access
+let _euDb = null;
+export const getEuDb = () => {
+    if (!_euDb) {
+        _euDb = getFirestore(app, DB_REGIONS.eu);
+    }
+    return _euDb;
+};
+
+/**
+ * Returns the correct Firestore instance for a given user.
+ * @param {string|null} dbId — value of users/{uid}._db ('bayfatura-eu' or null)
+ */
+export const getDb = (dbId) =>
+    dbId === DB_REGIONS.eu ? getEuDb() : db;
+
 export const storage = getStorage(app);
-// Production callable functions are deployed in europe-west3. Keeping the
-// client region explicit prevents the SDK from silently calling us-central1.
 export const functions = getFunctions(app, 'europe-west3');
 
-// Analytics - only in production and when measurementId exists
+const getStoredCookieConsent = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+        return JSON.parse(localStorage.getItem('bayfatura_cookie_consent') || 'null');
+    } catch {
+        return null;
+    }
+};
+
+const hasAnalyticsConsent = () => getStoredCookieConsent()?.analytics === true;
+
+// Analytics - only in production, when measurementId exists, and after consent.
 export let analytics = null;
-if (typeof window !== 'undefined' && firebaseConfig.measurementId && import.meta.env.PROD) {
+export const enableAnalytics = async () => {
+    if (analytics || typeof window === 'undefined' || !firebaseConfig.measurementId || !import.meta.env.PROD) {
+        return analytics;
+    }
+
+    try {
+        const { getAnalytics, isSupported } = await import('firebase/analytics');
+        if (!(await isSupported())) {
+            logger.info('Firebase', 'Analytics desteklenmeyen ortamda atlandı');
+            return null;
+        }
+
+        analytics = getAnalytics(app);
+        return analytics;
+    } catch (err) {
+        logger.warn('Firebase', 'Analytics yüklenemedi', err);
+        return null;
+    }
+};
+
+if (typeof window !== 'undefined' && hasAnalyticsConsent()) {
     import('firebase/analytics').then(async ({ getAnalytics, isSupported }) => {
         if (!(await isSupported())) {
             logger.info('Firebase', 'Analytics desteklenmeyen ortamda atlandı');
@@ -113,6 +182,7 @@ if (typeof window !== 'undefined' && firebaseConfig.measurementId && import.meta
         logger.warn('Firebase', 'Analytics yüklenemedi', err);
     });
 }
+
 
 // Providers
 export const googleProvider = new GoogleAuthProvider();

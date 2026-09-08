@@ -11,10 +11,6 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.email == 'omidbayenderi@gmail.com';
     }
 
-    function isOwner(uid) {
-      return isAuthenticated() && request.auth.uid == uid;
-    }
-
     function userEditableKeys() {
       return [
         'name',
@@ -106,7 +102,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         isSuperAdmin() || (request.auth.uid == userId && isSafeUserUpdate())
       );
-      allow delete: if isAuthenticated() && isSuperAdmin();
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
     }
 
     // =============================

@@ -127,6 +127,7 @@ const Quotes = () => {
                 </header>
 
                 <div className="card">
+                    <div className="table-scroll">
                     <table className="modern-table">
                         <thead>
                             <tr>
@@ -236,6 +237,7 @@ const Quotes = () => {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 
