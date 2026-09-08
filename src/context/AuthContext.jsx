@@ -19,7 +19,7 @@ import {
     reauthenticateWithCredential,
     deleteUser
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { isNativePlatform } from '../lib/platform';
 import { nativeSignInWithGoogle, isNativeAuthAvailable, NativeAuthError } from '../lib/nativeAuth';
 import { setUserId as setCrashlyticsUserId } from '../lib/nativeCrashlytics';
